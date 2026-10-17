@@ -237,31 +237,90 @@ class _FunctionProbeEmitter:
             )
 
     def _emit_call_probe(self, expr: Call) -> None:
-        if expr.call_kind != "function" or not isinstance(expr.target, object):
-            return
-        target = expr.target
-        if not hasattr(target, "param_types") or not hasattr(target, "decl"):
-            return
-        ordered: list[T.Type] = []
-        for source_index in expr.arg_order:
-            if source_index < 0 or source_index >= len(expr.args):
+        if expr.call_kind == "function" and isinstance(expr.target, object):
+            target = expr.target
+            if not hasattr(target, "param_types") or not hasattr(target, "decl"):
                 return
-            ordered.append(expr.args[source_index].ty or T.ErrorType)
-        argument_list = "[" + ", ".join(_type_expr(ty) for ty in ordered) + "]"
-        call_result = f"check_call(__shadow_functions, {_quote(target.name)}, {argument_list})"
-        arg_mismatch = False
-        for diagnostic in self.diagnostics:
-            if diagnostic.code != "PE3003" or not diagnostic.message.startswith("argument '"):
-                continue
-            if f"of '{target.name}'" not in diagnostic.message:
-                continue
-            if any(diagnostic.span.start == arg.span.start for arg in expr.args):
-                arg_mismatch = True
-                break
-        if arg_mismatch:
-            self._assert(f"is_error({call_result})")
-        else:
-            self._assert(f"type_equal({call_result}, {_type_expr(expr.ty)})")
+            ordered: list[T.Type] = []
+            for source_index in expr.arg_order:
+                if source_index < 0 or source_index >= len(expr.args):
+                    return
+                ordered.append(expr.args[source_index].ty or T.ErrorType)
+            argument_list = "[" + ", ".join(_type_expr(ty) for ty in ordered) + "]"
+            call_result = f"check_call(__shadow_functions, {_quote(target.name)}, {argument_list})"
+            arg_mismatch = False
+            for diagnostic in self.diagnostics:
+                if diagnostic.code != "PE3003" or not diagnostic.message.startswith("argument '"):
+                    continue
+                if f"of '{target.name}'" not in diagnostic.message:
+                    continue
+                if any(diagnostic.span.start == arg.span.start for arg in expr.args):
+                    arg_mismatch = True
+                    break
+            if arg_mismatch:
+                self._assert(f"is_error({call_result})")
+            else:
+                self._assert(f"type_equal({call_result}, {_type_expr(expr.ty)})")
+            return
+        if expr.call_kind == "struct" and isinstance(expr.target, object):
+            target = expr.target
+            if not hasattr(target, "field_types") or not hasattr(target, "name"):
+                return
+            ordered: list[T.Type] = []
+            for source_index in expr.arg_order:
+                if source_index < 0 or source_index >= len(expr.args):
+                    return
+                ordered.append(expr.args[source_index].ty or T.ErrorType)
+            argument_list = "[" + ", ".join(_type_expr(ty) for ty in ordered) + "]"
+            call_result = f"check_struct_init(__shadow_structs, {_quote(target.name)}, {argument_list})"
+            field_mismatch = any(
+                diagnostic.code == "PE3003"
+                and diagnostic.message.startswith("field '")
+                and f"of '{target.name}'" in diagnostic.message
+                and any(diagnostic.span.start == arg.span.start for arg in expr.args)
+                for diagnostic in self.diagnostics
+            )
+            if field_mismatch:
+                self._assert(f"is_error({call_result})")
+            else:
+                self._assert(f"type_equal({call_result}, {_type_expr(expr.ty)})")
+            return
+        if expr.call_kind == "method" and isinstance(expr.callee, Field):
+            base_ty = expr.callee.base.ty
+            if base_ty is None:
+                return
+            arg_list = "[" + ", ".join(_type_expr(arg.ty) for arg in expr.args) + "]"
+            method_result = (
+                f"resolve_method({_type_expr(base_ty)}, {_quote(expr.callee.name)}, {arg_list})"
+            )
+            arg_mismatch = any(
+                diagnostic.code == "PE3003"
+                and (
+                    f"of method '{expr.callee.name}'" in diagnostic.message
+                    or diagnostic.message.startswith("matmul ")
+                )
+                for diagnostic in self.diagnostics
+            )
+            if arg_mismatch:
+                self._assert(f"is_error({method_result})")
+            else:
+                self._assert(f"type_equal({method_result}, {_type_expr(expr.ty)})")
+
+    def _emit_field_probe(self, expr: Field) -> None:
+        self._emit_expr(expr.base)
+        base_ty = expr.base.ty
+        if base_ty is None or base_ty is T.ErrorType:
+            return
+        if isinstance(base_ty, T.StructType):
+            self._assert(
+                f"type_equal(resolve_struct_field(__shadow_structs, {_type_expr(base_ty)}, "
+                f"{_quote(expr.name)}), {_type_expr(expr.ty)})"
+            )
+        elif expr.field_kind == "property":
+            self._assert(
+                f"type_equal(resolve_property({_type_expr(base_ty)}, {_quote(expr.name)}), "
+                f"{_type_expr(expr.ty)})"
+            )
 
     def _emit_expr(self, expr: Expr | None) -> None:
         if expr is None:
@@ -318,12 +377,13 @@ class _FunctionProbeEmitter:
             )
             return
         if isinstance(expr, Field):
-            # Field resolution is a separate next increment. Still exercise any
-            # local/name and call probes in the receiver expression.
-            self._emit_expr(expr.base)
+            self._emit_field_probe(expr)
             return
         if isinstance(expr, Call):
-            self._emit_expr(expr.callee)
+            if isinstance(expr.callee, Field) and expr.call_kind == "method":
+                self._emit_expr(expr.callee.base)
+            else:
+                self._emit_expr(expr.callee)
             for child in expr.args:
                 self._emit_expr(child)
             self._emit_call_probe(expr)
@@ -559,6 +619,7 @@ def shadow_check(module, typed) -> dict[str, int]:
     main_lines: list[str] = [
         "    let __shadow_builtin_cases = run_builtin_checks();",
         "    let mut __shadow_functions: List<FunctionSignature> = [];",
+        "    let mut __shadow_structs: List<StructSignature> = [];",
     ]
     for signature in typed.functions.values():
         param_names = "[" + ", ".join(_quote(param.name) for param in signature.decl.params) + "]"
@@ -566,6 +627,13 @@ def shadow_check(module, typed) -> dict[str, int]:
         main_lines.append(
             "    __shadow_functions.push(FunctionSignature("
             f"{_quote(signature.name)}, {param_names}, {param_types}, {_type_expr(signature.return_type)}));"
+        )
+    for struct in typed.structs.values():
+        field_names = "[" + ", ".join(_quote(name) for name in struct.field_names) + "]"
+        field_types = "[" + ", ".join(_type_expr(ty) for ty in struct.field_types) + "]"
+        main_lines.append(
+            "    __shadow_structs.push(StructSignature("
+            f"{_quote(struct.name)}, {field_names}, {field_types}));"
         )
 
     semantic_cases = 0
@@ -621,5 +689,5 @@ def shadow_check(module, typed) -> dict[str, int]:
     return {
         "type_cases": type_cases,
         "semantic_cases": semantic_cases,
-        "builtin_cases": 55,
+        "builtin_cases": 74,
     }

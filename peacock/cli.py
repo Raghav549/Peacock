@@ -525,6 +525,229 @@ def cmd_ast(argv: list[str]) -> int:
     return EXIT_OK
 
 
+def _format_pac_source(source: str) -> str:
+    """Normalise line endings, trailing whitespace, 4-space block indentation and blank lines."""
+    out_lines: list[str] = []
+    indent = 0
+    blank_run = 0
+    for raw_line in source.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+        stripped = raw_line.strip()
+        if not stripped:
+            blank_run += 1
+            if blank_run <= 1 and out_lines:
+                out_lines.append("")
+            continue
+        blank_run = 0
+        leading_closes = 0
+        while leading_closes < len(stripped) and stripped[leading_closes] == "}":
+            leading_closes += 1
+        effective_indent = max(0, indent - (1 if leading_closes > 0 else 0))
+        out_lines.append(("    " * effective_indent) + stripped)
+        # Count brace balance outside string literals and line comments
+        in_str = False
+        esc = False
+        delta = 0
+        i = 0
+        while i < len(stripped):
+            ch = stripped[i]
+            if in_str:
+                if esc:
+                    esc = False
+                elif ch == "\\":
+                    esc = True
+                elif ch == '"':
+                    in_str = False
+            else:
+                if ch == "/" and i + 1 < len(stripped) and stripped[i + 1] == "/":
+                    break
+                if ch == '"':
+                    in_str = True
+                elif ch == "{":
+                    delta += 1
+                elif ch == "}":
+                    delta -= 1
+            i += 1
+        indent = max(0, indent + delta)
+    while out_lines and out_lines[-1] == "":
+        out_lines.pop()
+    return "\n".join(out_lines) + "\n"
+
+
+def cmd_fmt(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="peacock fmt")
+    parser.add_argument("file", type=Path)
+    parser.add_argument("--check", action="store_true", help="exit 1 if formatting would change the file")
+    args = parser.parse_args(argv)
+    source = _read_source(args.file)
+    tokens, lex_diag = lex(source, str(args.file))
+    if lex_diag.has_errors:
+        print(lex_diag.render_all(source), file=sys.stderr)
+        return EXIT_DIAGNOSTICS
+    _module, parse_diag = parse(tokens, source, str(args.file))
+    if parse_diag.has_errors:
+        print(parse_diag.render_all(source), file=sys.stderr)
+        return EXIT_DIAGNOSTICS
+    formatted = _format_pac_source(source)
+    if args.check:
+        if formatted != source:
+            print(f"{args.file}: would reformat", file=sys.stderr)
+            return EXIT_DIAGNOSTICS
+        print(f"OK {args.file} (already formatted)")
+        return EXIT_OK
+    if formatted != source:
+        args.file.write_text(formatted, encoding="utf-8")
+        print(f"formatted {args.file}")
+    else:
+        print(f"unchanged {args.file}")
+    return EXIT_OK
+
+
+def cmd_lint(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="peacock lint")
+    parser.add_argument("file", type=Path)
+    parser.add_argument("--json", action="store_true")
+    args = parser.parse_args(argv)
+    result, source = _compile(args.file, optimize=True)
+    findings = [
+        {
+            "code": d.code,
+            "severity": d.severity.value,
+            "message": d.message,
+            "line": d.span.line,
+            "column": d.span.column,
+        }
+        for d in result.diagnostics
+    ]
+    if result.image is not None:
+        for fn_name, fn in sorted(result.image.get("functions", {}).items()):
+            declared = set(fn.get("caps", []))
+            used_caps: set[str] = set()
+            for instr in fn.get("code", []):
+                op = instr[0]
+                if op == "CALL_NATIVE":
+                    cap = native_capability(instr[1])
+                    if cap:
+                        used_caps.add(cap)
+                elif op == "CALL_METHOD":
+                    cap = method_capability(instr[1])
+                    if cap:
+                        used_caps.add(cap)
+                elif op in ("MODEL_INIT", "TRAIN_CALL"):
+                    used_caps.add("compute")
+            for unused_cap in sorted(declared - used_caps):
+                findings.append(
+                    {
+                        "code": "PE3105",
+                        "severity": "warning",
+                        "message": f"function '{fn_name}' declares capability '{unused_cap}' but never uses it",
+                        "line": 1,
+                        "column": 1,
+                    }
+                )
+    if args.json:
+        print(json.dumps({"ok": result.ok and not findings, "findings": findings}, indent=2))
+    else:
+        for f in findings:
+            print(f"{f['code']} [{f['severity']}] line {f['line']}:{f['column']} — {f['message']}")
+        if not findings:
+            print(f"OK {args.file} (0 lint findings)")
+    return EXIT_OK if result.ok else EXIT_DIAGNOSTICS
+
+
+def cmd_doc(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="peacock doc")
+    parser.add_argument("file", nargs="?", type=Path, default=None)
+    parser.add_argument("--stdlib", action="store_true", help="generate standard-library API documentation")
+    parser.add_argument("--json", action="store_true")
+    args = parser.parse_args(argv)
+    if args.stdlib or args.file is None:
+        entries = []
+        for name in sorted(B.NATIVES):
+            sigs = [
+                "("
+                + ", ".join(
+                    f"{p.name}: {p.ty.display()}" + (" = ..." if p.optional else "")
+                    for p in s.params
+                )
+                + f") -> {s.returns.display()}"
+                + (f" [capability: {s.capability}]" if s.capability else "")
+                for s in B.NATIVES[name]
+            ]
+            entries.append({"name": name, "signatures": sigs, "doc": B.NATIVE_DOCS.get(name, "")})
+        if args.json:
+            print(json.dumps({"stdlib": entries}, indent=2))
+        else:
+            print("# PEACOCK Standard Library Reference\n")
+            for item in entries:
+                for sig in item["signatures"]:
+                    print(f"- `{item['name']}{sig}` — {item['doc']}")
+        return EXIT_OK
+
+    result, source = _compile(args.file, optimize=False)
+    if not result.ok or result.image is None:
+        _print_diagnostics(result, source)
+        return EXIT_DIAGNOSTICS
+    img = result.image
+    doc_payload = {
+        "module": img.get("module") or args.file.stem,
+        "uses": img.get("uses", []),
+        "structs": img.get("structs", {}),
+        "functions": {
+            k: {
+                "params": v.get("params", []),
+                "return_type": v.get("return_type", "Unit"),
+                "capabilities": v.get("caps", []),
+            }
+            for k, v in img.get("functions", {}).items()
+        },
+        "models": img.get("models", {}),
+    }
+    if args.json:
+        print(json.dumps(doc_payload, indent=2))
+    else:
+        print(f"# Module `{doc_payload['module']}`\n")
+        for fn_name, meta in sorted(doc_payload["functions"].items()):
+            params = ", ".join(meta["params"])
+            caps = f" [capabilities: {', '.join(meta['capabilities'])}]" if meta["capabilities"] else ""
+            print(f"- `fn {fn_name}({params}) -> {meta['return_type']}`{caps}")
+    return EXIT_OK
+
+
+def cmd_init(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="peacock init")
+    parser.add_argument("directory", type=Path)
+    args = parser.parse_args(argv)
+    target = args.directory
+    target.mkdir(parents=True, exist_ok=True)
+    mod_name = "".join(ch if ch.isalnum() or ch == "_" else "_" for ch in target.name.lower()) or "app"
+    if mod_name[0].isdigit():
+        mod_name = "app_" + mod_name
+    main_pac = target / "main.pac"
+    manifest = target / "peacock.json"
+    if not main_pac.exists():
+        main_pac.write_text(
+            f'module {mod_name}\n\nfn main() -> Unit {{\n    print("Hello from {mod_name}");\n}}\n',
+            encoding="utf-8",
+        )
+    if not manifest.exists():
+        manifest.write_text(
+            json.dumps(
+                {
+                    "name": mod_name,
+                    "version": "0.1.0",
+                    "language_version": LANGUAGE_VERSION,
+                    "entry": "main.pac",
+                    "capabilities": [],
+                },
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+    print(f"initialized PEACOCK project in {target}")
+    return EXIT_OK
+
+
 COMMANDS = {
     "version": cmd_version,
     "check": cmd_check,
@@ -537,6 +760,10 @@ COMMANDS = {
     "test": cmd_test,
     "tokens": cmd_tokens,
     "ast": cmd_ast,
+    "fmt": cmd_fmt,
+    "lint": cmd_lint,
+    "doc": cmd_doc,
+    "init": cmd_init,
 }
 
 USAGE = """PEACOCK AI bootstrap toolchain
@@ -551,6 +778,10 @@ commands:
   audit <file.pac>          static capability audit
   tokens <file.pac>         dump the token stream (debugging)
   ast <file.pac>            dump the syntax tree (debugging)
+  fmt <file.pac>            format a .pac source file (--check)
+  lint <file.pac>           static diagnostics and capability lint (--json)
+  doc [file.pac]            generate module or --stdlib documentation
+  init <dir>                scaffold a new PEACOCK project
   bench                     run the reproducible benchmark suite
   fuzz                      run deterministic fuzzers
   test                      run the unit/integration test suite

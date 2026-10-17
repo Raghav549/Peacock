@@ -315,6 +315,42 @@ class SelfHostParityTests(unittest.TestCase):
                 actual.append("str:<value>" if label.startswith("str:") else label)
             self.assertEqual(actual, expected)
 
+    def test_fmt_lint_doc_and_init_commands(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp) / "demo_app"
+            init_res = run_cli("init", str(project_dir))
+            self.assertEqual(init_res.returncode, 0, init_res.stderr)
+            main_pac = project_dir / "main.pac"
+            self.assertTrue(main_pac.is_file())
+            self.assertTrue((project_dir / "peacock.json").is_file())
+
+            # Test fmt --check and fmt
+            unformatted = project_dir / "messy.pac"
+            unformatted.write_text("module messy\nfn main() -> Unit {\ncapability fs;\nprint(\"hi\");   \n}\n\n\n", encoding="utf-8")
+            fmt_check = run_cli("fmt", str(unformatted), "--check")
+            self.assertEqual(fmt_check.returncode, 1)
+            fmt_fix = run_cli("fmt", str(unformatted))
+            self.assertEqual(fmt_fix.returncode, 0, fmt_fix.stderr)
+            fmt_recheck = run_cli("fmt", str(unformatted), "--check")
+            self.assertEqual(fmt_recheck.returncode, 0, fmt_recheck.stderr)
+
+            # Test lint --json detects unused capability PE3105
+            lint_res = run_cli("lint", str(unformatted), "--json")
+            self.assertEqual(lint_res.returncode, 0, lint_res.stderr)
+            lint_payload = json.loads(lint_res.stdout)
+            self.assertFalse(lint_payload["ok"])
+            self.assertTrue(any(f["code"] == "PE3105" for f in lint_payload["findings"]))
+
+            # Test doc and doc --stdlib --json
+            doc_mod = run_cli("doc", str(main_pac), "--json")
+            self.assertEqual(doc_mod.returncode, 0, doc_mod.stderr)
+            self.assertEqual(json.loads(doc_mod.stdout)["module"], "demo_app")
+            doc_stdlib = run_cli("doc", "--stdlib", "--json")
+            self.assertEqual(doc_stdlib.returncode, 0, doc_stdlib.stderr)
+            stdlib_entries = json.loads(doc_stdlib.stdout)["stdlib"]
+            self.assertTrue(any(e["name"] == "colour.iridescence" for e in stdlib_entries))
+            self.assertTrue(any(e["name"] == "nn.gelu" for e in stdlib_entries))
+
 
 if __name__ == "__main__":
     unittest.main()

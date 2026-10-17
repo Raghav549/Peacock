@@ -1,5 +1,5 @@
-# Test and lint the Python versions supported by pyproject.toml.
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-testing/building-and-testing-python
+# Complete CI pipeline for PEACOCK AI (Python 3.11+ bootstrap, .pac compiler,
+# differential self-hosting checks, AI/frontend suites, website export, and release artifact validation).
 
 name: Python package
 
@@ -11,31 +11,49 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        # pyproject.toml declares Python >=3.11; older versions are unsupported.
         python-version: ["3.11"]
 
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Install dependencies
+    - name: Install dependencies and verify package build
       run: |
         python -m pip install --upgrade pip
         python -m pip install flake8 pytest
-        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-    - name: Lint with flake8
+        python -m pip install -e .
+    - name: Lint Python bootstrap with flake8
       run: |
-        # stop the build if there are Python syntax errors or undefined names
         flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-    - name: Test with pytest
+    - name: Run compiler, AI, frontend, security, documentation and differential suites
       run: |
-        pytest
+        ./bin/peacock version
+        ./bin/peacock test
+    - name: Verify self-hosting kernels and differential semantic shadow
+      run: |
+        ./bin/peacock check selfhost/type_model.pac --semantic-shadow
+        ./bin/peacock run selfhost/type_model.pac
+        ./bin/peacock check selfhost/ir_model.pac --semantic-shadow
+        ./bin/peacock run selfhost/ir_model.pac
+    - name: Build and verify PEACOCK website from .pac source
+      run: |
+        ./bin/peacock check website/site.pac --semantic-shadow
+        ./bin/peacock run website/site.pac --grant fs --root . --max-steps 20000000 -- website/dist
+        ./bin/peacock build website/site.pac -o /tmp/peacock-website.pkb
+    - name: Run deterministic fuzz smoke gates
+      run: |
+        ./bin/peacock fuzz --iterations 250 --seed 1
+    - name: Upload verified website and bytecode release artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: peacock-release-artifacts
+        path: |
+          website/dist/
+          /tmp/peacock-website.pkb

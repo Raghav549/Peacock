@@ -128,6 +128,28 @@ NATIVES: dict[str, tuple[NativeSignature, ...]] = {
     "colour.luminance": (NativeSignature((_p("color", COLOR),), F),),
     "colour.contrast": (NativeSignature((_p("a", COLOR), _p("b", COLOR)), F),),
     "colour.palette": (NativeSignature((_p("count", I), _p("seed", I)), T.ListType(COLOR)),),
+    "colour.iridescence": (
+        NativeSignature(
+            (
+                _p("cos_theta", F),
+                _p("thickness_nm", F),
+                _p("film_ior", F, 1.65),
+                _p("base_ior", F, 1.33),
+                _p("alpha", F, 1.0),
+            ),
+            COLOR,
+        ),
+    ),
+    "colour.wcag_aa": (
+        NativeSignature(
+            (_p("foreground", COLOR), _p("background", COLOR), _p("large_text", B, False)), B
+        ),
+    ),
+    "colour.wcag_aaa": (
+        NativeSignature(
+            (_p("foreground", COLOR), _p("background", COLOR), _p("large_text", B, False)), B
+        ),
+    ),
     # -- graphics --------------------------------------------------------
     "graphics.canvas": (NativeSignature((_p("width", I), _p("height", I)), CANVAS),),
     "graphics.clear": (NativeSignature((_p("canvas", CANVAS), _p("color", COLOR)), U),),
@@ -179,6 +201,33 @@ NATIVES: dict[str, tuple[NativeSignature, ...]] = {
     "graphics.aurora": (
         NativeSignature((_p("canvas", CANVAS), _p("time", F), _p("seed", I)), U),
     ),
+    "graphics.lit_sphere": (
+        NativeSignature(
+            (
+                _p("canvas", CANVAS),
+                _p("cx", F),
+                _p("cy", F),
+                _p("radius", F),
+                _p("albedo", COLOR),
+                _p("roughness", F, 0.25),
+                _p("metallic", F, 0.6),
+                _p("iridescence_nm", F, 280.0),
+            ),
+            U,
+        ),
+    ),
+    "graphics.feather_eye": (
+        NativeSignature(
+            (
+                _p("canvas", CANVAS),
+                _p("cx", F),
+                _p("cy", F),
+                _p("radius", F),
+                _p("phase", F, 0.0),
+            ),
+            U,
+        ),
+    ),
     "graphics.save": (
         NativeSignature((_p("canvas", CANVAS), _p("path", S)), U, capability="fs"),
     ),
@@ -196,9 +245,30 @@ NATIVES: dict[str, tuple[NativeSignature, ...]] = {
     "fs.create_dir": (
         NativeSignature((_p("path", S),), U, capability="fs"),
     ),
+    "fs.exists": (
+        NativeSignature((_p("path", S),), B, capability="fs"),
+    ),
+    "fs.list_dir": (
+        NativeSignature((_p("path", S),), T.ListType(S), capability="fs"),
+    ),
     # -- neural networks -------------------------------------------------
     "nn.parameter": (
         NativeSignature((_p("data", ANY),), T.TensorType("Float32", None), capability="compute"),
+    ),
+    "nn.gelu": (
+        NativeSignature((_p("x", T.TensorType("Float32", None)),), T.TensorType("Float32", None)),
+    ),
+    "nn.layer_norm": (
+        NativeSignature(
+            (_p("x", T.TensorType("Float32", None)), _p("eps", F, 1e-5)),
+            T.TensorType("Float32", None),
+        ),
+    ),
+    "nn.cosine_similarity": (
+        NativeSignature(
+            (_p("a", T.TensorType("Float32", None)), _p("b", T.TensorType("Float32", None))),
+            F,
+        ),
     ),
     "nn.mse": (
         NativeSignature(
@@ -265,6 +335,10 @@ NATIVES: dict[str, tuple[NativeSignature, ...]] = {
     "text.ord": (NativeSignature((_p("value", S),), I),),
     "text.chr": (NativeSignature((_p("code", I),), S),),
     "text.split_lines": (NativeSignature((_p("value", S),), T.ListType(S)),),
+    "text.sha256": (NativeSignature((_p("value", S),), S),),
+    "text.fnv1a64": (NativeSignature((_p("value", S),), I),),
+    "text.json_escape": (NativeSignature((_p("value", S),), S),),
+    "text.json_valid": (NativeSignature((_p("value", S),), B),),
     # -- motion ----------------------------------------------------------
     "motion.spring_steps": (
         NativeSignature(
@@ -316,10 +390,15 @@ NATIVE_DOCS: dict[str, str] = {
     "colour.contrast": "WCAG contrast ratio between two colours (1 to 21).",
     "colour.palette": "Deterministic palette of count perceptually spaced colours.",
     "colour.to_css": "CSS string for a colour (sRGB or hex fallback).",
+    "colour.iridescence": "Two-interface thin-film optical interference colour at RGB wavelengths.",
+    "colour.wcag_aa": "True if two colours meet the WCAG 2.1 AA contrast threshold.",
+    "colour.wcag_aaa": "True if two colours meet the WCAG 2.1 AAA contrast threshold.",
     # filesystem
     "fs.read_text": "Read a UTF-8 text file inside the sandbox. Requires the fs capability.",
     "fs.write_text": "Write a UTF-8 text file inside the sandbox. Requires the fs capability.",
     "fs.create_dir": "Create a directory (and missing parents) inside the filesystem sandbox. Requires the fs capability.",
+    "fs.exists": "True if a path exists inside the filesystem sandbox. Requires the fs capability.",
+    "fs.list_dir": "Sorted entry names in a sandboxed directory. Requires the fs capability.",
     # graphics
     "graphics.canvas": "Create an RGBA canvas of the given integer dimensions.",
     "graphics.clear": "Replace every pixel with a colour.",
@@ -329,6 +408,8 @@ NATIVE_DOCS: dict[str, str] = {
     "graphics.line": "Draw an anti-aliased line segment with a width.",
     "graphics.gradient": "Fill a canvas with a multi-stop perceptual gradient at an angle.",
     "graphics.glow": "Add a soft radial light glow to a canvas.",
+    "graphics.lit_sphere": "Render an analytic 3D sphere with GGX/Schlick shading and optional thin-film iridescence.",
+    "graphics.feather_eye": "Render a deterministic peacock-feather ocellus using thin-film interference rings.",
     # math
     "math.pi": "The constant pi.",
     "math.e": "Euler's number.",
@@ -352,6 +433,9 @@ NATIVE_DOCS: dict[str, str] = {
     "motion.spring_steps": "Simulate a damped spring and return step samples.",
     # neural networks
     "nn.parameter": "Create a Float32 tensor that tracks gradients. Requires compute.",
+    "nn.gelu": "Gaussian Error Linear Unit activation with reverse-mode autodiff.",
+    "nn.layer_norm": "Layer normalisation along the last axis with reverse-mode autodiff.",
+    "nn.cosine_similarity": "Cosine similarity between two identically shaped tensors.",
     "nn.mse": "Mean-squared error between two equally shaped tensors.",
     "nn.cross_entropy": "Mean cross-entropy between logits and one-hot labels.",
     "nn.max_abs_diff": "Maximum absolute elementwise difference between two tensors.",
@@ -370,6 +454,10 @@ NATIVE_DOCS: dict[str, str] = {
     "text.is_alnum": "True if a one-character String is an ASCII letter or digit.",
     "text.is_space": "True if a one-character String is ASCII whitespace.",
     "text.split_lines": "Split a String on line boundaries, discarding the separators.",
+    "text.sha256": "Lowercase hexadecimal SHA-256 digest of a UTF-8 String.",
+    "text.fnv1a64": "Deterministic 64-bit signed FNV-1a hash of a UTF-8 String.",
+    "text.json_escape": "Quote and escape a String as an RFC 8259 JSON string literal.",
+    "text.json_valid": "True if a String is valid RFC 8259 JSON.",
 }
 
 #: Namespaces that can be imported with ``use``. Derived from NATIVES.
@@ -439,6 +527,8 @@ METHODS: dict[tuple[str, str], tuple[tuple[T.Type | str, ...], T.Type | str | No
     ("Tensor", "sqrt"): ((), TENSOR_PLACEHOLDER, None),
     ("Tensor", "abs"): ((), TENSOR_PLACEHOLDER, None),
     ("Tensor", "relu"): ((), TENSOR_PLACEHOLDER, None),
+    ("Tensor", "gelu"): ((), TENSOR_PLACEHOLDER, None),
+    ("Tensor", "layer_norm"): ((), TENSOR_PLACEHOLDER, None),
     ("Tensor", "tanh"): ((), TENSOR_PLACEHOLDER, None),
     ("Tensor", "sigmoid"): ((), TENSOR_PLACEHOLDER, None),
     ("Tensor", "softmax"): ((), TENSOR_PLACEHOLDER, None),

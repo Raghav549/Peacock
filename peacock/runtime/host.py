@@ -152,3 +152,21 @@ class HostPolicy:
                 raise OSError("the path exists but is not a directory")
         except OSError as exc:
             raise HostError(f"cannot create directory '{path}': {exc}", "PE5002") from exc
+
+    def path_exists(self, path: str) -> bool:
+        """Return True if a path inside the sandbox root exists."""
+        self.require("fs")
+        resolved = self.resolve_path(path)
+        return resolved.exists()
+
+    def list_directory(self, path: str) -> list[str]:
+        """Return sorted entry names in a directory inside the sandbox root."""
+        self.require("fs")
+        resolved = self.resolve_path(path)
+        if not resolved.exists() or not resolved.is_dir():
+            raise HostError(f"cannot list directory '{path}': not an existing directory", "PE5002")
+        try:
+            return sorted(entry.name for entry in resolved.iterdir())
+        except OSError as exc:
+            raise HostError(f"cannot list directory '{path}': {exc}", "PE5002") from exc
+

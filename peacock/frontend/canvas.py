@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import math
 
-from .colour import Color, ColorError, palette, sample_gradient
+from .colour import Color, ColorError, palette, sample_gradient, thin_film_iridescence
 
 MAX_DIMENSION = 4096
 MAX_PIXELS = 1_048_576
@@ -340,6 +340,107 @@ class Canvas:
                     coverage=min(1.0, strength),
                     additive=True,
                 )
+        self.draw_calls += 1
+
+    def lit_sphere(
+        self,
+        cx: float,
+        cy: float,
+        radius: float,
+        albedo: Color,
+        roughness: float = 0.25,
+        metallic: float = 0.6,
+        iridescence_nm: float = 280.0,
+    ) -> None:
+        """Render an analytic 3-D sphere with GGX/Schlick metallic-roughness + thin-film iridescence.
+
+        This is a deterministic analytic surface-normal shader on the 2-D software
+        framebuffer, not a general polygon-mesh 3-D scene graph.
+        """
+        if radius <= 0 or albedo.alpha == 0:
+            return
+        rough = max(0.05, min(1.0, float(roughness)))
+        metal = max(0.0, min(1.0, float(metallic)))
+        alpha_g = rough * rough
+        alpha2 = alpha_g * alpha_g
+        # Normalized key light direction (-0.45, -0.55, 0.703)
+        lx, ly, lz = -0.45, -0.55, 0.7035623639735145
+        # Half-vector with view (0, 0, 1)
+        hx, hy, hz = lx, ly, lz + 1.0
+        hlen = math.sqrt(hx * hx + hy * hy + hz * hz)
+        hx, hy, hz = hx / hlen, hy / hlen, hz / hlen
+
+        start_x = max(0, math.floor(cx - radius - 1))
+        end_x = min(self.width, math.ceil(cx + radius + 1))
+        start_y = max(0, math.floor(cy - radius - 1))
+        end_y = min(self.height, math.ceil(cy + radius + 1))
+
+        for py in range(start_y, end_y):
+            dy = (py + 0.5 - cy) / radius
+            for px in range(start_x, end_x):
+                dx = (px + 0.5 - cx) / radius
+                r2 = dx * dx + dy * dy
+                if r2 > 1.0:
+                    continue
+                nz = math.sqrt(max(0.0, 1.0 - r2))
+                nx, ny = dx, dy
+                ndotl = max(0.0, nx * lx + ny * ly + nz * lz)
+                ndoth = max(0.0, nx * hx + ny * hy + nz * hz)
+                ndotv = max(0.001, nz)
+
+                # Trowbridge-Reitz GGX normal distribution D
+                denom = ndoth * ndoth * (alpha2 - 1.0) + 1.0
+                d_ggx = alpha2 / (math.pi * denom * denom)
+                # Schlick Fresnel + optional thin-film iridescence
+                f0_r = 0.04 * (1.0 - metal) + albedo.r * metal
+                f0_g = 0.04 * (1.0 - metal) + albedo.g * metal
+                f0_b = 0.04 * (1.0 - metal) + albedo.b * metal
+                schlick = (1.0 - ndotv) ** 5
+                fr = f0_r + (1.0 - f0_r) * schlick
+                fg = f0_g + (1.0 - f0_g) * schlick
+                fb = f0_b + (1.0 - f0_b) * schlick
+
+                if iridescence_nm > 0.0:
+                    iri = thin_film_iridescence(ndotv, iridescence_nm)
+                    fr = 0.5 * fr + 0.5 * iri.r
+                    fg = 0.5 * fg + 0.5 * iri.g
+                    fb = 0.5 * fb + 0.5 * iri.b
+
+                kd = (1.0 - metal) * (1.0 - 0.35 * schlick)
+                spec_scale = min(4.0, d_ggx * 0.25 / max(0.15, ndotv))
+                ambient = 0.10 + 0.08 * (0.5 - 0.5 * ny)
+                cr = min(1.0, albedo.r * (ambient + kd * ndotl) + fr * spec_scale * ndotl)
+                cg = min(1.0, albedo.g * (ambient + kd * ndotl) + fg * spec_scale * ndotl)
+                cb = min(1.0, albedo.b * (ambient + kd * ndotl) + fb * spec_scale * ndotl)
+                edge_cov = _smoothstep(1.0, 0.96, math.sqrt(r2))
+                self._store((py * self.width + px) * 4, Color(cr, cg, cb, albedo.alpha), coverage=edge_cov)
+        self.draw_calls += 1
+
+    def feather_eye(self, cx: float, cy: float, radius: float, phase: float = 0.0) -> None:
+        """Render a deterministic peacock-feather ocellus using thin-film interference rings."""
+        if radius <= 0:
+            return
+        start_x = max(0, math.floor(cx - radius))
+        end_x = min(self.width, math.ceil(cx + radius))
+        start_y = max(0, math.floor(cy - radius))
+        end_y = min(self.height, math.ceil(cy + radius))
+        for py in range(start_y, end_y):
+            dy = (py + 0.5 - cy) / (radius * 0.88)
+            for px in range(start_x, end_x):
+                dx = (px + 0.5 - cx) / radius
+                dist = math.hypot(dx, dy)
+                if dist > 1.0:
+                    continue
+                cos_theta = math.sqrt(max(0.0, 1.0 - dist * dist))
+                thickness = 210.0 + 190.0 * dist + 25.0 * math.sin(phase + dist * 9.0)
+                iri = thin_film_iridescence(cos_theta, max(80.0, thickness))
+                # Deep velvet core for dist < 0.28, turquoise ring 0.28..0.62, emerald-gold outer
+                core_mask = _smoothstep(0.18, 0.34, dist)
+                outer_fade = _smoothstep(1.0, 0.78, dist)
+                r = iri.r * (0.18 + 0.82 * core_mask)
+                g = iri.g * (0.22 + 0.78 * core_mask)
+                b = iri.b * (0.45 + 0.55 * core_mask)
+                self._store((py * self.width + px) * 4, Color(r, g, b, 1.0), coverage=outer_fade)
         self.draw_calls += 1
 
     # -- diagnostics -------------------------------------------------------

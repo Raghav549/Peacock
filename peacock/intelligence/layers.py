@@ -10,6 +10,7 @@ from .tensor import (
     Tensor,
     TensorError,
     add,
+    gelu,
     matmul,
     relu,
     reshape,

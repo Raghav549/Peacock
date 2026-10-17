@@ -12,22 +12,24 @@ accepted.
 
 ```bash
 ./bin/peacock test
-# Ran 506 tests in 40.347s — OK (v0.1.0, 2026-10-17)
+# Ran 513 tests in 48.814s — OK (v0.1.0, 2026-10-17)
 ```
 
-This run is from the current uncommitted Arena working tree and includes the
-semantic-shadow, filesystem capability and PEACOCK-authored website regressions.
+This run is from the `arena/0e213b6a-peacock` branch and includes the expanded
+semantic-shadow kernel (74 assertions), Stage 4 IR verification kernel (15
+assertions), AI/chromatic/3D extensions, CLI tooling (`fmt`, `lint`, `doc`,
+`init`), and PEACOCK website + Vercel configuration checks.
 
 | Suite | Tests | Result |
 |---|---:|---|
 | `tests/compiler` | 223 | OK |
-| `tests/ai` | 81 | OK |
-| `tests/frontend` | 74 | OK |
+| `tests/ai` | 82 | OK |
+| `tests/frontend` | 76 | OK |
 | `tests/security` | 37 | OK |
-| `tests/integration` | 65 | OK |
+| `tests/integration` | 69 | OK |
 | `tests/unit` | 20 | OK |
 | `tests/benchmarks` | 6 | OK |
-| **Total** | **506** | **OK** |
+| **Total** | **513** | **OK** |
 
 ```bash
 ./bin/peacock fuzz --iterations 1000 --seed 1
@@ -54,15 +56,16 @@ All commands were run from the repository root on the reference machine.
 | `./bin/peacock run examples/aurora.pac --grant fs` | writes `examples/out/aurora.png` (960×540, 162,337 bytes, valid PNG) |
 | `./bin/peacock run selfhost/tokenizer.pac --grant fs -- examples/tour.pac` | prints `367`, equal to the bootstrap lexer's token count minus EOF |
 | `./bin/peacock run selfhost/parser.pac --grant fs --root . --max-steps 100000000 -- examples/xor.pac` | AST digest identical to the bootstrap on the 14-file corpus; parses its own 1,085-line source with identical digest |
-| `./bin/peacock run selfhost/type_model.pac` | 56 PEACOCK assertions pass, including ErrorType iterable recovery |
+| `./bin/peacock run selfhost/type_model.pac` | 74 PEACOCK assertions pass, including structs, fields, properties, methods and ErrorType iterable recovery |
+| `./bin/peacock run selfhost/ir_model.pac` | 15 PEACOCK assertions pass for PIR register def-before-use, slot bounds, labels, try/catch balance, constant folding and jump targets |
 | `./bin/peacock check examples/tour.pac --semantic-shadow --json` | Experimental VM-executed semantic probes pass; JSON includes type/semantic/builtin probe counts |
 | `./bin/peacock run examples/present.pac --grant ui --present out/preview` | prints `presented 4 frames`; manifest lists 4 × 320×180 frames; `latest.png` decodes to 230,400 RGBA bytes |
 | `./bin/peacock run examples/present.pac --grant ui` (no backend) | PE4006, exit 3; the host, not the program, decides where frames go |
 | `./bin/peacock run examples/present.pac --grant ui --serve 8099 --linger 2` | `/manifest.json` reports 4 frames and a 320×180 latest frame; `/frame.png` decodes; `/` serves script-free HTML; the port closes after exit |
 | `./bin/peacock build examples/hello.pac -o /tmp/hello.pkb` | 598-byte verified artifact with SHA-256 |
-| `./bin/peacock check website/site.pac` | PEACOCK source checks; 32 functions, 4,574 instructions |
-| `./bin/peacock run website/site.pac --grant fs --root . --max-steps 10000000 -- website/dist` | Generates 12 HTML routes, responsive CSS and the project SVG through the real CLI/compiler/VM; no JS bundle |
-| `python -m unittest tests.integration.test_website -v` | 4 website export/audit tests pass |
+| `./bin/peacock check website/site.pac --semantic-shadow` | PEACOCK source and shadow checks pass; 34 functions, 5,001 instructions |
+| `./bin/peacock run website/site.pac --grant fs --root . --max-steps 20000000 -- website/dist` | Generates 12 HTML routes, responsive CSS, SVG logo and `assets/chromatic-3d-preview.png` through the real CLI/compiler/VM; no JS bundle |
+| `python -m unittest tests.integration.test_website -v` | 5 website export, asset and Vercel config tests pass |
 
 The integration suite re-runs the examples through the CLI, including the PNG
 decode, training report JSON, tokenizer parity, artifact tampering rejection and

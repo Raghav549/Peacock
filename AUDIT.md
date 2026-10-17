@@ -92,24 +92,47 @@ initial checkout state.
 ## Current follow-on verification (2026-10-17)
 
 This section supersedes the historical test count, migration summary and priority
-list above for the current working tree. The checkout is on
-`arena/c197f94a-peacock`, based on `afddb2d84c3281aac9100a40a1fd4fd59704cf3b`;
-changes are uncommitted. `./bin/peacock test` passes **506 tests** (40.347 s):
-223 compiler, 81 AI, 74 frontend, 37 security, 65 integration, 20 unit and 6
-benchmark tests.
+list above for the current working tree on `arena/0e213b6a-peacock` (branched
+from `92469d1b618ab47ff025ae43bf172969321719f0`). `./bin/peacock test` passes
+**513 tests**: 223 compiler, 82 AI, 76 frontend, 37 security, 69 integration,
+20 unit and 6 benchmark tests.
 
-The semantic shadow now runs through experimental `check`/`build
---semantic-shadow` flags and covers selected type/expression/scope/declaration/
-assignment/call/return/condition/iterable rules. ErrorType iterable recovery is
-regression-tested: an unresolved iterable yields only its primary Python
-`PE3002`, and the PEACOCK kernel agrees. The Python analyser remains authoritative;
-this is not full diagnostic parity or self-hosting.
+Key verified additions in this milestone:
 
-`website/site.pac` compiles and runs through the actual PEACOCK CLI/compiler/VM
-to generate twelve static HTML routes, responsive CSS and SVG; four integration
-tests validate paths, page structure, embedded `.pac` examples and CSS. The
-static generator is distinct from the frame `WebBackend`, has no JavaScript, and
-has not had browser-based visual testing. `fs.create_dir` is capability-gated,
-sandbox-rooted and covered by security regressions. See `STATUS.md` for current
-evidence, `ROADMAP.md` for dependency-ordered next steps, and
-`website/README.md` for the export boundary.
+1. **CPython repository architectural research (`research/cpython-architecture.md`):**
+   Live inspection of `https://github.com/python/cpython` (`Grammar/`, `Parser/`,
+   `Python/`, `Include/`, `Objects/`, `Modules/`, `Programs/`, `Tools/`, `PC/`,
+   `PCbuild/`, `Mac/`, `Platforms/`, `Misc/`, `InternalDocs/`, `Lib/`, `Lib/test/`,
+   `.github/workflows/`) with a 7-point evaluation per subsystem.
+2. **Expanded `.pac` semantic shadow (`selfhost/type_model.pac`, 74 assertions) and Stage 4 IR kernel (`selfhost/ir_model.pac`, 15 assertions):**
+   `selfhost/type_model.pac` and `peacock/compiler/selfhost_types.py` now cover
+   struct signatures, struct constructor calls, struct field resolution,
+   built-in properties, collection/string/tensor/colour methods, capability
+   checks and diagnostic code mapping alongside type relations, expressions,
+   lexical scopes, declarations, assignments, user calls, conditions, returns
+   and iterables. `selfhost/ir_model.pac` models linear PIR instruction
+   verification (register def-before-use, slot bounds, duplicate labels, jump
+   targets, balanced `try_begin`/`try_end`, terminators), integer constant
+   folding and bytecode jump-target bounds. Both kernels are parsed by
+   `selfhost/parser.pac` with byte-identical AST digests to the bootstrap.
+3. **Standard-library, AI and Chromatic/3D extensions:**
+   Added `nn.gelu`, `nn.layer_norm`, `nn.cosine_similarity` (with finite-difference
+   autodiff verification), `colour.iridescence` (two-interface thin-film optical
+   interference at RGB wavelengths), `colour.wcag_aa`/`wcag_aaa`,
+   `graphics.feather_eye`, `graphics.lit_sphere` (analytic 3D GGX/Schlick
+   metallic-roughness sphere shading), `fs.exists`, `fs.list_dir`, `text.sha256`,
+   `text.fnv1a64`, `text.json_escape` and `text.json_valid`.
+4. **Public developer CLI ecosystem (`peacock/cli.py`):**
+   Added `fmt` (`--check`), `lint` (`--json`, including `PE3105` unused capability
+   detection), `doc` (module or `--stdlib --json`), and `init` project scaffolding.
+5. **Vercel 404 root-cause fix and PEACOCK website verification (`vercel.json`, `website/site.pac`, `website/dist/`):**
+   Investigated the Vercel `404: NOT_FOUND` failure on `https://peacock-website-eight.vercel.app`
+   (commit `92469d1` status `56604594874`): the repository lacked `vercel.json`,
+   had no root `index.html`, and excluded `website/dist/` in `.gitignore`,
+   causing Vercel to perform a 2-second zero-build deployment with no HTML
+   output. Added `vercel.json` (`buildCommand` running `website/site.pac`,
+   `outputDirectory: "website/dist"`, `cleanUrls: true`), tracked the verified
+   `website/dist/` build in Git, enriched `website/site.pac` with live PEACOCK
+   chromatic/3D rendering (`assets/chromatic-3d-preview.png`) and SHA-256 source
+   digests, and verified all 12 routes and assets over local HTTP (`200 OK`).
+

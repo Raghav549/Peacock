@@ -350,10 +350,11 @@ in `.pac` while keeping OS access behind natives:
 3. semantic analyser and type checker — **shadow prototype**:
    `semantic_mode="shadow"` / `--semantic-shadow` emits PEACOCK VM probes from
    supported typed-AST expressions, declarations, local scopes/names, assignments,
-   user-function signatures/calls, conditions and returns. Python remains
-   authoritative; the kernel does not generate diagnostics and several semantic
-   domains are still unsupported;
-4. IR/bytecode emitter;
+   structs, struct fields, built-in properties, methods, user-function
+   signatures/calls, conditions and returns (74 built-in assertions). Python
+   remains authoritative;
+4. IR/bytecode emitter — **verification kernel prototype** (`selfhost/ir_model.pac`,
+   15 assertions for PIR verification, constant folding and bytecode jump bounds);
 5. VM in PEACOCK (with a small host ABI for allocation, I/O and time);
 6. bootstrap chain: Python compiler builds the PEACOCK compiler, which then
    rebuilds itself; the Python compiler is retired only when the fixed point and

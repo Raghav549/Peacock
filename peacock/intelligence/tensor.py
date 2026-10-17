@@ -674,6 +674,83 @@ def sigmoid(t) -> Tensor:
     return _unary(t, "sigmoid", fn, lambda x, y, g: [g[i] * y[i] * (1.0 - y[i]) for i in range(len(x))], _float_result_dtype(tt))
 
 
+def gelu(t) -> Tensor:
+    """Gaussian Error Linear Unit (Hendrycks & Gimpel 2016 tanh approximation)."""
+    k = math.sqrt(2.0 / math.pi)
+    c = 0.044715
+
+    def fn(x: float) -> float:
+        u = k * (x + c * x * x * x)
+        return 0.5 * x * (1.0 + math.tanh(u))
+
+    def grad_fn(xs, _ys, gs):
+        out = []
+        for x, g in zip(xs, gs):
+            u = k * (x + c * x * x * x)
+            s = math.tanh(u)
+            du = k * (1.0 + 3.0 * c * x * x)
+            dgelu = 0.5 * (1.0 + s) + 0.5 * x * (1.0 - s * s) * du
+            out.append(g * dgelu)
+        return out
+
+    tt = ensure_tensor(t)
+    return _unary(t, "gelu", fn, grad_fn, _float_result_dtype(tt))
+
+
+def layer_norm(t: Tensor, eps: float = 1e-5) -> Tensor:
+    """Zero-mean, unit-variance normalisation along the last axis with autodiff."""
+    t = ensure_tensor(t)
+    if eps <= 0 or not math.isfinite(eps):
+        raise TensorError("layer_norm eps must be a positive finite float")
+    _axis, outer, inner, n = _axis_groups(t.shape, -1)
+    out = [0.0] * t.size
+    inv_stds = [0.0] * (outer * inner)
+    for o in range(outer):
+        for i in range(inner):
+            base = o * n * inner + i
+            vals = [float(t.data[base + k * inner]) for k in range(n)]
+            mean = sum(vals) / n
+            var = sum((v - mean) * (v - mean) for v in vals) / n
+            inv_std = 1.0 / math.sqrt(var + eps)
+            inv_stds[o * inner + i] = inv_std
+            for k in range(n):
+                out[base + k * inner] = (vals[k] - mean) * inv_std
+    requires = t.requires_grad
+    backward = None
+    if requires:
+        def backward(g: Tensor):
+            gd = [0.0] * t.size
+            for o in range(outer):
+                for i in range(inner):
+                    base = o * n * inner + i
+                    inv_std = inv_stds[o * inner + i]
+                    g_vals = [float(g.data[base + k * inner]) for k in range(n)]
+                    xhat = [out[base + k * inner] for k in range(n)]
+                    sum_g = sum(g_vals)
+                    sum_gx = sum(gv * xv for gv, xv in zip(g_vals, xhat))
+                    scale = inv_std / n
+                    for k in range(n):
+                        gd[base + k * inner] = scale * (n * g_vals[k] - sum_g - xhat[k] * sum_gx)
+            _accumulate(t, Tensor._wrap(gd, t.shape, t.dtype))
+
+    return Tensor._wrap(out, t.shape, _float_result_dtype(t), requires, (t,), backward, "layer_norm")
+
+
+def cosine_similarity(a: Tensor, b: Tensor, eps: float = 1e-8) -> float:
+    """Cosine similarity between two identically shaped non-empty tensors."""
+    a = ensure_tensor(a)
+    b = ensure_tensor(b)
+    if a.shape != b.shape or a.size == 0:
+        raise TensorError(
+            f"cosine_similarity requires identical non-empty shapes, got {list(a.shape)} and {list(b.shape)}"
+        )
+    dot = sum(float(x) * float(y) for x, y in zip(a.data, b.data))
+    na = math.sqrt(sum(float(x) * float(x) for x in a.data))
+    nb = math.sqrt(sum(float(y) * float(y) for y in b.data))
+    denom = max(eps, na * nb)
+    return dot / denom
+
+
 def _axis_groups(shape: Sequence[int], axis: int):
     if not shape:
         raise TensorError("operation requires rank >= 1")

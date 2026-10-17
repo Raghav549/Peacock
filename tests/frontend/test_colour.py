@@ -127,6 +127,25 @@ class MixingTests(unittest.TestCase):
         with self.assertRaises(ColorError):
             Color.from_hex("#12345")
 
+    def test_thin_film_iridescence_and_wcag_thresholds(self):
+        from peacock.frontend.colour import thin_film_iridescence, wcag_passes
+
+        normal_view = thin_film_iridescence(1.0, 280.0)
+        grazing_view = thin_film_iridescence(0.25, 280.0)
+        self.assertTrue(normal_view.in_gamut())
+        self.assertTrue(grazing_view.in_gamut())
+        self.assertNotEqual(normal_view.to_hex(), grazing_view.to_hex())
+        with self.assertRaises(ColorError):
+            thin_film_iridescence(1.5, 280.0)
+
+        ink = Color.from_hex("#edf3ff")
+        bg = Color.from_hex("#080d18")
+        low = Color.from_hex("#182235")
+        self.assertTrue(wcag_passes(ink, bg, "AA"))
+        self.assertTrue(wcag_passes(ink, bg, "AAA"))
+        self.assertFalse(wcag_passes(low, bg, "AA"))
+
+
 
 if __name__ == "__main__":
     unittest.main()

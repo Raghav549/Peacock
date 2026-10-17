@@ -7,6 +7,8 @@ third-party ML or UI framework.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 from dataclasses import dataclass
 from typing import Any
@@ -14,7 +16,7 @@ from typing import Any
 from peacock.compiler import builtins as B
 from peacock.compiler.diagnostics import PanicError, PeacockError, ResourceLimitError, RuntimeError_
 from peacock.frontend.canvas import Canvas, CanvasError
-from peacock.frontend.colour import Color, ColorError, palette
+from peacock.frontend.colour import Color, ColorError, palette, thin_film_iridescence, wcag_passes
 from peacock.frontend.easing import ease
 from peacock.frontend.png import encode_png
 from peacock.frontend.spring import SpringConfig, settle
@@ -362,6 +364,31 @@ def _colour_palette(ctx, args):
     return _wrap_engine_errors(palette, count, seed)
 
 
+def _colour_iridescence(ctx, args):
+    cos_theta = _need_float(args[0], "colour.iridescence cos_theta")
+    thickness_nm = _need_float(args[1], "colour.iridescence thickness_nm")
+    film_ior = _need_float(args[2], "colour.iridescence film_ior")
+    base_ior = _need_float(args[3], "colour.iridescence base_ior")
+    alpha = _need_float(args[4], "colour.iridescence alpha")
+    return _wrap_engine_errors(
+        thin_film_iridescence, cos_theta, thickness_nm, film_ior, base_ior, alpha
+    )
+
+
+def _colour_wcag_aa(ctx, args):
+    fg = _need_color(args[0], "colour.wcag_aa foreground")
+    bg = _need_color(args[1], "colour.wcag_aa background")
+    large = bool(args[2]) if len(args) > 2 else False
+    return _wrap_engine_errors(wcag_passes, fg, bg, "AA", large)
+
+
+def _colour_wcag_aaa(ctx, args):
+    fg = _need_color(args[0], "colour.wcag_aaa foreground")
+    bg = _need_color(args[1], "colour.wcag_aaa background")
+    large = bool(args[2]) if len(args) > 2 else False
+    return _wrap_engine_errors(wcag_passes, fg, bg, "AAA", large)
+
+
 # -- graphics ---------------------------------------------------------------
 def _graphics_canvas(ctx, args):
     width = _need_int(args[0], "canvas width")
@@ -440,6 +467,29 @@ def _graphics_aurora(ctx, args):
     return UNIT
 
 
+def _graphics_lit_sphere(ctx, args):
+    canvas = _need_canvas(args[0], "lit_sphere canvas")
+    cx = _need_float(args[1], "lit_sphere cx")
+    cy = _need_float(args[2], "lit_sphere cy")
+    radius = _need_float(args[3], "lit_sphere radius")
+    albedo = _need_color(args[4], "lit_sphere albedo")
+    roughness = _need_float(args[5], "lit_sphere roughness")
+    metallic = _need_float(args[6], "lit_sphere metallic")
+    iridescence_nm = _need_float(args[7], "lit_sphere iridescence_nm")
+    canvas.lit_sphere(cx, cy, radius, albedo, roughness, metallic, iridescence_nm)
+    return UNIT
+
+
+def _graphics_feather_eye(ctx, args):
+    canvas = _need_canvas(args[0], "feather_eye canvas")
+    cx = _need_float(args[1], "feather_eye cx")
+    cy = _need_float(args[2], "feather_eye cy")
+    radius = _need_float(args[3], "feather_eye radius")
+    phase = _need_float(args[4], "feather_eye phase")
+    canvas.feather_eye(cx, cy, radius, phase)
+    return UNIT
+
+
 def _graphics_save(ctx, args):
     canvas = _need_canvas(args[0], "save canvas")
     path = _need_str(args[1], "save path")
@@ -481,6 +531,16 @@ def _fs_create_dir(ctx, args):
     return UNIT
 
 
+def _fs_exists(ctx, args):
+    path = _need_str(args[0], "fs.exists path")
+    return ctx.host.path_exists(path)
+
+
+def _fs_list_dir(ctx, args):
+    path = _need_str(args[0], "fs.list_dir path")
+    return ctx.host.list_directory(path)
+
+
 # -- neural networks --------------------------------------------------------
 def _nn_parameter(ctx, args):
     value = args[0]
@@ -495,6 +555,23 @@ def _nn_parameter(ctx, args):
     if tensor.size > ctx.host.max_tensor_elements:
         _fail("parameter tensor exceeds the host element limit", "PE4003")
     return tensor
+
+
+def _nn_gelu(ctx, args):
+    x = _need_tensor(args[0], "nn.gelu x")
+    return _wrap_engine_errors(T.gelu, x)
+
+
+def _nn_layer_norm(ctx, args):
+    x = _need_tensor(args[0], "nn.layer_norm x")
+    eps = _need_float(args[1], "nn.layer_norm eps")
+    return _wrap_engine_errors(T.layer_norm, x, eps)
+
+
+def _nn_cosine_similarity(ctx, args):
+    a = _need_tensor(args[0], "nn.cosine_similarity a")
+    b = _need_tensor(args[1], "nn.cosine_similarity b")
+    return _wrap_engine_errors(T.cosine_similarity, a, b)
 
 
 def _nn_mse(ctx, args):
@@ -669,6 +746,36 @@ def _text_split_lines(ctx, args):
     return _need_str(args[0], "text.split_lines").splitlines()
 
 
+def _text_sha256(ctx, args):
+    value = _need_str(args[0], "text.sha256")
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _text_fnv1a64(ctx, args):
+    value = _need_str(args[0], "text.fnv1a64")
+    h = 0xCBF29CE484222325
+    for byte in value.encode("utf-8"):
+        h ^= byte
+        h = (h * 0x100000001B3) & 0xFFFFFFFFFFFFFFFF
+    if h >= (1 << 63):
+        h -= 1 << 64
+    return h
+
+
+def _text_json_escape(ctx, args):
+    value = _need_str(args[0], "text.json_escape")
+    return json.dumps(value, ensure_ascii=False)
+
+
+def _text_json_valid(ctx, args):
+    value = _need_str(args[0], "text.json_valid")
+    try:
+        json.loads(value)
+        return True
+    except ValueError:
+        return False
+
+
 # -- motion -----------------------------------------------------------------
 def _motion_spring_steps(ctx, args):
     start = _need_float(args[0], "spring start")
@@ -819,6 +926,10 @@ def _tensor_method(receiver: Tensor, name: str, args: list):
         return absolute(receiver)
     if name == "relu" and not args:
         return T.relu(receiver)
+    if name == "gelu" and not args:
+        return T.gelu(receiver)
+    if name == "layer_norm" and not args:
+        return T.layer_norm(receiver)
     if name == "tanh" and not args:
         return T.tanh(receiver)
     if name == "sigmoid" and not args:
@@ -908,6 +1019,9 @@ _IMPLS = {
     "colour.luminance": _colour_luminance,
     "colour.contrast": _colour_contrast,
     "colour.palette": _colour_palette,
+    "colour.iridescence": _colour_iridescence,
+    "colour.wcag_aa": _colour_wcag_aa,
+    "colour.wcag_aaa": _colour_wcag_aaa,
     "graphics.canvas": _graphics_canvas,
     "graphics.clear": _graphics_clear,
     "graphics.fill": _graphics_fill,
@@ -917,6 +1031,8 @@ _IMPLS = {
     "graphics.gradient": _graphics_gradient,
     "graphics.glow": _graphics_glow,
     "graphics.aurora": _graphics_aurora,
+    "graphics.lit_sphere": _graphics_lit_sphere,
+    "graphics.feather_eye": _graphics_feather_eye,
     "graphics.save": _graphics_save,
     "graphics.present": _graphics_present,
     "nn.xor": _nn_xor,
@@ -932,7 +1048,12 @@ _IMPLS = {
     "fs.read_text": _fs_read_text,
     "fs.write_text": _fs_write_text,
     "fs.create_dir": _fs_create_dir,
+    "fs.exists": _fs_exists,
+    "fs.list_dir": _fs_list_dir,
     "nn.parameter": _nn_parameter,
+    "nn.gelu": _nn_gelu,
+    "nn.layer_norm": _nn_layer_norm,
+    "nn.cosine_similarity": _nn_cosine_similarity,
     "nn.max_abs_diff": _nn_max_abs_diff,
     "nn.mse": _nn_mse,
     "nn.cross_entropy": _nn_cross_entropy,
@@ -944,6 +1065,10 @@ _IMPLS = {
     "text.ord": _text_ord,
     "text.chr": _text_chr,
     "text.split_lines": _text_split_lines,
+    "text.sha256": _text_sha256,
+    "text.fnv1a64": _text_fnv1a64,
+    "text.json_escape": _text_json_escape,
+    "text.json_valid": _text_json_valid,
     "motion.spring_steps": _motion_spring_steps,
     "motion.ease": _motion_ease,
 }

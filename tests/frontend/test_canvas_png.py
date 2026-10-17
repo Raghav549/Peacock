@@ -110,6 +110,19 @@ class PNGTests(unittest.TestCase):
         canvas.gradient([RED, BLUE], 45.0)
         self.assertEqual(encode_png(canvas), encode_png(canvas))
 
+    def test_lit_sphere_and_feather_eye_render_deterministically(self):
+        c1 = Canvas(32, 32)
+        c1.clear(Color.from_hex("#080d18"))
+        c1.feather_eye(16.0, 16.0, 12.0, 0.5)
+        c1.lit_sphere(16.0, 16.0, 8.0, Color.from_hex("#22b8aa"), 0.2, 0.7, 300.0)
+        c2 = Canvas(32, 32)
+        c2.clear(Color.from_hex("#080d18"))
+        c2.feather_eye(16.0, 16.0, 12.0, 0.5)
+        c2.lit_sphere(16.0, 16.0, 8.0, Color.from_hex("#22b8aa"), 0.2, 0.7, 300.0)
+        self.assertEqual(encode_png(c1), encode_png(c2))
+        self.assertGreater(c1.pixel(16, 16)[1], 0.05)
+
+
     def test_hdr_values_are_tone_mapped(self):
         canvas = Canvas(2, 2)
         canvas.clear(Color.from_srgb(1.0, 1.0, 1.0))

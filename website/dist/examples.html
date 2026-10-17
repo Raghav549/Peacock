@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#080d18"><meta name="description" content="A verified collection of PEACOCK programs for the implemented compiler, CPU AI and software graphics subset."><title>Examples — PEACOCK AI</title><link rel="stylesheet" href="styles.css"></head><body><a class="skip-link" href="#main">Skip to content</a><header class="site-header"><div class="header-inner"><a class="brand" href="index.html" aria-label="PEACOCK AI home"><img class="brand-logo" src="assets/peacock.svg" alt=""><span class="brand-copy"><strong>PEACOCK AI</strong><span>Language · compiler · studio</span></span></a><nav class="primary-nav" aria-label="Primary"><div class="nav-links"><a class="nav-link" href="index.html">Home</a><a class="nav-link" href="language.html">Language</a><a class="nav-link" href="compiler.html">Compiler</a><a class="nav-link" href="ai-engine.html">AI Engine</a><a class="nav-link" href="frontend-studio.html">Frontend Studio</a><a class="nav-link" href="docs.html">Docs</a><a class="nav-link is-current" href="examples.html" aria-current="page">Examples</a><a class="nav-link" href="research.html">Research</a><a class="nav-link" href="roadmap.html">Roadmap</a><a class="nav-link" href="security.html">Security</a><a class="nav-link" href="download.html">Get started</a><a class="nav-link" href="community.html">Community</a></div></nav></div></header><main id="main" class="page-main"><header class="page-heading"><p class="eyebrow">Examples gallery</p><h1>Only runnable examples, grouped by what works.</h1><p class="page-summary">A verified collection of PEACOCK programs for the implemented compiler, CPU AI and software graphics subset.</p></header><div class="content-stack"><section class="content-section" id="example-index"><div class="section-heading"><h2>Browse by working capability</h2><p class="muted">Choose a category to jump to runnable examples; this is a static, keyboard-accessible filter rather than a JavaScript search widget.</p></div><div class="section-content"><div class="filter-links"><a class="filter-chip" href="#language-examples">Language</a><a class="filter-chip" href="#ai-examples">AI and tensors</a><a class="filter-chip" href="#graphics-examples">Graphics</a></div></div></section><section class="content-section" id="language-examples"><div class="section-heading"><h2>Language</h2><p class="muted">A hello-world program and a larger language tour are checked in with the compiler.</p></div><div class="section-content"><article class="panel code-panel"><h3 class="code-title">examples/hello.pac</h3><p class="copy-hint">Selectable source — use your browser&#39;s copy command. · SHA-256: 29c928c03d60db99</p><pre class="code-frame"><code class="language-peacock">// The smallest PEACOCK program.
+module hello
+
+fn main() -&gt; Unit {
+    print(&quot;Hello from PEACOCK&quot;);
+}
+</code></pre></article><a class="inline-link" href="https://github.com/Raghav549/Peacock/blob/main/examples/tour.pac">Open examples/tour.pac</a></div></section><section class="content-section" id="ai-examples"><div class="section-heading"><h2>AI and tensors</h2><p class="muted">Small CPU-only programs demonstrate tensor arithmetic and a trainable XOR model.</p></div><div class="section-content"><article class="panel code-panel"><h3 class="code-title">examples/tensors.pac</h3><p class="copy-hint">Selectable source — use your browser&#39;s copy command. · SHA-256: 8b7195600c448d89</p><pre class="code-frame"><code class="language-peacock">// Differentiable computation in PEACOCK: matmul, loss, reverse-mode gradients.
+module tensors
+
+use nn
+
+fn main() -&gt; Unit {
+    capability compute;
+
+    let x = tensor([[1.0, 2.0], [3.0, 4.0]]);
+    let column = tensor([[0.5], [1.5]]);
+    let projected = x.matmul(column);
+    print(&quot;matmul: &quot; + str(projected));
+    print(&quot;shape: &quot; + str(projected.shape));
+    print(&quot;softmax: &quot; + str(tensor([[1.0, 2.0, 3.0]]).softmax()));
+
+    let weights = nn.parameter([[0.1, -0.2], [0.3, 0.4]]);
+    let targets = tensor([[1.0, 0.0], [0.0, 1.0]]);
+    let predictions = x.matmul(weights);
+    let loss = nn.mse(predictions, targets);
+    print(&quot;loss: &quot; + str(loss.item()));
+    loss.backward();
+    print(&quot;weight gradient: &quot; + str(weights.grad));
+
+    // Analytic check: for mean-squared error, dL/dW = X^T * (2/N) * (P - T).
+    let expected = x.transpose().matmul((predictions - targets) * 0.5);
+    print(&quot;autodiff gradient: &quot; + str(weights.grad));
+    print(&quot;closed-form gradient: &quot; + str(expected));
+    print(&quot;max abs difference: &quot; + str(nn.max_abs_diff(weights.grad, expected)));
+}
+</code></pre></article><article class="panel code-panel"><h3 class="code-title">examples/xor.pac</h3><p class="copy-hint">Selectable source — use your browser&#39;s copy command. · SHA-256: 1af124d491c4d489</p><pre class="code-frame"><code class="language-peacock">// Train a small neural network on XOR, entirely through PEACOCK syntax.
+module xor_net
+
+use nn
+
+model XorNet {
+    input x: Tensor&lt;Float32, [2]&gt;
+    output y: Tensor&lt;Float32, [2]&gt;
+    stack {
+        Dense(units: 8, activation: relu)
+        Dense(units: 2)
+    }
+}
+
+training XorTraining {
+    objective: &quot;cross_entropy&quot;
+    optimiser: &quot;adam&quot;
+    epochs: 400
+    learning_rate: 0.05
+    batch_size: 4
+    seed: 7
+}
+
+fn main() -&gt; Unit {
+    capability compute;
+    let data = nn.xor();
+    let net = XorNet.init(seed: 7);
+    let losses = XorTraining.run(net, data);
+    let accuracy = XorTraining.evaluate(net, data);
+    print(&quot;epochs: &quot; + str(len(losses)));
+    print(&quot;final loss: &quot; + str(nn.loss(net, data, loss: &quot;cross_entropy&quot;)));
+    print(&quot;accuracy: &quot; + str(accuracy));
+}
+</code></pre></article><p class="callout">Run the training example with `./bin/peacock run examples/xor.pac --grant compute`. No GPU is required or claimed.</p></div></section><section class="content-section" id="graphics-examples"><div class="section-heading"><h2>Graphics</h2><p class="muted">The reference renderer can produce deterministic image output from PEACOCK programs.</p></div><div class="section-content"><article class="panel code-panel"><h3 class="code-title">examples/aurora.pac</h3><p class="copy-hint">Selectable source — use your browser&#39;s copy command. · SHA-256: 826d859a751e4f4f</p><pre class="code-frame"><code class="language-peacock">// Deterministic procedural colour: render an aurora to a real PNG.
+module aurora
+
+use colour
+use graphics
+
+fn main() -&gt; Unit {
+    capability fs;
+    let canvas = graphics.canvas(960, 540);
+    let palette = [
+        colour.oklch(0.55, 0.18, 160.0),
+        colour.oklch(0.72, 0.20, 285.0),
+        colour.oklch(0.62, 0.16, 60.0)
+    ];
+    graphics.gradient(canvas, palette, 35.0);
+    graphics.aurora(canvas, 1.5, 42);
+    graphics.save(canvas, &quot;examples/out/aurora.png&quot;);
+    print(&quot;wrote examples/out/aurora.png&quot;);
+}
+</code></pre></article><p class="callout">The current renderer is software 2D; aurora colour fields are artistic procedural graphics, not a physical sky simulation.</p></div></section></div></main><footer class="site-footer"><div><strong>PEACOCK AI</strong><p>Experimental language and ecosystem. Status is evidence-led, not a release claim.</p></div><div class="footer-links"><a href="https://github.com/Raghav549/Peacock">Repository</a><a href="https://github.com/Raghav549/Peacock/blob/main/STATUS.md">Status</a><a href="https://github.com/Raghav549/Peacock/blob/main/SECURITY.md">Security</a></div></footer></body></html>

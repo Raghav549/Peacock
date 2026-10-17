@@ -33,6 +33,12 @@ struct FunctionSignature {
     result: TypeDesc
 }
 
+struct StructSignature {
+    name: String,
+    field_names: List<String>,
+    field_types: List<TypeDesc>
+}
+
 fn primitive(name: String) -> TypeDesc {
     return TypeDesc("primitive", name, false, [], []);
 }
@@ -468,6 +474,283 @@ fn iterable_supported(actual: TypeDesc) -> Bool {
     return is_error(actual) or actual.tag == "list" or (actual.tag == "opaque" and actual.name == "Range");
 }
 
+fn struct_index(structs: List<StructSignature>, name: String) -> Int {
+    let mut i = structs.len() - 1;
+    while i >= 0 {
+        if structs.get(i).name == name {
+            return i;
+        }
+        i -= 1;
+    }
+    return -1;
+}
+
+fn check_struct_init(structs: List<StructSignature>, name: String, arguments: List<TypeDesc>) -> TypeDesc {
+    let index = struct_index(structs, name);
+    if index < 0 {
+        return error_type();
+    }
+    let st = structs.get(index);
+    if len(arguments) != len(st.field_types) {
+        return error_type();
+    }
+    let mut i = 0;
+    while i < len(arguments) {
+        if not is_assignable(arguments.get(i), st.field_types.get(i)) {
+            return error_type();
+        }
+        i += 1;
+    }
+    return nominal_type(name);
+}
+
+fn resolve_struct_field(structs: List<StructSignature>, base: TypeDesc, field_name: String) -> TypeDesc {
+    if is_error(base) {
+        return error_type();
+    }
+    if base.tag != "nominal" {
+        return error_type();
+    }
+    let index = struct_index(structs, base.name);
+    if index < 0 {
+        return error_type();
+    }
+    let st = structs.get(index);
+    let mut i = 0;
+    while i < len(st.field_names) {
+        if st.field_names.get(i) == field_name {
+            return st.field_types.get(i);
+        }
+        i += 1;
+    }
+    return error_type();
+}
+
+fn resolve_property(base: TypeDesc, prop_name: String) -> TypeDesc {
+    if is_error(base) {
+        return error_type();
+    }
+    if base.tag == "tensor" {
+        if prop_name == "rank" or prop_name == "size" {
+            return primitive("Int");
+        }
+        if prop_name == "shape" {
+            return list_type(primitive("Int"));
+        }
+        if prop_name == "dtype" {
+            return primitive("String");
+        }
+        if prop_name == "requires_grad" {
+            return primitive("Bool");
+        }
+        if prop_name == "grad" {
+            return tensor_type(base.name, false, []);
+        }
+        return error_type();
+    }
+    if base.tag == "opaque" and base.name == "Canvas" {
+        if prop_name == "width" or prop_name == "height" {
+            return primitive("Int");
+        }
+        return error_type();
+    }
+    if base.tag == "opaque" and base.name == "Model" {
+        if prop_name == "parameter_count" {
+            return primitive("Int");
+        }
+        return error_type();
+    }
+    if base.tag == "opaque" and base.name == "Dataset" {
+        if prop_name == "size" {
+            return primitive("Int");
+        }
+        if prop_name == "features" or prop_name == "labels" {
+            return tensor_type("Float32", false, []);
+        }
+        return error_type();
+    }
+    return error_type();
+}
+
+fn resolve_method(base: TypeDesc, method_name: String, arguments: List<TypeDesc>) -> TypeDesc {
+    if is_error(base) {
+        return error_type();
+    }
+    if base.tag == "list" and len(base.elements) == 1 {
+        let elem = base.elements.get(0);
+        if method_name == "len" and len(arguments) == 0 {
+            return primitive("Int");
+        }
+        if method_name == "push" and len(arguments) == 1 and is_assignable(arguments.get(0), elem) {
+            return primitive("Unit");
+        }
+        if method_name == "pop" and len(arguments) == 0 {
+            return elem;
+        }
+        if method_name == "get" and len(arguments) == 1 and is_assignable(arguments.get(0), primitive("Int")) {
+            return elem;
+        }
+        if method_name == "contains" and len(arguments) == 1 and is_assignable(arguments.get(0), elem) {
+            return primitive("Bool");
+        }
+        if method_name == "index_of" and len(arguments) == 1 and is_assignable(arguments.get(0), elem) {
+            return primitive("Int");
+        }
+        if method_name == "join" and len(arguments) == 1 and is_assignable(arguments.get(0), primitive("String")) {
+            if is_error(elem) or (elem.tag == "primitive" and elem.name == "String") {
+                return primitive("String");
+            }
+            return error_type();
+        }
+        if method_name == "sort" and len(arguments) == 0 {
+            if is_error(elem) or is_numeric(elem) {
+                return primitive("Unit");
+            }
+            return error_type();
+        }
+        if method_name == "reverse" and len(arguments) == 0 {
+            return primitive("Unit");
+        }
+        return error_type();
+    }
+    if base.tag == "primitive" and base.name == "String" {
+        if method_name == "len" and len(arguments) == 0 {
+            return primitive("Int");
+        }
+        if (method_name == "upper" or method_name == "lower" or method_name == "trim") and len(arguments) == 0 {
+            return primitive("String");
+        }
+        if (method_name == "contains" or method_name == "starts_with" or method_name == "ends_with") and len(arguments) == 1 and is_assignable(arguments.get(0), primitive("String")) {
+            return primitive("Bool");
+        }
+        if method_name == "split" and len(arguments) == 1 and is_assignable(arguments.get(0), primitive("String")) {
+            return list_type(primitive("String"));
+        }
+        if method_name == "replace" and len(arguments) == 2 and is_assignable(arguments.get(0), primitive("String")) and is_assignable(arguments.get(1), primitive("String")) {
+            return primitive("String");
+        }
+        if method_name == "substring" and len(arguments) == 2 and is_assignable(arguments.get(0), primitive("Int")) and is_assignable(arguments.get(1), primitive("Int")) {
+            return primitive("String");
+        }
+        return error_type();
+    }
+    if base.tag == "tensor" {
+        if (method_name == "sum" or method_name == "mean" or method_name == "max" or method_name == "min" or method_name == "item") and len(arguments) == 0 {
+            return primitive("Float");
+        }
+        if (method_name == "exp" or method_name == "log" or method_name == "sqrt" or method_name == "abs" or method_name == "relu" or method_name == "gelu" or method_name == "layer_norm" or method_name == "tanh" or method_name == "sigmoid" or method_name == "softmax") and len(arguments) == 0 {
+            return base;
+        }
+        if method_name == "reshape" and len(arguments) == 1 and is_assignable(arguments.get(0), list_type(primitive("Int"))) {
+            return tensor_type(base.name, false, []);
+        }
+        if method_name == "transpose" and len(arguments) == 0 {
+            if not base.shape_known {
+                return tensor_type(base.name, false, []);
+            }
+            let rev: List<Int> = [];
+            let mut i = len(base.dims) - 1;
+            while i >= 0 {
+                rev.push(base.dims.get(i));
+                i -= 1;
+            }
+            return tensor_type(base.name, true, rev);
+        }
+        if method_name == "matmul" and len(arguments) == 1 {
+            let rhs = arguments.get(0);
+            if rhs.tag != "tensor" or rhs.name != base.name {
+                return error_type();
+            }
+            if not base.shape_known or not rhs.shape_known {
+                return tensor_type(base.name, false, []);
+            }
+            if len(base.dims) != 2 or len(rhs.dims) != 2 or base.dims.get(1) != rhs.dims.get(0) {
+                return error_type();
+            }
+            return tensor_type(base.name, true, [base.dims.get(0), rhs.dims.get(1)]);
+        }
+        if (method_name == "backward" or method_name == "zero_grad") and len(arguments) == 0 {
+            return primitive("Unit");
+        }
+        return error_type();
+    }
+    if base.tag == "opaque" and base.name == "Range" and method_name == "len" and len(arguments) == 0 {
+        return primitive("Int");
+    }
+    if base.tag == "opaque" and base.name == "Color" {
+        if method_name == "css" and len(arguments) == 0 {
+            return primitive("String");
+        }
+        if method_name == "luminance" and len(arguments) == 0 {
+            return primitive("Float");
+        }
+        return error_type();
+    }
+    if base.tag == "opaque" and base.name == "Canvas" and method_name == "save" and len(arguments) == 1 and is_assignable(arguments.get(0), primitive("String")) {
+        return primitive("Unit");
+    }
+    if base.tag == "opaque" and base.name == "Model" {
+        if method_name == "summary" and len(arguments) == 0 {
+            return primitive("String");
+        }
+        if method_name == "predict" and len(arguments) == 1 and arguments.get(0).tag == "tensor" {
+            return tensor_type("Float32", false, []);
+        }
+        return error_type();
+    }
+    if base.tag == "opaque" and base.name == "Dataset" {
+        if method_name == "size" and len(arguments) == 0 {
+            return primitive("Int");
+        }
+        if (method_name == "features" or method_name == "labels") and len(arguments) == 0 {
+            return tensor_type("Float32", false, []);
+        }
+        return error_type();
+    }
+    return error_type();
+}
+
+fn capability_declared(declared: List<String>, required: String) -> Bool {
+    if required == "" {
+        return true;
+    }
+    return declared.contains(required);
+}
+
+fn diagnostic_code_for_violation(violation: String) -> String {
+    if violation == "duplicate_decl" {
+        return "PE3001";
+    }
+    if violation == "unknown_name" {
+        return "PE3002";
+    }
+    if violation == "type_mismatch" {
+        return "PE3003";
+    }
+    if violation == "arity_mismatch" {
+        return "PE3004";
+    }
+    if violation == "invalid_capability" {
+        return "PE3005";
+    }
+    if violation == "unimported_namespace" {
+        return "PE3006";
+    }
+    if violation == "immutable_assign" {
+        return "PE3007";
+    }
+    if violation == "bad_return" {
+        return "PE3008";
+    }
+    if violation == "missing_capability" {
+        return "PE3011";
+    }
+    if violation == "unknown_field" {
+        return "PE3015";
+    }
+    return "PE3012";
+}
+
 fn run_builtin_checks() -> Int {
     let int_ty = primitive("Int");
     let float_ty = primitive("Float");
@@ -553,6 +836,28 @@ fn run_builtin_checks() -> Int {
     assert(not iterable_supported(int_ty));
     assert(iterable_supported(err_ty));
     cases += 13;
+
+    let mut structs: List<StructSignature> = [];
+    structs.push(StructSignature("Point", ["x", "y"], [int_ty, float_ty]));
+    assert(type_equal(check_struct_init(structs, "Point", [int_ty, float_ty]), nominal_type("Point")));
+    assert(is_error(check_struct_init(structs, "Point", [int_ty])));
+    assert(is_error(check_struct_init(structs, "Point", [float_ty, float_ty])));
+    assert(type_equal(resolve_struct_field(structs, nominal_type("Point"), "x"), int_ty));
+    assert(type_equal(resolve_struct_field(structs, nominal_type("Point"), "y"), float_ty));
+    assert(is_error(resolve_struct_field(structs, nominal_type("Point"), "z")));
+    assert(type_equal(resolve_property(concrete, "rank"), int_ty));
+    assert(type_equal(resolve_property(concrete, "shape"), list_type(int_ty)));
+    assert(type_equal(resolve_property(opaque_type("Canvas"), "width"), int_ty));
+    assert(type_equal(resolve_method(list_type(int_ty), "get", [int_ty]), int_ty));
+    assert(type_equal(resolve_method(list_type(string_ty), "join", [string_ty]), string_ty));
+    assert(is_error(resolve_method(list_type(int_ty), "join", [string_ty])));
+    assert(type_equal(resolve_method(string_ty, "split", [string_ty]), list_type(string_ty)));
+    assert(type_equal(resolve_method(concrete, "transpose", []), tensor_type("Float32", true, [3, 2])));
+    assert(type_equal(resolve_method(concrete, "matmul", [tensor_type("Float32", true, [3, 4])]), tensor_type("Float32", true, [2, 4])));
+    assert(capability_declared(["fs", "compute"], "fs"));
+    assert(not capability_declared(["fs"], "ui"));
+    assert(diagnostic_code_for_violation("unknown_field") == "PE3015");
+    cases += 18;
 
     return cases;
 }

@@ -122,6 +122,10 @@ class PeacockWebsiteTests(unittest.TestCase):
         self.assertEqual(pages, ROUTES)
         self.assertTrue((self.output_dir / "styles.css").is_file())
         self.assertTrue((self.output_dir / "assets/peacock.svg").is_file())
+        self.assertTrue((self.output_dir / "assets/chromatic-3d-preview.png").is_file())
+        from peacock.frontend.png import decode_png
+        w, h, _rgba = decode_png((self.output_dir / "assets/chromatic-3d-preview.png").read_bytes())
+        self.assertEqual((w, h), (360, 140))
         self.assertIn("Built 12 PEACOCK-authored pages", self.build_output)
         self.assertFalse(list(self.output_dir.rglob("*.js")))
 
@@ -171,6 +175,25 @@ class PeacockWebsiteTests(unittest.TestCase):
         self.assertIn("prefers-reduced-motion: reduce", css)
         self.assertIn(":focus-visible", css)
         self.assertIn("scrollbar-width: thin", css)
+
+    def test_vercel_configuration_and_checked_in_dist_match_source_build(self):
+        import json
+
+        vercel_path = REPO_ROOT / "vercel.json"
+        self.assertTrue(vercel_path.is_file())
+        cfg = json.loads(vercel_path.read_text(encoding="utf-8"))
+        self.assertEqual(cfg.get("outputDirectory"), "website/dist")
+        self.assertIn("website/site.pac", cfg.get("buildCommand", ""))
+
+        checked_in = REPO_ROOT / "website/dist"
+        self.assertTrue(checked_in.is_dir())
+        for route in sorted(ROUTES):
+            self.assertEqual(
+                (checked_in / route).read_text(encoding="utf-8"),
+                (self.output_dir / route).read_text(encoding="utf-8"),
+                f"checked-in website/dist/{route} is out of sync with website/site.pac",
+            )
+
 
 
 if __name__ == "__main__":

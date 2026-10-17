@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#080d18"><meta name="description" content="Learn the syntax and types that the current compiler actually accepts, plus the boundaries that remain future work."><title>Language — PEACOCK AI</title><link rel="stylesheet" href="styles.css"></head><body><a class="skip-link" href="#main">Skip to content</a><header class="site-header"><div class="header-inner"><a class="brand" href="index.html" aria-label="PEACOCK AI home"><img class="brand-logo" src="assets/peacock.svg" alt=""><span class="brand-copy"><strong>PEACOCK AI</strong><span>Language · compiler · studio</span></span></a><nav class="primary-nav" aria-label="Primary"><div class="nav-links"><a class="nav-link" href="index.html">Home</a><a class="nav-link is-current" href="language.html" aria-current="page">Language</a><a class="nav-link" href="compiler.html">Compiler</a><a class="nav-link" href="ai-engine.html">AI Engine</a><a class="nav-link" href="frontend-studio.html">Frontend Studio</a><a class="nav-link" href="docs.html">Docs</a><a class="nav-link" href="examples.html">Examples</a><a class="nav-link" href="research.html">Research</a><a class="nav-link" href="roadmap.html">Roadmap</a><a class="nav-link" href="security.html">Security</a><a class="nav-link" href="download.html">Get started</a><a class="nav-link" href="community.html">Community</a></div></nav></div></header><main id="main" class="page-main"><header class="page-heading"><p class="eyebrow">Language reference</p><h1>A typed language with .pac at its core.</h1><p class="page-summary">Learn the syntax and types that the current compiler actually accepts, plus the boundaries that remain future work.</p></header><div class="content-stack"><section class="content-section" id="language-core"><div class="section-heading"><h2>The implemented language core</h2><p class="muted">The current v0.1 language is deliberately smaller than the long-term design.</p></div><div class="section-content"><div class="card-grid"><article class="panel feature-card"><span class="status status--implemented">.pac</span><h3>Source and grammar</h3><p class="muted">Modules, imports of built-in namespaces, structs, functions, expressions, loops, errors and capability declarations.</p></article><article class="panel feature-card"><span class="status status--implemented">Static subset</span><h3>Types</h3><p class="muted">Int, Float, Bool, String, Unit, List, tensors, nominal structs and opaque engine types; no user-defined generics yet.</p></article><article class="panel feature-card"><span class="status status--implemented">PE1xxx–PE7xxx</span><h3>Diagnostics</h3><p class="muted">Source spans, stable diagnostic codes, error recovery in the Python parser and targeted type/capability messages.</p></article><article class="panel feature-card"><span class="status status--partial">List&lt;T&gt;</span><h3>Collections</h3><p class="muted">Mutable lists, indexing and common list operations exist. Unicode and iterator APIs remain limited.</p></article></div></div></section><section class="content-section" id="hello"><div class="section-heading"><h2>Start with ordinary code</h2><p class="muted">The build pipeline consumes this actual PEACOCK source file; it is not Python in a renamed file.</p></div><div class="section-content"><article class="panel code-panel"><h3 class="code-title">examples/hello.pac</h3><p class="copy-hint">Selectable source — use your browser&#39;s copy command. · SHA-256: 29c928c03d60db99</p><pre class="code-frame"><code class="language-peacock">// The smallest PEACOCK program.
+module hello
+
+fn main() -&gt; Unit {
+    print(&quot;Hello from PEACOCK&quot;);
+}
+</code></pre></article><div class="card-grid"><article class="panel feature-card"><span class="status status--implemented">Explicit</span><h3>No implicit numeric coercion</h3><p class="muted">Int and Float are distinct; write an explicit conversion rather than relying on silent widening.</p></article><article class="panel feature-card"><span class="status status--implemented">Declared + granted</span><h3>Capability-gated effects</h3><p class="muted">Filesystem, compute and UI authority are declared in source and granted independently by the host.</p></article></div></div></section><section class="content-section" id="syntax"><div class="section-heading"><h2>Read a wider syntax tour</h2><p class="muted">The tour exercises functions, expressions, lists, structs, control flow and error handling in the supported grammar.</p></div><div class="section-content"><article class="panel code-panel"><h3 class="code-title">examples/tour.pac</h3><p class="copy-hint">Selectable source — use your browser&#39;s copy command. · SHA-256: 4aefd4c27e94bb02</p><pre class="code-frame"><code class="language-peacock">// PEACOCK language tour: functions, structs, lists, loops, errors, assertions.
+module tour
+
+struct Point {
+    x: Int
+    y: Int
+}
+
+fn distance_squared(a: Point, b: Point) -&gt; Int {
+    let dx = a.x - b.x;
+    let dy = a.y - b.y;
+    return dx * dx + dy * dy;
+}
+
+fn sum(values: List&lt;Int&gt;) -&gt; Int {
+    let mut total = 0;
+    for value in values {
+        total += value;
+    }
+    return total;
+}
+
+fn doubled(n: Int) -&gt; Int {
+    if n &lt; 0 {
+        throw &quot;doubled() does not accept negative numbers&quot;;
+    }
+    return n * 2;
+}
+
+fn main() -&gt; Unit {
+    let mut squares: List&lt;Int&gt; = [];
+    for i in 1..6 {
+        squares.push(i * i);
+    }
+    print(&quot;squares: &quot; + str(squares));
+    print(&quot;sum: &quot; + str(sum(squares)));
+
+    let origin = Point(0, 0);
+    let corner = Point(3, 4);
+    print(&quot;distance squared: &quot; + str(distance_squared(origin, corner)));
+
+    let mut i = 0;
+    while i &lt; 3 {
+        print(&quot;loop &quot; + str(i));
+        i += 1;
+    }
+
+    try {
+        print(&quot;doubled: &quot; + str(doubled(21)));
+        let bad = doubled(-1);
+        print(&quot;not reached &quot; + str(bad));
+    } catch (message) {
+        print(&quot;caught: &quot; + message);
+    }
+
+    assert(sum(squares) == 55, &quot;sum of squares should be 55&quot;);
+
+    let label = &quot;  PEACOCK  &quot;;
+    print(&quot;trimmed: [&quot; + label.trim() + &quot;]&quot;);
+    print(&quot;characters: &quot; + str(len(label)));
+    print(&quot;split: &quot; + str(&quot;a,b,c&quot;.split(&quot;,&quot;)));
+    print(&quot;types: &quot; + type_name(label) + &quot;, &quot; + type_name(3.5) + &quot;, &quot; + type_name(squares));
+}
+</code></pre></article><a class="inline-link" href="https://github.com/Raghav549/Peacock/blob/main/SPECIFICATION.md">Open the full language specification</a></div></section></div></main><footer class="site-footer"><div><strong>PEACOCK AI</strong><p>Experimental language and ecosystem. Status is evidence-led, not a release claim.</p></div><div class="footer-links"><a href="https://github.com/Raghav549/Peacock">Repository</a><a href="https://github.com/Raghav549/Peacock/blob/main/STATUS.md">Status</a><a href="https://github.com/Raghav549/Peacock/blob/main/SECURITY.md">Security</a></div></footer></body></html>

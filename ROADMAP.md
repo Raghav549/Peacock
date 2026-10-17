@@ -187,10 +187,14 @@ Stages:
 2. parser + AST — **partial**: full-grammar syntax and AST-digest parity are
    done; error recovery, `PE2xxx` diagnostic/span parity and a typed AST are not;
 3. semantic analyser/type checker — **shadow prototype**: selected types,
-   expressions, scope/name/assignment/call/return/condition/iterable rules are
-   probed; diagnostics, fields/methods, native overloads and model/training
-   analysis are not ported; Python remains authoritative;
-4. IR and bytecode emitter — planned;
+   expressions, scope/name/assignment/call/return/condition/iterable rules plus
+   structs, struct fields, built-in properties, methods and diagnostic code
+   mappings are probed (74 built-in assertions); native overloads, model/training
+   declarations and full diagnostic emission remain Python;
+4. IR and bytecode emitter — **verification kernel prototype** (`selfhost/ir_model.pac`,
+   15 assertions covering PIR register def-before-use, slot bounds, duplicate
+   labels, jump targets, balanced `try_begin`/`try_end` scopes, constant folding
+   and bytecode jump bounds); full AST→IR lowering in `.pac` remains planned;
 5. VM in PEACOCK with a minimal host ABI — planned;
 6. fixed point: the PEACOCK compiler compiles itself, and the resulting image
    passes the full suite.

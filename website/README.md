@@ -25,10 +25,25 @@ From the repository root with Python 3.11+:
 ```
 
 The website generator currently needs the explicit 10,000,000-step budget
-because it renders twelve pages and escapes the real example source text inside
-the reference VM. `fs` must be granted by the host and declared in `main`; the
-output remains confined to the selected sandbox root. `website/dist/` is a
-build artifact and is ignored by Git.
+because it renders twelve pages, computes thin-film iridescence and WCAG
+contrast telemetry, renders `assets/chromatic-3d-preview.png` via the PEACOCK
+2D/3D software rasteriser, computes SHA-256 digests of embedded `.pac` sources,
+and escapes source text inside the reference VM. `fs` must be granted by the
+host and declared in `main`; the output remains confined to the selected
+sandbox root.
+
+## Vercel deployment configuration
+
+The previous Vercel `404: NOT_FOUND` failure on
+`https://peacock-website-eight.vercel.app` occurred because the repository root
+had no `vercel.json`, no root `index.html`, and `website/dist/` was excluded by
+`.gitignore`, causing Vercel to perform a 2-second no-build static deployment of
+the repo root with zero HTML files.
+
+This is fixed by:
+
+1. `vercel.json` at the repository root declaring `buildCommand` (`python3 ./bin/peacock run website/site.pac --grant fs --root . --max-steps 50000000 -- website/dist`), `outputDirectory: "website/dist"`, `framework: null`, and `cleanUrls: true`;
+2. tracking the verified `website/dist/` build output in Git and validating in `tests/integration/test_website.py` that `website/dist/` matches a fresh build of `website/site.pac`.
 
 Serve the exported files locally:
 

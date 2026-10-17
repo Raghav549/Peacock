@@ -30,13 +30,14 @@ Python remains authoritative and there is no switch-over. Diagnostic recovery
 parity and several semantic domains remain unimplemented.
 
 `website/site.pac` is a PEACOCK-authored static website exporter verified through
-the actual CLI and compiler/VM. It generates twelve HTML routes, CSS and an SVG
-asset from one `.pac` compilation unit (there is no user module system yet). Its
-browser output uses no JavaScript or external UI framework. The export command
-needs a 10,000,000-step VM budget; generated `website/dist/` is ignored. Tests
-check routes, links, semantic/accessibility markers, source examples and CSS;
-there is no browser screenshot suite. The following remain Python bootstrap
-implementations:
+the actual CLI and compiler/VM. It generates twelve HTML routes, CSS, SVG logo
+and a PEACOCK-rendered chromatic/3D PNG showcase (`assets/chromatic-3d-preview.png`)
+from one `.pac` compilation unit (there is no user module system yet). Its
+browser output uses no JavaScript or external UI framework. `vercel.json` at the
+repository root configures Vercel to build `website/site.pac` into `website/dist`
+and serve `outputDirectory: "website/dist"`, and `website/dist/` is tracked and
+checked for byte-exact parity with `website/site.pac` in `tests/integration/test_website.py`.
+The following remain Python bootstrap implementations:
 
 - production lexer/parser/AST/diagnostics and parser recovery;
 - semantic analysis, name resolution and the production type model;

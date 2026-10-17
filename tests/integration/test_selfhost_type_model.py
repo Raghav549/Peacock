@@ -30,8 +30,38 @@ class SelfHostedTypeModelTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(
             result.stdout.strip(),
-            "PEACOCK type-model checks passed (56 assertions)",
+            "PEACOCK type-model checks passed (74 assertions)",
         )
+
+    def test_ir_model_checks_execute_in_peacock(self):
+        check_res = run_cli("check", "selfhost/ir_model.pac", "--semantic-shadow")
+        self.assertEqual(check_res.returncode, 0, check_res.stderr)
+        run_res = run_cli("run", "selfhost/ir_model.pac")
+        self.assertEqual(run_res.returncode, 0, run_res.stderr)
+        self.assertEqual(
+            run_res.stdout.strip(),
+            "PEACOCK IR-model checks passed (15 assertions)",
+        )
+
+    def test_struct_fields_properties_and_methods_in_shadow_mode(self):
+        source = '''\
+module struct_shadow
+struct Vec2 { x: Float, y: Float }
+fn length_sq(v: Vec2) -> Float {
+    let coords: List<Float> = [v.x, v.y];
+    let first = coords.get(0);
+    let label = "vec,x,y".split(",").join("-");
+    assert(label.len() > 0);
+    return first * first + v.y * v.y;
+}
+fn main() -> Unit {
+    let v = Vec2(3.0, 4.0);
+    print(str(length_sq(v)));
+}
+'''
+        result = compile_source(source, "struct_shadow.pac", semantic_mode="shadow")
+        self.assertTrue(result.ok, result.diagnostics.render_all(source))
+        self.assertGreater(result.stats["selfhost_semantic_cases"], 15)
 
     def test_type_model_is_checked_as_pac_source(self):
         result = run_cli("check", "selfhost/type_model.pac")

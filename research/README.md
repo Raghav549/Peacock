@@ -32,6 +32,7 @@ honest substrate for these questions.
 | [open-questions.md](open-questions.md) | 18 numbered research questions with hypotheses, experiment designs, metrics, decision rules and current status |
 | [architecture-decisions.md](architecture-decisions.md) | ADR-0001 … ADR-0021: context, decision, alternatives, consequences, and what would reverse each decision |
 | [benchmark-methodology.md](benchmark-methodology.md) | How measurements are taken, what they do and do not mean, and the anti-comparison policy |
+| [cpython-architecture.md](cpython-architecture.md) | Live architectural audit of `python/cpython` (`Grammar/`, `Parser/`, `Python/`, `Include/`, `Objects/`, `Modules/`, `Programs/`, `Tools/`, `PC/`, `PCbuild/`, `Mac/`, `Lib/test/`, `.github/workflows/`) and how each principle applies to PEACOCK |
 
 ## What research actually influenced what
 

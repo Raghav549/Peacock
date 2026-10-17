@@ -2,10 +2,11 @@ __pycache__/
 *.py[cod]
 *.pkb
 examples/out/
-website/dist/
 benchmarks/latest.json
 .pytest_cache/
 .venv/
-dist/
-build/
+/dist/
+/build/
 *.egg-info/
+!website/dist/
+!website/dist/**

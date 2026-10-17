@@ -323,3 +323,55 @@ def sample_gradient(colors: list[Color], t: float, space: str = "oklab") -> Colo
     i = min(int(pos), len(colors) - 2)
     local = pos - i
     return colors[i].mix(colors[i + 1], local, space)
+
+
+def thin_film_iridescence(
+    cos_theta: float,
+    thickness_nm: float,
+    film_ior: float = 1.65,
+    base_ior: float = 1.33,
+    alpha: float = 1.0,
+) -> Color:
+    """Two-interface thin-film optical interference at RGB reference wavelengths.
+
+    Models Snell refraction into a dielectric film (default n=1.65, inspired by
+    keratin/melanin barbule layers) and evaluates two-beam phase interference at
+    650 nm, 532 nm and 460 nm in linear light. Note: this is a 3-wavelength RGB
+    physical approximation, not a full 380-780 nm spectral integral.
+    """
+    if not all(math.isfinite(v) for v in (cos_theta, thickness_nm, film_ior, base_ior, alpha)):
+        raise ColorError("iridescence parameters must be finite")
+    if not (0.0 <= cos_theta <= 1.0):
+        raise ColorError("cos_theta must be in [0, 1]")
+    if thickness_nm < 0.0 or film_ior <= 1.0 or base_ior <= 0.0:
+        raise ColorError("thickness_nm must be >= 0 and film_ior > 1.0")
+    sin_theta_sq = max(0.0, 1.0 - cos_theta * cos_theta)
+    sin_film_sq = sin_theta_sq / (film_ior * film_ior)
+    cos_film = math.sqrt(max(0.0, 1.0 - sin_film_sq))
+    opd_nm = 2.0 * film_ior * thickness_nm * cos_film
+    # Half-wave phase shift at air->film interface plus substrate reflection shift
+    phase_offset = 0.5 if base_ior < film_ior else 0.0
+    r0_top = ((1.0 - film_ior) / (1.0 + film_ior)) ** 2
+    r0_bot = ((film_ior - base_ior) / (film_ior + base_ior)) ** 2
+    schlick = r0_top + (1.0 - r0_top) * ((1.0 - cos_theta) ** 5)
+    amp = min(1.0, math.sqrt(r0_top) + math.sqrt(r0_bot))
+
+    channels: list[float] = []
+    for wavelength in (650.0, 532.0, 460.0):
+        phase = 2.0 * math.pi * (opd_nm / wavelength + phase_offset)
+        interference = 0.5 * (1.0 + math.cos(phase))
+        refl = _clamp01(0.12 * schlick + (0.88 * amp * interference))
+        channels.append(refl)
+    return Color(channels[0], channels[1], channels[2], alpha)
+
+
+def wcag_passes(a: Color, b: Color, level: str = "AA", large_text: bool = False) -> bool:
+    """Evaluate WCAG 2.1 contrast thresholds for AA or AAA."""
+    ratio = a.contrast_ratio(b)
+    norm = level.upper()
+    if norm == "AA":
+        return ratio >= (3.0 if large_text else 4.5)
+    if norm == "AAA":
+        return ratio >= (4.5 if large_text else 7.0)
+    raise ColorError(f"unknown WCAG level '{level}' (expected 'AA' or 'AAA')")
+

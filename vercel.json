@@ -1,0 +1,7 @@
+{
+  "buildCommand": "python3 ./bin/peacock run website/site.pac --grant fs --root . --max-steps 50000000 -- website/dist",
+  "installCommand": "echo 'PEACOCK zero-dependency bootstrap'",
+  "outputDirectory": "website/dist",
+  "framework": null,
+  "cleanUrls": true
+}

@@ -272,6 +272,31 @@ class SerializationTests(unittest.TestCase):
             vec([1.0, 2.0]).item()
         self.assertEqual(Tensor([7.0], (1,)).item(), 7.0)
 
+    def test_gelu_and_layer_norm_finite_difference_gradients(self):
+        from peacock.intelligence.tensor import cosine_similarity, gelu, layer_norm, sum_all
+
+        x = Tensor([-1.2, -0.3, 0.4, 1.5], (2, 2), "Float64", requires_grad=True)
+        y = sum_all(layer_norm(gelu(x)))
+        y.backward()
+        assert x.grad is not None
+        eps = 1e-6
+        for idx in range(x.size):
+            plus = list(x.data)
+            minus = list(x.data)
+            plus[idx] += eps
+            minus[idx] -= eps
+            f_plus = sum_all(layer_norm(gelu(Tensor(plus, (2, 2), "Float64")))).item()
+            f_minus = sum_all(layer_norm(gelu(Tensor(minus, (2, 2), "Float64")))).item()
+            numeric = (f_plus - f_minus) / (2.0 * eps)
+            self.assertAlmostEqual(x.grad.data[idx], numeric, places=6)
+
+        a = Tensor([1.0, 0.0, 1.0], (3,), "Float64")
+        b = Tensor([1.0, 0.0, 1.0], (3,), "Float64")
+        c = Tensor([-1.0, 0.0, -1.0], (3,), "Float64")
+        self.assertAlmostEqual(cosine_similarity(a, b), 1.0, places=7)
+        self.assertAlmostEqual(cosine_similarity(a, c), -1.0, places=7)
+
+
 
 if __name__ == "__main__":
     unittest.main()

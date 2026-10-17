@@ -17,6 +17,10 @@ peacock <command> [options]
 | `audit <file.pac>` | static capability report; `--json` |
 | `tokens <file.pac>` | token dump (debug) |
 | `ast <file.pac>` | AST dump (debug) |
+| `fmt <file.pac>` | format a `.pac` source file (`--check`) |
+| `lint <file.pac>` | static diagnostics and capability lint (`--json`) |
+| `doc [file.pac]` | generate module or `--stdlib` API documentation (`--json`) |
+| `init <dir>` | scaffold a new PEACOCK project (`main.pac`, `peacock.json`) |
 | `bench` | reproducible benchmark suite; `--json PATH`, `--quick` |
 | `fuzz` | deterministic fuzzers; `--iterations`, `--seed`, `--json` |
 | `test` | run the unittest suite; `-p PATTERN`, `--quiet` |

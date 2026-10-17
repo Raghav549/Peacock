@@ -8,7 +8,10 @@
 
 module peacock_website
 
+use colour
 use fs
+use graphics
+use motion
 use process
 use text
 
@@ -148,11 +151,38 @@ fn section_node(section_id: String, title: String, description: String, children
 }
 
 fn code_panel(title: String, source: String) -> UiNode {
+    let digest = text.sha256(source).substring(0, 16);
     return element("article", "panel code-panel", [
         text_node("h3", "code-title", title),
-        text_node("p", "copy-hint", "Selectable source — use your browser's copy command."),
+        text_node("p", "copy-hint", "Selectable source — use your browser's copy command. · SHA-256: " + digest),
         element("pre", "code-frame", [text_node("code", "language-peacock", source)])
     ]);
+}
+
+fn chromatic_telemetry_summary() -> String {
+    let normal_iri = colour.iridescence(1.0, 280.0);
+    let grazing_iri = colour.iridescence(0.35, 280.0);
+    let ink = colour.from_hex("#edf3ff");
+    let bg = colour.from_hex("#080d18");
+    let ratio = colour.contrast(ink, bg);
+    let aaa_ok = colour.wcag_aaa(ink, bg, false);
+    let ease_mid = motion.ease("ease_out_cubic", 0.5);
+    let springs = motion.spring_steps(0.0, 1.0, 180.0, 16.0, 6, 0.016);
+    return "Thin-film normal (0 deg, 280nm): " + colour.to_css(normal_iri) +
+        " | grazing (cos=0.35, 280nm): " + colour.to_css(grazing_iri) +
+        " | Ink/BG WCAG contrast: " + str(ratio).substring(0, 5) + ":1 (AAA=" + str(aaa_ok) + ")" +
+        " | ease_out_cubic(0.5)=" + str(ease_mid) +
+        " | spring[5]=" + str(springs.get(5)).substring(0, 6);
+}
+
+fn render_chromatic_showcase(output_dir: String) -> Unit {
+    capability fs;
+    let canvas = graphics.canvas(360, 140);
+    graphics.clear(canvas, colour.from_hex("#080d18"));
+    graphics.aurora(canvas, 1.2, 7);
+    graphics.feather_eye(canvas, 105.0, 70.0, 52.0, 0.4);
+    graphics.lit_sphere(canvas, 255.0, 70.0, 46.0, colour.oklch(0.72, 0.14, 192.0, 1.0), 0.18, 0.78, 300.0);
+    graphics.save(canvas, output_dir + "/assets/chromatic-3d-preview.png");
 }
 
 fn page(slug: String, nav_label: String, title: String, eyebrow: String, summary: String, sections: List<UiNode>) -> Page {
@@ -266,12 +296,12 @@ fn compiler_page() -> Page {
     ]);
     let bootstrap = section_node("bootstrap", "Bootstrap and self-hosting", "A PEACOCK-written component is not the same thing as a self-hosting compiler.", [
         grid([
-            card("Tokenizer and parser", "Parity-tested", "partial", "PEACOCK source tokenizes and parses the core grammar; parser parity uses structural AST digests."),
-            card("Semantic kernel", "Shadow mode", "experimental", "The .pac type model now probes relations, operators, lists/indexing, local scopes, names, declarations, assignments, signatures, calls, conditions and returns."),
-            card("Production semantics", "Still Python", "partial", "The Python SemanticAnalyzer produces diagnostics and remains the production reference path."),
-            card("IR through VM migration", "Not started", "planned", "IR construction, verification, optimisation, bytecode, runtime and bootstrap reproducibility remain future stages.")
+            card("Tokenizer and parser", "Parity-tested", "partial", "PEACOCK source tokenizes and parses the core grammar; parser parity uses structural AST digests across 18 .pac files."),
+            card("Semantic kernel", "Shadow mode · 74 checks", "experimental", "selfhost/type_model.pac probes relations, operators, lists/indexing, local scopes, names, declarations, assignments, structs, fields, properties, methods, signatures, calls, conditions and returns."),
+            card("IR & bytecode kernel", "Stage 4 · 15 checks", "experimental", "selfhost/ir_model.pac models linear PIR register def-before-use invariants, slot ranges, label uniqueness, try/catch balance, constant folding and jump targets."),
+            card("Production semantics", "Still Python", "partial", "The Python SemanticAnalyzer, IRBuilder and VM remain the authoritative production pipeline until full fixed-point parity passes.")
         ]),
-        code_panel("Opt in to differential semantic probes", "./bin/peacock check examples/tour.pac --semantic-shadow --json")
+        code_panel("Opt in to differential semantic and IR probes", "./bin/peacock check examples/tour.pac --semantic-shadow --json\n./bin/peacock run selfhost/type_model.pac\n./bin/peacock run selfhost/ir_model.pac")
     ]);
     return page("compiler.html", "Compiler", "An original compiler, still on its bootstrap.", "Compiler architecture", "The compiler is a working language implementation, but PEACOCK is not self-hosting and does not yet emit native code or WebAssembly.", [pipeline, bootstrap]);
 }
@@ -279,8 +309,8 @@ fn compiler_page() -> Page {
 fn ai_engine_page(xor_source: String, tensor_source: String) -> Page {
     let capabilities = section_node("ai-capabilities", "What the Intelligence Engine verifies", "The current engine is independently implemented in the repository and uses CPU-only Python numerical kernels.", [
         grid([
-            card("Tensor algebra", "CPU · tested", "implemented", "Shape-aware tensors, indexing, reductions, broadcasting, rank-2 matmul, activations and stable softmax."),
-            card("Automatic differentiation", "Reverse mode", "implemented", "A local computation graph accumulates gradients; finite-difference checks exercise the tested operations."),
+            card("Tensor algebra", "CPU · tested", "implemented", "Shape-aware tensors, indexing, reductions, broadcasting, rank-2 matmul, activations (ReLU, GELU, Sigmoid, Tanh), LayerNorm, cosine similarity and stable softmax."),
+            card("Automatic differentiation", "Reverse mode", "implemented", "A local computation graph accumulates gradients; central finite-difference checks verify Dense, matmul, softmax, GELU and LayerNorm backward passes."),
             card("Training", "Small models", "implemented", "Dense/Sequential models, XOR and spiral datasets, MSE/cross-entropy, SGD/Adam and evaluation metrics."),
             card("Inference and save/load", "Custom artifacts", "partial", "Small-model inference and .pkm serialization/quantisation helpers exist; no production model-serving target.")
         ])
@@ -294,27 +324,34 @@ fn ai_engine_page(xor_source: String, tensor_source: String) -> Page {
 }
 
 fn frontend_page(aurora_source: String, motion_source: String) -> Page {
-    let current = section_node("visual-core", "The visual engine that exists", "PEACOCK has an original 2D software renderer and colour/motion libraries; it does not yet have a general-purpose widget framework.", [
+    let telemetry = chromatic_telemetry_summary();
+    let current = section_node("visual-core", "The visual engine that exists", "PEACOCK has an original 2D software renderer, thin-film chromatic intelligence, analytic 3D surface shading and motion/physics libraries.", [
         grid([
-            card("Colour", "Perceptual utilities", "implemented", "sRGB/XYZ, CIELAB, Oklab/Oklch, blending, palette generation, gradients and contrast helpers."),
-            card("2D rendering", "Software reference", "implemented", "Premultiplied linear-light RGBA, source-over compositing, coverage-sampled shapes, glow approximations and PNG output."),
-            card("Motion and layout", "Foundations", "partial", "Easing, springs, timelines, flex layout and 2D AABB physics are libraries; no live input/frame scheduler is integrated."),
-            card("Interactive UI and 3D", "Roadmap", "planned", "Widgets, text shaping, accessibility runtime, 3D scene graphs, materials, GPU rasterisation and platform input are not implemented.")
+            card("Chromatic intelligence", "Oklab + thin-film", "implemented", "sRGB/XYZ, CIELAB, Oklab/Oklch, two-interface Airy thin-film optical interference at RGB wavelengths, and WCAG 2.1 AA/AAA contrast checks."),
+            card("2D & analytic 3D shading", "Software reference", "implemented", "Premultiplied linear-light RGBA, Porter-Duff compositing, 4x4 AA shapes, peacock-feather ocellus rings, and analytic 3D sphere GGX/Schlick metallic-roughness shading."),
+            card("Motion and layout", "Foundations", "partial", "Easing, damped springs, keyframe timelines, flex layout and 2D AABB physics are deterministic libraries."),
+            card("Interactive UI and scene graphs", "Roadmap", "planned", "General widgets, text shaping, native accessibility runtime, polygon-mesh 3D scene graphs, GPU rasterisation and platform input remain roadmap work.")
+        ]),
+        element("article", "panel feature-card", [
+            badge("Rendered at build time by PEACOCK", "implemented"),
+            text_node("h3", "", "Chromatic Intelligence, Peacock-Feather Interference & 3D GGX/Schlick Sphere"),
+            image_node("assets/chromatic-3d-preview.png", "PEACOCK-rendered peacock feather ocellus and 3D iridescent metallic sphere", "showcase-banner"),
+            text_node("p", "callout", telemetry)
         ])
     ]);
-    let site_renderer = section_node("site-renderer", "This website is a PEACOCK application", "website/site.pac builds a component tree, escapes text and attributes, applies route state, then emits accessible static HTML and responsive CSS through the fs capability.", [
+    let site_renderer = section_node("site-renderer", "This website is a PEACOCK application", "website/site.pac builds a component tree, escapes text and attributes, computes chromatic/motion telemetry, renders PNG graphics and emits accessible static HTML and responsive CSS through the fs capability.", [
         grid([
             card("Declarative component tree", "PEACOCK source", "experimental", "Reusable UiNode, Page, card, section, status and code-panel components are defined in .pac."),
             card("Routes and navigation", "12 static routes", "implemented", "A shared renderer creates page links and marks the current route with aria-current; every page is a separate HTML route."),
-            card("Browser boundary", "HTML + CSS only", "implemented", "The bootstrap runs the .pac program; the browser renders generated semantic HTML/CSS. No JavaScript or external UI framework is generated."),
-            card("Not a general frontend runtime", "Static export", "partial", "This site generator is a real PEACOCK application, not a claim that interactive native UI or 3D has shipped.")
+            card("Browser boundary", "HTML + CSS + PNG/SVG", "implemented", "The bootstrap runs the .pac program; the browser renders generated semantic HTML/CSS and PEACOCK-encoded PNG/SVG assets. No JavaScript or external UI framework is generated."),
+            card("Not a general frontend runtime", "Static export", "partial", "This site generator is a real PEACOCK application, not a claim that interactive native UI or a polygon-mesh 3D engine has shipped.")
         ])
     ]);
     let examples = section_node("visual-examples", "See the actual .pac programs", "The snippets below are read from the tested example sources during the site build.", [
         code_panel("examples/aurora.pac", aurora_source),
         code_panel("examples/motion.pac", motion_source)
     ]);
-    return page("frontend-studio.html", "Frontend Studio", "A visual stack grows from colour and pixels.", "Frontend Studio", "A measured path from the current software renderer to a native, accessible and interactive application runtime.", [current, site_renderer, examples]);
+    return page("frontend-studio.html", "Frontend Studio", "A visual stack grows from colour, optics and pixels.", "Frontend Studio & Chromatic Intelligence", "Perceptual Oklab/Oklch colour spaces, thin-film optical interference, analytic 3D GGX/Schlick surface shading, damped springs, and deterministic 2D physics.", [current, site_renderer, examples]);
 }
 
 fn docs_page(hello_source: String) -> Page {
@@ -323,15 +360,15 @@ fn docs_page(hello_source: String) -> Page {
         code_panel("First PEACOCK source", hello_source),
         grid([
             card("Requirements", "Python 3.11+", "implemented", "The bootstrap and tests use the Python standard library; package building uses the declared setuptools build backend."),
-            card("Canonical files", ".pac / .pkb", "implemented", "Source files use .pac. The compiler emits verified .pkb bytecode images."),
-            card("Capability grants", "Explicit", "implemented", "Use --grant fs, compute or ui only when the source declares the capability and the host boundary is configured."),
+            card("Canonical files", ".pac / .pkb / .pkm", "implemented", "Source files use .pac. The compiler emits verified .pkb bytecode images; models use .pkm."),
+            card("Developer CLI tools", "fmt · lint · doc · init", "implemented", "Format source with peacock fmt, run static/capability lints with peacock lint, scaffold with peacock init, and generate docs with peacock doc."),
             card("Editor support", "Prepared", "partial", "A TextMate grammar and VS Code metadata exist; no published extension or language server is available.")
         ]),
         link_node("CLI reference", "https://github.com/Raghav549/Peacock/blob/main/docs/cli.md", "inline-link"),
         link_node("Language specification", "https://github.com/Raghav549/Peacock/blob/main/SPECIFICATION.md", "inline-link")
     ]);
-    let workflow = section_node("workflow", "A minimal developer workflow", "Check, test and build use the same front end; the `test` command runs the repository's unittest suite.", [
-        code_panel("Daily commands", "./bin/peacock check path/to/app.pac\n./bin/peacock run path/to/app.pac\n./bin/peacock test\n./bin/peacock build path/to/app.pac -o app.pkb")
+    let workflow = section_node("workflow", "Complete developer workflow", "Check, format, lint, document, test and build use the same unified CLI.", [
+        code_panel("Daily commands", "./bin/peacock init my_project\n./bin/peacock fmt path/to/app.pac --check\n./bin/peacock lint path/to/app.pac\n./bin/peacock doc --stdlib\n./bin/peacock check path/to/app.pac --semantic-shadow\n./bin/peacock test\n./bin/peacock build path/to/app.pac -o app.pkb")
     ]);
     return page("docs.html", "Docs", "Get from a checkout to a running .pac program.", "Developer documentation", "Practical, reproducible instructions for the currently supported bootstrap environment.", [setup, workflow]);
 }
@@ -372,6 +409,7 @@ fn research_page() -> Page {
     let sources = section_node("sources", "Source library and verification status", "The bibliography file records 162 entries spanning programming languages, compilers, differentiable programming, numerical methods, graphics, security and evaluation.", [
         text_node("p", "callout", "The current build environment does not permit direct access to arXiv or publisher hosts. Do not treat every identifier in the inherited bibliography as externally verified; the research README records that limitation."),
         link_node("Open research/references.bib", "https://github.com/Raghav549/Peacock/blob/main/research/references.bib", "inline-link"),
+        link_node("Open CPython architectural analysis", "https://github.com/Raghav549/Peacock/blob/main/research/cpython-architecture.md", "inline-link"),
         link_node("Open literature review and limitations", "https://github.com/Raghav549/Peacock/blob/main/research/literature-review.md", "inline-link"),
         link_node("Open benchmark methodology", "https://github.com/Raghav549/Peacock/blob/main/research/benchmark-methodology.md", "inline-link")
     ]);
@@ -506,7 +544,7 @@ fn stylesheet() -> String {
         ".hero-panel { position: relative; isolation: isolate; overflow: hidden; padding: clamp(26px, 5vw, 58px); border: 1px solid #74e5d544; border-radius: 30px; background: radial-gradient(ellipse at 100% 10%, #5e51bd48, transparent 48%), radial-gradient(ellipse at 0 100%, #0a7c8055, transparent 50%), linear-gradient(130deg, #132335f5, #0b1220f5); box-shadow: 0 32px 80px #0005; } .hero-panel::after { content: ''; position: absolute; z-index: -1; width: 240px; height: 240px; right: -60px; top: -80px; border: 1px solid #8df2e822; border-radius: 50%; box-shadow: 0 0 0 22px #8df2e80a, 0 0 0 44px #8df2e805; } .hero-panel > .status { margin-bottom: 22px; } .hero-kicker { margin-bottom: 10px; } .hero-copy { max-width: 760px; color: #d5e2f4; font-size: clamp(1.1rem, 2vw, 1.4rem); } .hero-note { max-width: 780px; color: var(--muted); font-size: .9rem; margin: 22px 0 0; } .hero-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }",
         ".button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 16px; border: 1px solid #c5d8ee44; border-radius: 12px; font-weight: 700; text-decoration: none; transition: transform .18s ease, border-color .18s ease, background .18s ease; } .button:hover { transform: translateY(-2px); border-color: var(--teal); } .button-primary { color: #051514; background: linear-gradient(100deg, #80ebd9, #a2d4ff); border-color: transparent; } .button-primary:hover { color: #051514; background: linear-gradient(100deg, #a2d4ff, #c2a2ff); } .button-secondary { color: var(--ink); background: #ffffff0d; } .inline-link { display: inline-block; width: fit-content; font-weight: 700; }",
         ".code-panel { padding: 20px; overflow: hidden; } .code-title { margin: 0; } .copy-hint { color: var(--muted); font-size: .8rem; margin: 5px 0 12px; } .code-frame { overflow: auto; max-height: 34rem; margin: 0; padding: 17px; border: 1px solid #9fb6d322; border-radius: 14px; background: #060b13; color: #d9ebff; font: .84rem/1.7 ui-monospace, SFMono-Regular, Consolas, monospace; tab-size: 4; } .language-peacock { white-space: pre; } .callout { padding: 16px 18px; border-left: 3px solid var(--teal); border-radius: 0 12px 12px 0; color: #d4e3f5; background: #61dece0c; } .filter-links { display: flex; flex-wrap: wrap; gap: 9px; } .filter-chip { padding: 8px 13px; color: var(--teal); border: 1px solid #72e4d255; border-radius: 999px; text-decoration: none; } .filter-chip:hover { background: #72e4d21a; }",
-        ".details-panel { padding: 17px 20px; } details summary { cursor: pointer; color: var(--ink); font-weight: 700; } details p { margin: 12px 0 0; } .site-footer { max-width: 1160px; margin: 0 auto; padding: 28px; border-top: 1px solid #d7e6ff20; display: flex; align-items: center; justify-content: space-between; gap: 22px; color: var(--muted); } .site-footer strong { color: var(--ink); letter-spacing: .1em; } .site-footer p { margin: 5px 0 0; font-size: .84rem; } .footer-links { display: flex; flex-wrap: wrap; gap: 17px; }",
+        ".details-panel { padding: 17px 20px; } details summary { cursor: pointer; color: var(--ink); font-weight: 700; } details p { margin: 12px 0 0; } .showcase-banner { display: block; width: 100%; max-width: 540px; height: auto; margin: 14px 0; border-radius: 14px; border: 1px solid #72e4d244; } .site-footer { max-width: 1160px; margin: 0 auto; padding: 28px; border-top: 1px solid #d7e6ff20; display: flex; align-items: center; justify-content: space-between; gap: 22px; color: var(--muted); } .site-footer strong { color: var(--ink); letter-spacing: .1em; } .site-footer p { margin: 5px 0 0; font-size: .84rem; } .footer-links { display: flex; flex-wrap: wrap; gap: 17px; }",
         "@media (max-width: 1050px) { .header-inner { align-items: flex-start; flex-direction: column; gap: 10px; } .brand { min-width: 0; } .nav-links { justify-content: flex-start; } .nav-link { padding: 6px 8px; } }",
         "@media (max-width: 680px) { .header-inner { padding: 12px 16px; } .nav-links { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; padding: 2px 1px 8px; scrollbar-width: thin; } .nav-link { flex: 0 0 auto; } .page-main { padding: 38px 17px 58px; } .card-grid { grid-template-columns: 1fr; } .hero-panel { border-radius: 22px; } .site-footer { padding: 23px 17px; align-items: flex-start; flex-direction: column; } .footer-links { gap: 13px; } h1 { font-size: clamp(2.25rem, 12vw, 3.5rem); } .code-frame { font-size: .76rem; } }",
         "@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }"
@@ -545,6 +583,7 @@ fn main() -> Unit {
     }
     fs.write_text(output_dir + "/styles.css", stylesheet());
     fs.write_text(output_dir + "/assets/peacock.svg", logo_source);
+    render_chromatic_showcase(output_dir);
     print("Built 12 PEACOCK-authored pages in " + output_dir);
     print("Static export: semantic HTML + responsive CSS; no JavaScript bundle");
 }
