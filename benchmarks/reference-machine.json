@@ -1,0 +1,192 @@
+{
+  "schema": 1,
+  "generated_at": "2026-10-17T16:51:33+00:00",
+  "environment": {
+    "python": "3.11.2",
+    "implementation": "CPython",
+    "platform": "Linux-6.1.158+-x86_64-with-glibc2.36",
+    "machine": "x86_64",
+    "processor": "",
+    "cpu_count": 2,
+    "total_ram_bytes": 4131278848,
+    "gpu": "none detected (no nvidia-smi; CPU-only reference engine)",
+    "git_commit": "755fbc8",
+    "git_dirty": true
+  },
+  "results": [
+    {
+      "category": "compiler",
+      "name": "compile_hello",
+      "value": 0.5181090000405675,
+      "unit": "ms",
+      "note": "6 lines -> 6 instructions",
+      "samples": 5
+    },
+    {
+      "category": "compiler",
+      "name": "compile_tour",
+      "value": 4.130312999677699,
+      "unit": "ms",
+      "note": "63 lines -> 477 instructions",
+      "samples": 5
+    },
+    {
+      "category": "compiler",
+      "name": "compile_selfhost-tokenizer",
+      "value": 14.792771999964316,
+      "unit": "ms",
+      "note": "235 lines -> 1932 instructions",
+      "samples": 5
+    },
+    {
+      "category": "compiler",
+      "name": "compile_200_functions",
+      "value": 28.592148999905476,
+      "unit": "ms",
+      "note": "9538 bytes, 206 lines",
+      "samples": 5
+    },
+    {
+      "category": "compiler",
+      "name": "compile_throughput",
+      "value": 311.62510084551286,
+      "unit": "KiB/s",
+      "note": "synthetic 400-function module, full pipeline",
+      "samples": 5
+    },
+    {
+      "category": "compiler",
+      "name": "compile_peak_memory_tokenizer",
+      "value": 0.8430881500244141,
+      "unit": "MiB",
+      "note": "tracemalloc peak during full pipeline",
+      "samples": 1
+    },
+    {
+      "category": "runtime",
+      "name": "vm_loop_execution",
+      "value": 224.84999900007097,
+      "unit": "ms",
+      "note": "640027 bytecode steps",
+      "samples": 1
+    },
+    {
+      "category": "runtime",
+      "name": "vm_steps_per_second",
+      "value": 2846462.098493485,
+      "unit": "steps/s",
+      "note": "tight integer loop",
+      "samples": 1
+    },
+    {
+      "category": "runtime",
+      "name": "startup_hello",
+      "value": 0.1359339998998621,
+      "unit": "ms",
+      "note": "load image + VM + run",
+      "samples": 5
+    },
+    {
+      "category": "intelligence",
+      "name": "matmul_48x48",
+      "value": 8.031904999825201,
+      "unit": "ms",
+      "note": "221184 FLOPs, reference Python kernel",
+      "samples": 5
+    },
+    {
+      "category": "intelligence",
+      "name": "matmul_mflops",
+      "value": 27.538174319145167,
+      "unit": "MFLOP/s",
+      "note": "same run",
+      "samples": 5
+    },
+    {
+      "category": "intelligence",
+      "name": "softmax_128x128",
+      "value": 2.7749490000132937,
+      "unit": "ms",
+      "note": "last-axis softmax",
+      "samples": 5
+    },
+    {
+      "category": "intelligence",
+      "name": "mlp_train_step",
+      "value": 2.547355999922729,
+      "unit": "ms",
+      "note": "batch 16, 16->32->4, forward + cross-entropy + backward",
+      "samples": 5
+    },
+    {
+      "category": "intelligence",
+      "name": "train_xor_100_epochs",
+      "value": 30.147578000196518,
+      "unit": "ms",
+      "note": "final loss 0.010279, accuracy 1.0",
+      "samples": 1
+    },
+    {
+      "category": "intelligence",
+      "name": "inference_latency_single",
+      "value": 0.03876899995702843,
+      "unit": "ms",
+      "note": "2->8->2 model, reference engine",
+      "samples": 200
+    },
+    {
+      "category": "frontend",
+      "name": "gradient_320x180",
+      "value": 123.7256890003664,
+      "unit": "ms",
+      "note": "perceptual gradient fill",
+      "samples": 5
+    },
+    {
+      "category": "frontend",
+      "name": "aurora_160x90",
+      "value": 100.55366200003846,
+      "unit": "ms",
+      "note": "procedural fBm aurora, artistic",
+      "samples": 5
+    },
+    {
+      "category": "frontend",
+      "name": "png_encode_320x180",
+      "value": 73.51507100020171,
+      "unit": "ms",
+      "note": "RGBA8, filter 0, zlib level 6",
+      "samples": 5
+    },
+    {
+      "category": "frontend",
+      "name": "ui_frame_512x512",
+      "value": 30.6782560001011,
+      "unit": "ms",
+      "note": "clear + 20 rects + 20 circles (4x4 AA)",
+      "samples": 3
+    },
+    {
+      "category": "motion",
+      "name": "spring_simulation",
+      "value": 772727.1217013362,
+      "unit": "steps/s",
+      "note": "10000 substeps",
+      "samples": 1
+    },
+    {
+      "category": "motion",
+      "name": "easing_calls",
+      "value": 3273536.62195217,
+      "unit": "calls/s",
+      "note": "ease_in_out_cubic",
+      "samples": 1
+    }
+  ],
+  "notes": [
+    "All measurements are in-process wall-clock medians on the machine listed in environment.",
+    "The reference engine is pure Python; arithmetic throughput is not representative of native PEACOCK.",
+    "Rendering measurements are for the software rasteriser with 4x4 coverage anti-aliasing.",
+    "No results here compare PEACOCK to another language; methodology requires fair, reproducible comparisons."
+  ]
+}

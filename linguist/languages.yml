@@ -1,0 +1,11 @@
+# Proposed GitHub Linguist entry for PEACOCK.
+# PREPARED ONLY: nothing here is submitted, and GitHub does not currently
+# recognise PEACOCK. See SUBMISSION.md before opening a pull request.
+Peacock:
+  type: programming
+  color: "#0E7C86"
+  extensions:
+    - ".pac"
+  tm_scope: source.peacock
+  ace_mode: text
+  # language_id is assigned by Linguist when a new language is accepted.
