@@ -72,18 +72,27 @@ def compile_source(
         result.stats["total_ms"] = (time.perf_counter() - start_total) * 1000.0
         return result
 
-    if semantic_mode == "shadow":
-        from .selfhost_types import SelfHostTypeMismatch, shadow_check
-
-        try:
-            result.stats["selfhost_type_cases"] = shadow_check(module)
-        except SelfHostTypeMismatch as exc:
-            raise InternalCompilerError(str(exc)) from exc
-
     t0 = time.perf_counter()
     typed = SemanticAnalyzer(module, result.diagnostics).analyze()
     result.stats["semantic_ms"] = (time.perf_counter() - t0) * 1000.0
     result.typed = typed
+
+    if semantic_mode == "shadow":
+        # Run the PEACOCK-written semantic kernel against the annotations and
+        # diagnostics produced by the bootstrap. It stays explicitly opt-in;
+        # the Python analyser remains authoritative until broader parity gates
+        # are met.
+        from .selfhost_types import SelfHostTypeMismatch, shadow_check
+
+        t0 = time.perf_counter()
+        try:
+            shadow_stats = shadow_check(module, typed)
+            result.stats["selfhost_type_cases"] = shadow_stats["type_cases"]
+            result.stats["selfhost_semantic_cases"] = shadow_stats["semantic_cases"]
+            result.stats["selfhost_builtin_cases"] = shadow_stats["builtin_cases"]
+        except SelfHostTypeMismatch as exc:
+            raise InternalCompilerError(str(exc)) from exc
+        result.stats["selfhost_shadow_ms"] = (time.perf_counter() - t0) * 1000.0
     if result.diagnostics.has_errors:
         result.stats["total_ms"] = (time.perf_counter() - start_total) * 1000.0
         return result

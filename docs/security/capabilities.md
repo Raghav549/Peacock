@@ -14,7 +14,8 @@ Three layers, all required:
 use fs
 fn main() -> Unit {
     capability fs;                 // declare to the verifier
-    fs.write_text("out.txt", "ok");
+    fs.create_dir("out/generated");
+    fs.write_text("out/generated/status.txt", "ok");
 }
 ```
 
@@ -32,6 +33,12 @@ Neither layer alone is sufficient: `--grant fs` does not satisfy the static chec
 `capability fs;` does not grant host authority. The same is true for `ui`: the
 declaration is checked statically, the grant is checked by the VM, and the host
 must also have attached a presentation backend.
+
+`fs.create_dir(path)` creates parent directories inside the same `HostPolicy`
+sandbox and requires `fs`. It does not grant a broader filesystem surface than
+`read_text`/`write_text`; symlink escapes, traversal and absolute paths outside
+the root are still rejected. Confinement is best-effort and does not eliminate
+host-side TOCTOU races.
 
 `ui` is presentation-only and carries no input or display-query authority.
 `peacock audit app.pac --json` lists declared capabilities and statically visible

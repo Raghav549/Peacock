@@ -12,6 +12,7 @@
 | [frontend/canvas.md](frontend/canvas.md) | rasteriser, anti-aliasing, PNG, limits |
 | [frontend/motion.md](frontend/motion.md) | easing, springs, timelines, layout, physics |
 | [platforms/README.md](platforms/README.md) | host matrix and presentation adapters |
+| [../website/README.md](../website/README.md) | PEACOCK-authored website source, static export and limits |
 | [cli.md](cli.md) | command reference, exit codes, grants |
 | [../selfhost/README.md](../selfhost/README.md) | PEACOCK-written tokenizer/parser, parity evidence and scope |
 | [linguist.md](linguist.md) | prepared GitHub language recognition support |

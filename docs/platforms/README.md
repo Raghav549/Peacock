@@ -13,6 +13,12 @@ and presents `Canvas` frames through a `Backend`:
 | iOS shell | Swift/Objective-C host, signing | not implemented (requires macOS/Xcode) |
 | WASM host | browser runtime + ABI | not implemented |
 
+This frame-oriented `WebBackend` is distinct from the PEACOCK-authored static
+application website at [`website/site.pac`](../../website/site.pac), which exports
+twelve routes as HTML/CSS/SVG through the actual CLI. It is a site generator,
+not a VM platform target or general interactive browser runtime; see
+[`website/README.md`](../../website/README.md).
+
 ## Usage
 
 ```python

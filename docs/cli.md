@@ -10,9 +10,9 @@ peacock <command> [options]
 | Command | Purpose |
 |---|---|
 | `version` | versions, extension, implementation status |
-| `check <file.pac>` | full pipeline; `--json`, `--no-opt`, `--quiet` |
+| `check <file.pac>` | full pipeline; `--json`, `--no-opt`, `--quiet`, experimental `--semantic-shadow` |
 | `run <file.pac\|file.pkb>` | compile if needed, execute; `--grant`, `--root`, `--json`, `--report`, `--max-steps`, `--present DIR`, `--serve PORT` |
-| `build <file.pac> [-o file.pkb]` | verified image + SHA-256 |
+| `build <file.pac> [-o file.pkb]` | verified image + SHA-256; optional experimental `--semantic-shadow` |
 | `disasm <file>` | human-readable instructions, models, training declarations |
 | `audit <file.pac>` | static capability report; `--json` |
 | `tokens <file.pac>` | token dump (debug) |
@@ -20,6 +20,21 @@ peacock <command> [options]
 | `bench` | reproducible benchmark suite; `--json PATH`, `--quick` |
 | `fuzz` | deterministic fuzzers; `--iterations`, `--seed`, `--json` |
 | `test` | run the unittest suite; `-p PATTERN`, `--quiet` |
+
+## Semantic shadow checks (experimental)
+
+`check --semantic-shadow` keeps the Python analyser authoritative and then runs
+AST-derived checks through `selfhost/type_model.pac` in the PEACOCK VM. It
+covers the currently migrated type relations, expression result rules, local
+scope/name probes, declarations/assignments, user-function signatures/calls,
+conditions and returns. The JSON stats include `selfhost_type_cases`,
+`selfhost_semantic_cases`, `selfhost_builtin_cases` and shadow time. A disagreement
+is an internal compiler error; the flag does not change ordinary compilation
+acceptance or diagnostics. `build` also accepts the flag to require the same
+shadow pass before emitting `.pkb`.
+
+This remains experimental: field/method semantics, native overloads,
+model/training checks, diagnostics, IR, bytecode and VM are not migrated.
 
 ## Grants and sandbox
 

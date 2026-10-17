@@ -475,6 +475,12 @@ def _fs_write_text(ctx, args):
     return UNIT
 
 
+def _fs_create_dir(ctx, args):
+    path = _need_str(args[0], "fs.create_dir path")
+    ctx.host.create_directory(path)
+    return UNIT
+
+
 # -- neural networks --------------------------------------------------------
 def _nn_parameter(ctx, args):
     value = args[0]
@@ -925,6 +931,7 @@ _IMPLS = {
     "process.args": _process_args,
     "fs.read_text": _fs_read_text,
     "fs.write_text": _fs_write_text,
+    "fs.create_dir": _fs_create_dir,
     "nn.parameter": _nn_parameter,
     "nn.max_abs_diff": _nn_max_abs_diff,
     "nn.mse": _nn_mse,

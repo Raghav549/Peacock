@@ -193,6 +193,9 @@ NATIVES: dict[str, tuple[NativeSignature, ...]] = {
     "fs.write_text": (
         NativeSignature((_p("path", S), _p("content", S)), U, capability="fs"),
     ),
+    "fs.create_dir": (
+        NativeSignature((_p("path", S),), U, capability="fs"),
+    ),
     # -- neural networks -------------------------------------------------
     "nn.parameter": (
         NativeSignature((_p("data", ANY),), T.TensorType("Float32", None), capability="compute"),
@@ -316,6 +319,7 @@ NATIVE_DOCS: dict[str, str] = {
     # filesystem
     "fs.read_text": "Read a UTF-8 text file inside the sandbox. Requires the fs capability.",
     "fs.write_text": "Write a UTF-8 text file inside the sandbox. Requires the fs capability.",
+    "fs.create_dir": "Create a directory (and missing parents) inside the filesystem sandbox. Requires the fs capability.",
     # graphics
     "graphics.canvas": "Create an RGBA canvas of the given integer dimensions.",
     "graphics.clear": "Replace every pixel with a colour.",

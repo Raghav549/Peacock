@@ -75,10 +75,12 @@ def _read_source(path: Path, require_extension: bool = True) -> str:
         raise CLIError(f"'{path}' is not valid UTF-8: {exc}")
 
 
-def _compile(path: Path, optimize: bool = True):
+def _compile(path: Path, optimize: bool = True, semantic_mode: str = "python"):
     source = _read_source(path)
     try:
-        return compile_source(source, str(path), optimize_ir=optimize), source
+        return compile_source(
+            source, str(path), optimize_ir=optimize, semantic_mode=semantic_mode
+        ), source
     except InternalCompilerError as exc:
         print(f"internal compiler error: {exc}", file=sys.stderr)
         print("This is a compiler bug, not a user error. Please report it.", file=sys.stderr)
@@ -141,7 +143,10 @@ def cmd_version(argv: list[str]) -> int:
     print(f"artifact extension: {ARTIFACT_EXTENSION}")
     print(f"python: {platform.python_version()} on {platform.platform()}")
     print(f"machine: {platform.machine()}, cpus: {os.cpu_count()}")
-    print("implementation status: phases 1-3; NOT self-hosting; see STATUS.md")
+    print(
+        "implementation status: phases 0-4 substantially implemented; 5-7 and 9 partial; "
+        "NOT self-hosting; see STATUS.md"
+    )
     return EXIT_OK
 
 
@@ -149,10 +154,19 @@ def cmd_check(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="peacock check")
     parser.add_argument("file", type=Path)
     parser.add_argument("--no-opt", action="store_true")
+    parser.add_argument(
+        "--semantic-shadow",
+        action="store_true",
+        help="differentially execute the PEACOCK-written semantic kernel (experimental)",
+    )
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--quiet", action="store_true")
     args = parser.parse_args(argv)
-    result, source = _compile(args.file, optimize=not args.no_opt)
+    result, source = _compile(
+        args.file,
+        optimize=not args.no_opt,
+        semantic_mode="shadow" if args.semantic_shadow else "python",
+    )
     if args.json:
         payload = {
             "ok": result.ok,
@@ -319,8 +333,17 @@ def cmd_build(argv: list[str]) -> int:
     parser.add_argument("file", type=Path)
     parser.add_argument("-o", "--output", type=Path, default=None)
     parser.add_argument("--no-opt", action="store_true")
+    parser.add_argument(
+        "--semantic-shadow",
+        action="store_true",
+        help="require the experimental PEACOCK semantic shadow checks before emitting bytecode",
+    )
     args = parser.parse_args(argv)
-    result, source = _compile(args.file, optimize=not args.no_opt)
+    result, source = _compile(
+        args.file,
+        optimize=not args.no_opt,
+        semantic_mode="shadow" if args.semantic_shadow else "python",
+    )
     _print_diagnostics(result, source)
     if not result.ok:
         return EXIT_DIAGNOSTICS

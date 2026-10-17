@@ -11,7 +11,7 @@ self-hosting.
 |---|---:|---|---|
 | `tokenizer.pac` | 235 | lexes a `.pac` file into labelled tokens (keywords, identifiers, numbers, strings, operators, comments) | token count and non-string token-label parity with the bootstrap lexer on `examples/tour.pac` (367 tokens) |
 | `parser.pac` | 1,085 | lexes and parses the full 0.1 grammar — module/use/struct/fn, statements, expressions, model and training declarations — and prints a canonical AST digest | byte-identical digest with the bootstrap AST on the 14-file core corpus, plus parsing its own source and `tokenizer.pac` |
-| `type_model.pac` | — | executable type-algebra kernel: primitive/list/nominal, Never/Error and tensor assignability plus broadcast compatibility | VM-run assertions plus opt-in AST-driven shadow checks against Python; experimental relation layer, not a semantic analyser |
+| `type_model.pac` | — | executable PEACOCK kernel for recursive type relations, unary/binary/list/index inference, lexical bindings, declaration/assignment, user-function signatures/calls, conditions, returns and iterable rules | VM-run assertions plus opt-in typed-AST shadow probes against Python; experimental, incomplete and not a production semantic analyser |
 | `fixtures/core_syntax.pac` | 57 | covers else-if, nested blocks, indexing, power associativity, `not/and/or`, `%`, ranges, break/continue, `assert` and generics | included in the parity corpus and executable |
 | `fixtures/invalid/*.pac` | — | malformed programs for the negative suite | assert a non-zero exit, a `PE4020` diagnostic, line/column and no stdout AST |
 
@@ -73,7 +73,7 @@ python3 -m unittest tests.integration.test_selfhost_parser -v
 |---|---|
 | 1. lexer/tokenizer | done (`tokenizer.pac`, plus the lexer inside `parser.pac`) |
 | 2. parser and AST | **partial** — full-grammar syntax parity and self-parse; diagnostics/recovery and typed AST pending |
-| 3. semantic analyser/type checker | **shadow prototype** (`type_model.pac` checks supported type relations extracted from parsed declaration ASTs; no expression typing/name resolution/diagnostic parity) |
+| 3. semantic analyser/type checker | **shadow prototype** (`type_model.pac` executes supported typed-AST expression/scope/name/assignment/call/return/condition/iterable probes; Python remains authoritative and kernel-generated diagnostics are not implemented) |
 | 4. IR/optimiser/bytecode emitter | planned |
 | 5. VM in PEACOCK | planned |
 | 6. fixed point | planned |

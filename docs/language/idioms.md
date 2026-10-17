@@ -28,6 +28,18 @@ fn main() -> Unit {
 ```
 
 ```peacock
+use fs
+fn main() -> Unit {
+    capability fs;
+    fs.create_dir("out/reports");
+    fs.write_text("out/reports/status.txt", "ready");
+}
+```
+
+`fs.create_dir` is sandbox-rooted and still requires both the source declaration
+and host `--grant fs`; see [capabilities](../security/capabilities.md).
+
+```peacock
 fn main() -> Unit {
     capability ui;
     let canvas = graphics.canvas(320, 180);

@@ -2,6 +2,7 @@ __pycache__/
 *.py[cod]
 *.pkb
 examples/out/
+website/dist/
 benchmarks/latest.json
 .pytest_cache/
 .venv/

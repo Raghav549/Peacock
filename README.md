@@ -10,17 +10,17 @@ security, and multiple deployment hosts behind one coherent language.
 **Canonical source extension: `.pac`.** Compiled programs use `.pkb`; models use
 `.pkm`. `.pk` and `.peacock` are **not** accepted by the toolchain.
 
-> **Honest status (v0.1.0, phase 1–3 of 10).** The lexer, parser, type checker,
-> typed IR, optimiser, bytecode compiler, stack VM, tensor/autodiff engine,
-> small-model trainer, colour pipeline, 2D software renderer, PNG codec, motion,
-> layout, and physics subsystems are implemented and exercised by **495 tests**.
-> The web/headless/server presentation adapters are implemented. Native mobile
-> shells, a native code generator, GPU kernels, a full UI toolkit, 3D rendering,
-> and AGI research tooling are **not implemented**. The compiler is **not
-> self-hosting**; a PEACOCK lexer and full-grammar parser are parity-tested
-> against the bootstrap. A small PEACOCK type-relation kernel runs in opt-in
-> shadow checks on parsed declarations; production semantic analysis, IR and
-> code generation remain Python.
+> **Honest status (v0.1.0; phases 0–4 substantially implemented, 5–7 and 9 partial).**
+> The lexer, parser, type checker, typed IR, optimiser, bytecode compiler, stack
+> VM, tensor/autodiff engine, small-model trainer, colour pipeline, 2D software
+> renderer, PNG codec, motion, layout, physics and web/headless/server
+> presentation adapters are exercised by **506 passing tests**. A twelve-route
+> static website is also authored in PEACOCK and exported by the actual CLI.
+> Native mobile shells, native code generation, GPU kernels, a general UI toolkit,
+> 3D rendering and AGI research tooling are **not implemented**. The compiler is
+> **not self-hosting**; the tokenizer/parser have parity evidence and an
+> experimental semantic-shadow kernel is compared with Python on supported
+> cases. Python remains authoritative for production semantics, IR and codegen.
 > GitHub does **not** yet recognise `.pac`; a Linguist submission is prepared in
 > [`linguist/`](linguist/), not accepted. See [STATUS.md](STATUS.md) for evidence.
 
@@ -43,6 +43,8 @@ security, and multiple deployment hosts behind one coherent language.
 | Frame presentation from `.pac` (`graphics.present`, capability `ui`) | Working; static-web backend via `--present` | `examples/present.pac`, `tests/integration/test_presentation.py` |
 | PEACOCK-written tokenizer | Working; parity-tested | `selfhost/tokenizer.pac`, `tests/integration/test_cli.py` |
 | PEACOCK-written full-grammar parser | Working (syntax); strict errors, no recovery yet | `selfhost/parser.pac`, `tests/integration/test_selfhost_parser.py` |
+| Semantic-shadow kernel | Experimental; typed-AST probes, Python remains authoritative | `selfhost/type_model.pac`, `--semantic-shadow` |
+| PEACOCK-authored static website | Working export; 12 HTML routes, CSS and SVG, no JS bundle | `website/site.pac`, `tests/integration/test_website.py` |
 | Native UI toolkit, 3D, GPU, native codegen | **Not implemented** | Roadmap phases 5–8 |
 | Android/iOS/desktop shells | **Not implemented** | `docs/platforms/README.md` |
 | Official GitHub language recognition | **Not accepted** | `linguist/SUBMISSION.md` |
@@ -76,6 +78,10 @@ planned self-hosted compiler (ADR-0001 in
 # Serve frames over HTTP while the program runs (then keep the last one)
 ./bin/peacock run examples/present.pac --grant ui --serve 8099 --linger 30
 # -> http://127.0.0.1:8099/  /frame.png  /manifest.json  /healthz
+
+# Export the PEACOCK-authored twelve-route website (static HTML/CSS/SVG)
+./bin/peacock run website/site.pac --grant fs --root . \
+  --max-steps 10000000 -- website/dist
 
 # Build and execute a bytecode artifact
 ./bin/peacock build examples/hello.pac -o /tmp/hello.pkb
@@ -171,7 +177,8 @@ peacock/intelligence/   tensors, autodiff, datasets, layers, training, evaluatio
 peacock/frontend/       colour, rasteriser, PNG, easing, spring, timeline, layout, physics
 peacock/platforms/      headless, static-web and HTTP frame hosts
 peacock/cli.py          run, check, build, disasm, audit, bench, fuzz, test, tokens, ast
-selfhost/               PEACOCK-written tokenizer and parser, parity fixtures and tests
+selfhost/               PEACOCK tokenizer, parser and semantic-shadow kernel with parity fixtures
+website/                PEACOCK-authored static website source and build guide
 examples/               canonical .pac programs (all compile and run in tests, incl. presentation)
 tests/                  unittest suite: compiler, ai, frontend, security, integration, unit, benchmarks
 linguist/               prepared GitHub Linguist language definition, grammar and samples (not accepted)
@@ -200,6 +207,8 @@ Start with the [documentation index](docs/README.md).
 - [docs/cli.md](docs/cli.md) — every command, grant, argument and exit code.
 - [docs/platforms/README.md](docs/platforms/README.md) — host matrix and the
   presentation adapters' honest limitations.
+- [website/README.md](website/README.md) — PEACOCK-authored site, twelve-route
+  static export, build command and verified limits.
 - [research/](research/README.md) — literature review, open questions,
   architecture decisions, benchmark methodology, bibliography.
 - [linguist/SUBMISSION.md](linguist/SUBMISSION.md) — prepared, **not accepted**,
@@ -215,9 +224,11 @@ The bootstrap uses **only the Python 3.11 standard library**:
   pixel pipeline are implemented here.
 - **hashlib** supplies SHA-256 for artifact and model integrity.
 - **The OS filesystem** is reached only through `HostPolicy`, which enforces
-  capability grants, a sandbox root, symlink resolution and size limits.
-- **A browser** is used only as a presentation boundary by `WebBackend`; the
-  viewer is static HTML with no JavaScript or framework.
+  `fs` grants, a sandbox root, symlink resolution and size limits. `fs.create_dir`
+  is sandbox-rooted and has the same documented best-effort confinement.
+- **A browser** displays standard HTML/CSS/SVG from the PEACOCK-authored static
+  website exporter or the script-free `WebBackend` frame viewer. Neither uses a
+  JavaScript UI framework; this does not imply a general browser runtime.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) § External boundaries and
 [SECURITY.md](SECURITY.md) for limitations.

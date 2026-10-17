@@ -86,6 +86,19 @@ analyser is deliberately conservative: it does not infer full flow-sensitive
 types, but it does track definite returns and unreachable statements. Diagnostics
 are collected in one `DiagnosticBag`; `ErrorType` suppresses cascades.
 
+An explicitly opt-in `--semantic-shadow` path runs **after** this Python
+analysis. `selfhost/type_model.pac` represents types, computes relations and
+expression result rules, and maintains a lexical binding stack for AST-derived
+probes of local declarations, name resolution, assignments, user-function
+signatures/calls, conditions and returns. The adapter serialises selected typed
+AST facts into generated `.pac` source, compiles/runs the kernel, and compares
+probe outcomes with expectations derived from Python's typed AST and selected
+diagnostics; separate regressions check diagnostic equality on representative
+invalid inputs. The Python analyser still decides compilation and emits diagnostics;
+unsupported fields/methods, native
+overloads, model/training analysis and diagnostic generation are not shadowed.
+This is experimental validation, not a production switch or self-hosting claim.
+
 ### 3.4 Typed IR (PIR)
 
 `compiler/ir.py` lowers the typed AST into a linear instruction list per
@@ -191,8 +204,10 @@ Three enforcement layers:
    declared capabilities and the host's grants.
 3. **Host:** `HostPolicy` grants capabilities, enforces step/depth/output/tensor/
    dataset/epoch/file budgets, resolves filesystem paths inside a sandbox root
-   (rejecting `..`, absolute paths, symlink escapes, NUL bytes and oversized
-   files), and forwards `graphics.present` frames to an attached backend, failing
+   (rejecting `..` traversal, absolute paths outside the root, symlink escapes,
+   NUL bytes and oversized files), permits `fs.create_dir` only within that root,
+   and forwards
+   `graphics.present` frames to an attached backend, failing
    with PE4006 when none is attached.
 
 The capabilities are `compute`, `fs` and `ui`. `ui` is presentation-only: it
@@ -236,8 +251,10 @@ small analytic cases. This is numerical validation, not a proof.
 * `physics.py`: fixed-step AABB rigid bodies with gravity, restitution,
   friction and positional correction.
 
-Rendering is 2D and CPU-only. Text shaping, accessibility, a widget toolkit, 3D,
-and GPU backends are planned.
+The graphics renderer is 2D and CPU-only. Text shaping, a reusable widget
+system, native accessibility integration, 3D and GPU backends are planned. The
+separate static website exporter emits semantic HTML and accessibility-oriented
+structure, but it is not a native accessibility system or general UI toolkit.
 
 ## 7. Host boundaries and platforms
 
@@ -259,6 +276,16 @@ without changing language semantics. A native window shell, input events
 and mobile shells are roadmap work; Android and iOS require platform toolchains
 and signing, and are documented as **not implemented**, not stubbed as if they
 worked.
+
+Separately, `website/site.pac` is a verified PEACOCK-authored static-site
+exporter, not an extension of the frame `WebBackend`. Its single `.pac`
+compilation unit defines reusable component nodes, route/navigation data, twelve
+page functions, HTML escaping/rendering and responsive CSS. The CLI compiles and
+runs it with `fs` granted; it reads repository examples and the SVG logo, then
+writes browser-readable HTML, CSS and SVG. It emits no JavaScript or UI framework.
+Twelve routes are covered by an integration test, but there is no browser-based
+visual regression, general client-side UI/event runtime, or app-module system.
+See [website/README.md](website/README.md).
 
 ## 8. External dependencies
 
@@ -320,10 +347,12 @@ in `.pac` while keeping OS access behind natives:
    including model/training declarations, with canonical AST-digest parity on the
    14-file corpus and self-parse; strict first-error reporting, no recovery or
    `PE2xxx` diagnostic parity yet, and no typed AST nodes;
-3. semantic analyser and type checker — **shadow prototype**: `semantic_mode="shadow"`
-   adapts eligible primitive/list/nominal/tensor annotations from parsed AST declarations and
-   executes relation assertions in `selfhost/type_model.pac`; Python remains
-   authoritative, and there is no expression/name/scope semantic port yet;
+3. semantic analyser and type checker — **shadow prototype**:
+   `semantic_mode="shadow"` / `--semantic-shadow` emits PEACOCK VM probes from
+   supported typed-AST expressions, declarations, local scopes/names, assignments,
+   user-function signatures/calls, conditions and returns. Python remains
+   authoritative; the kernel does not generate diagnostics and several semantic
+   domains are still unsupported;
 4. IR/bytecode emitter;
 5. VM in PEACOCK (with a small host ABI for allocation, I/O and time);
 6. bootstrap chain: Python compiler builds the PEACOCK compiler, which then
