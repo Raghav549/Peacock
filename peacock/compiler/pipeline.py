@@ -46,7 +46,10 @@ def compile_source(
     path: str = "<source>",
     *,
     optimize_ir: bool = True,
+    semantic_mode: str = "python",
 ) -> CompileResult:
+    if semantic_mode not in {"python", "shadow"}:
+        raise ValueError("semantic_mode must be 'python' or 'shadow'")
     result = CompileResult(source=source, path=path, optimize=optimize_ir)
     start_total = time.perf_counter()
 
@@ -68,6 +71,14 @@ def compile_source(
     if parse_diag.has_errors:
         result.stats["total_ms"] = (time.perf_counter() - start_total) * 1000.0
         return result
+
+    if semantic_mode == "shadow":
+        from .selfhost_types import SelfHostTypeMismatch, shadow_check
+
+        try:
+            result.stats["selfhost_type_cases"] = shadow_check(module)
+        except SelfHostTypeMismatch as exc:
+            raise InternalCompilerError(str(exc)) from exc
 
     t0 = time.perf_counter()
     typed = SemanticAnalyzer(module, result.diagnostics).analyze()

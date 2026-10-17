@@ -320,7 +320,10 @@ in `.pac` while keeping OS access behind natives:
    including model/training declarations, with canonical AST-digest parity on the
    14-file corpus and self-parse; strict first-error reporting, no recovery or
    `PE2xxx` diagnostic parity yet, and no typed AST nodes;
-3. semantic analyser and type checker;
+3. semantic analyser and type checker — **shadow prototype**: `semantic_mode="shadow"`
+   adapts eligible primitive/list/nominal/tensor annotations from parsed AST declarations and
+   executes relation assertions in `selfhost/type_model.pac`; Python remains
+   authoritative, and there is no expression/name/scope semantic port yet;
 4. IR/bytecode emitter;
 5. VM in PEACOCK (with a small host ABI for allocation, I/O and time);
 6. bootstrap chain: Python compiler builds the PEACOCK compiler, which then

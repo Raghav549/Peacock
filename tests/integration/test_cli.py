@@ -33,6 +33,13 @@ class CLIBasicsTests(unittest.TestCase):
         self.assertIn(".pac", result.stdout)
         self.assertIn("NOT self-hosting", result.stdout)
 
+    def test_version_flag(self):
+        result = run_cli("--version")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("PEACOCK AI", result.stdout)
+        self.assertIn(".pac", result.stdout)
+        self.assertIn("NOT self-hosting", result.stdout)
+
     def test_help(self):
         result = run_cli("--help")
         self.assertEqual(result.returncode, 0)
