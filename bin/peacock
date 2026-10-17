@@ -1,0 +1,8 @@
+#!/usr/bin/env sh
+# PEACOCK AI bootstrap toolchain entry point.
+# The implementation lives in ../peacock/ and requires Python 3.11+ (stdlib only).
+set -eu
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
+export PYTHONPATH
+exec python3 -m peacock.cli "$@"

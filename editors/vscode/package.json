@@ -1,0 +1,41 @@
+{
+  "name": "peacock-language",
+  "displayName": "PEACOCK",
+  "description": "Syntax highlighting and language configuration for PEACOCK (.pac). Prepared tooling; PEACOCK is not yet recognised by GitHub Linguist.",
+  "version": "0.1.0",
+  "publisher": "peacock-language",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Raghav549/Peacock"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "peacock",
+        "aliases": [
+          "PEACOCK",
+          "peacock"
+        ],
+        "extensions": [
+          ".pac"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "peacock",
+        "scopeName": "source.peacock",
+        "path": "./syntaxes/peacock.tmLanguage.json"
+      }
+    ]
+  }
+}

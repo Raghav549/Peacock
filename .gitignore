@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+*.pkb
+examples/out/
+benchmarks/latest.json
+.pytest_cache/
+.venv/
+dist/
+build/
+*.egg-info/

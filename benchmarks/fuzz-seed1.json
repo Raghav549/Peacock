@@ -1,0 +1,34 @@
+[
+  {
+    "target": "lexer",
+    "iterations": 1000,
+    "seed": 1,
+    "handled": 1000,
+    "crashes": [],
+    "ok": true
+  },
+  {
+    "target": "parser",
+    "iterations": 1000,
+    "seed": 2,
+    "handled": 1000,
+    "crashes": [],
+    "ok": true
+  },
+  {
+    "target": "artifact",
+    "iterations": 1000,
+    "seed": 3,
+    "handled": 1000,
+    "crashes": [],
+    "ok": true
+  },
+  {
+    "target": "model",
+    "iterations": 666,
+    "seed": 4,
+    "handled": 666,
+    "crashes": [],
+    "ok": true
+  }
+]

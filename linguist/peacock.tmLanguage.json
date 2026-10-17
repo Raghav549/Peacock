@@ -1,0 +1,243 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Peacock",
+  "scopeName": "source.peacock",
+  "fileTypes": [
+    "pac"
+  ],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#declarations"
+    },
+    {
+      "include": "#capabilities"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#reserved"
+    },
+    {
+      "include": "#types"
+    },
+    {
+      "include": "#constants"
+    },
+    {
+      "include": "#namespaces"
+    },
+    {
+      "include": "#builtins"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#methods"
+    },
+    {
+      "include": "#operators"
+    },
+    {
+      "include": "#punctuation"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-slash.peacock",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.peacock",
+          "begin": "/\\*",
+          "end": "\\*/",
+          "patterns": [
+            {
+              "include": "#comments"
+            }
+          ]
+        }
+      ]
+    },
+    "declarations": {
+      "patterns": [
+        {
+          "name": "meta.function.peacock",
+          "match": "\\b(fn)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "storage.type.function.peacock"
+            },
+            "2": {
+              "name": "entity.name.function.peacock"
+            }
+          }
+        },
+        {
+          "match": "\\b(struct|model|training)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "storage.type.peacock"
+            },
+            "2": {
+              "name": "entity.name.type.peacock"
+            }
+          }
+        }
+      ]
+    },
+    "capabilities": {
+      "patterns": [
+        {
+          "name": "meta.capability.peacock",
+          "match": "\\b(capability)\\s+(compute|fs|ui)\\b",
+          "captures": {
+            "1": {
+              "name": "storage.modifier.capability.peacock"
+            },
+            "2": {
+              "name": "support.constant.capability.peacock"
+            }
+          }
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.peacock",
+          "match": "\\b(if|else|while|for|in|return|break|continue|try|catch|throw|assert)\\b"
+        },
+        {
+          "name": "keyword.other.peacock",
+          "match": "\\b(module|use|as|fn|let|mut|struct|model|training|capability|and|or|not)\\b"
+        }
+      ]
+    },
+    "reserved": {
+      "patterns": [
+        {
+          "name": "keyword.other.reserved.peacock",
+          "match": "\\b(enum|match|impl|pub|const|import|async|await|spawn|yield)\\b"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "support.type.primitive.peacock",
+          "match": "\\b(Int|Float|Bool|String|Unit|Never)\\b"
+        },
+        {
+          "name": "support.type.peacock",
+          "match": "\\b(Tensor|List|Color|Canvas|Model|Dataset|Range)\\b"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.peacock",
+          "match": "\\b(true|false)\\b"
+        }
+      ]
+    },
+    "namespaces": {
+      "patterns": [
+        {
+          "name": "support.namespace.peacock",
+          "match": "\\b(colour|fs|graphics|math|motion|nn|process|text)\\b(?=\\.)"
+        }
+      ]
+    },
+    "builtins": {
+      "patterns": [
+        {
+          "name": "support.function.builtin.peacock",
+          "match": "\\b(print|str|len|int|float|bool|panic|tensor|range)\\b(?=\\s*\\()"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.peacock",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.peacock",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.float.peacock",
+          "match": "\\b[0-9][0-9_]*(\\.[0-9][0-9_]*)?([eE][+-]?[0-9][0-9_]*)\\b"
+        },
+        {
+          "name": "constant.numeric.float.peacock",
+          "match": "\\b[0-9][0-9_]*\\.[0-9][0-9_]*\\b"
+        },
+        {
+          "name": "constant.numeric.integer.peacock",
+          "match": "\\b(0[xX][0-9a-fA-F_]+|0[bB][01_]+|0[oO][0-7_]+|[0-9][0-9_]*)\\b"
+        }
+      ]
+    },
+    "methods": {
+      "patterns": [
+        {
+          "name": "meta.method-call.peacock",
+          "match": "(?<=\\.)([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()",
+          "captures": {
+            "1": {
+              "name": "entity.name.function.method.peacock"
+            }
+          }
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.peacock",
+          "match": "\\*\\*|==|!=|<=|>=|->|&&|\\|\\||[-+*/%<>=!]"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.separator.peacock",
+          "match": "[(),;]"
+        },
+        {
+          "name": "punctuation.accessor.peacock",
+          "match": "\\."
+        },
+        {
+          "name": "punctuation.section.peacock",
+          "match": "[{}\\[\\]]"
+        },
+        {
+          "name": "punctuation.definition.peacock",
+          "match": ":"
+        }
+      ]
+    }
+  }
+}
