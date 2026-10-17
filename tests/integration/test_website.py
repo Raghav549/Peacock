@@ -183,7 +183,7 @@ class PeacockWebsiteTests(unittest.TestCase):
         self.assertTrue(vercel_path.is_file())
         cfg = json.loads(vercel_path.read_text(encoding="utf-8"))
         self.assertEqual(cfg.get("outputDirectory"), "website/dist")
-        self.assertIn("website/site.pac", cfg.get("buildCommand", ""))
+        self.assertTrue(cfg.get("cleanUrls"))
 
         checked_in = REPO_ROOT / "website/dist"
         self.assertTrue(checked_in.is_dir())
