@@ -26,12 +26,12 @@ coordinate disclosure.
 
 ### Capabilities
 
-Two capabilities exist in v0.1:
+Three capabilities exist in v0.1:
 
 | Capability | Authority |
 |---|---|
 | `compute` | create trainable tensors, autodiff, model init/train/predict, save/load |
-| `fs` | read/write files inside the host sandbox root |
+| `fs` | read/write files and create directories inside the host sandbox root |
 | `ui` | hand rendered frames to a host-attached presentation backend |
 
 A program must **declare** a capability in each function that performs a
@@ -54,7 +54,8 @@ caught denial grants no authority and the operation does not occur. Panics
 * resolves relative paths against a root that must exist and be a directory;
 * rejects absolute paths outside the root, `..` escapes, and NUL bytes;
 * resolves symlinks and requires the final path to remain under the root;
-* creates parent directories only for writes, inside the root;
+* creates parent directories for writes and permits explicit `fs.create_dir`,
+  inside the root;
 * enforces `max_file_bytes` on reads and writes;
 * requires the `fs` grant for every operation.
 
@@ -138,7 +139,8 @@ mitigations.
 ## Security regression evidence
 
 `tests/security/test_capabilities.py` covers: missing declarations, runtime
-denials, caught denials, traversal/nested traversal/absolute/Windows-style
+denials, caught denials, sandboxed nested directory creation and attempted
+`fs.create_dir` escapes, traversal/nested traversal/absolute/Windows-style
 paths, NUL bytes, symlink escapes, file-size limits, step/depth/output/tensor/
 dataset/epoch limits, unknown grants, panic non-catchability, unknown natives,
 unknown capabilities in tampered images, and artifact digest tampering. The

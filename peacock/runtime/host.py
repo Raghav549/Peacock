@@ -136,3 +136,19 @@ class HostPolicy:
         except OSError as exc:
             raise HostError(f"cannot write '{path}': {exc}", "PE5002") from exc
         return len(data)
+
+    def create_directory(self, path: str) -> None:
+        """Create a directory tree inside the granted filesystem root.
+
+        Path resolution and the `fs` grant are checked before calling the host
+        filesystem. This is still best-effort confinement: it does not eliminate
+        TOCTOU races against a hostile process changing symlinks concurrently.
+        """
+        self.require("fs")
+        resolved = self.resolve_path(path, write=True)
+        try:
+            resolved.mkdir(parents=True, exist_ok=True)
+            if not resolved.is_dir():
+                raise OSError("the path exists but is not a directory")
+        except OSError as exc:
+            raise HostError(f"cannot create directory '{path}': {exc}", "PE5002") from exc

@@ -350,9 +350,13 @@ list with signatures is in `peacock/compiler/builtins.py`; documentation is in
 
 ### 8.4 `fs` (capability `fs`)
 
-`read_text(path)` → String, `write_text(path, content)` → Unit. Paths are
-resolved inside the host sandbox; `..`, absolute paths, symlink escapes, NUL
-bytes, and files over the host limit are rejected.
+`read_text(path)` → String, `write_text(path, content)` → Unit, and
+`create_dir(path)` → Unit (creates a directory tree). Paths are resolved inside
+the host sandbox; `..` traversal, absolute paths outside the root, symlink
+escapes and NUL bytes are rejected. File reads/writes are subject to the host
+file-size limit. Directory creation is capability-gated and sandbox-rooted, but
+inherits the documented best-effort/TOCTOU limitations of `HostPolicy`; it is
+not an OS-level sandbox.
 
 ### 8.5 `process`
 
@@ -503,10 +507,11 @@ The following are **not** part of this version and must not be assumed to work:
 * a native code generator, LLVM/Wasm backend, GPU kernels;
 * multiple model inputs/outputs, layers other than Dense, convolution/attention
   layers, optimisers other than SGD/Adam;
-* a UI widget toolkit, 3D rendering, text shaping, accessibility;
+* a general UI widget toolkit, 3D rendering, text shaping, or native accessibility integration;
 * Android/iOS/desktop native shells;
-* self-hosting (the bootstrap compiler is Python; one tokenizer is written in
-  PEACOCK).
+* self-hosting (the bootstrap compiler is Python; tokenizer, parser and
+  experimental semantic-shadow components are PEACOCK programs, not a self-hosted
+  compiler).
 
 Anything in this list requires a specification change, positive and negative
 tests, diagnostics and documentation before it can be called implemented.
@@ -515,16 +520,21 @@ tests, diagnostics and documentation before it can be called implemented.
 
 ## 13. Self-hosted type-model prototype (non-normative)
 
-`selfhost/type_model.pac` is a PEACOCK-written migration prototype. It exercises
-primitive/list/declared-nominal equality, `Never` bottom assignment, `<error>`
-recovery, tensor dtype and known/unknown-shape assignment, and right-aligned
-broadcast compatibility.
-Its `TypeDesc` is a prototype representation, not a public source-level type.
-The compiler API's opt-in `semantic_mode="shadow"` adapts supported primitive,
-simple list, declared nominal and tensor annotations from parsed declarations, generates
-relation assertions, and runs those assertions in the PEACOCK VM. Python's
-`compiler/types.py` computes the expected results; any disagreement fails the
-shadow check. Python semantic analysis then remains authoritative. The prototype
-covers neither expression typing nor symbol/scope analysis, and it does not
-change normative v0.1 acceptance. It is experimental validation infrastructure,
-not a user-facing compiler mode or production replacement.
+`selfhost/type_model.pac` is a PEACOCK-written migration prototype, not a
+normative source-level type API. Its recursive `TypeDesc` exercises primitive,
+list, nominal, opaque and tensor relations; `Never` bottom assignment;
+`<error>` recovery; broadcasting; unary/binary/list/index rules; a lexical
+binding stack; declarations, assignment mutability, function signatures, call
+argument/return checks and condition/iterable rules.
+
+The compiler API's opt-in `semantic_mode="shadow"` and CLI
+`peacock check --semantic-shadow` first run the Python analyser, then translate
+supported typed-AST expressions, local declarations, scopes, names, assignments,
+user-function signatures/calls and returns into a generated PEACOCK probe
+program. The PEACOCK VM executes the probe; relation and semantic probe counts
+are reported in compiler stats. Tests differentially exercise valid/invalid
+programs and the current example corpus. Field/member resolution, native
+overloads, model/training analysis, diagnostic production/recovery parity, IR
+and later compiler phases are still outside the kernel. Python remains the
+production authority; there is no production switch and PEACOCK is not
+self-hosting.

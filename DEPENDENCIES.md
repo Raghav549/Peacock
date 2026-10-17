@@ -20,12 +20,23 @@ React, Flutter or downloaded model/dataset is required by the current core.
 ## Current migration state
 
 `selfhost/tokenizer.pac` and `selfhost/parser.pac` are executed by the Python
-compiler/VM and have parity tests. `selfhost/type_model.pac` adds a small
-PEACOCK-written type relation/broadcast kernel. The opt-in
-`compile_source(..., semantic_mode="shadow")` adapter extracts supported primitive/list/nominal/tensor types
-from the parsed AST, runs generated checks in the PEACOCK VM, and leaves Python
-as the authority. This is not the default CLI path and does not replace any
-Python module. The following remain Python bootstrap implementations:
+compiler/VM and have parity tests. `selfhost/type_model.pac` adds an executable
+PEACOCK-written kernel for type relations, expression result rules and lexical
+bindings. The opt-in `compile_source(..., semantic_mode="shadow")` adapter and
+`--semantic-shadow` CLI flags derive probes from typed ASTs and compare outcomes
+with Python on supported expressions, declarations, scopes, assignments,
+user-function signatures/calls, conditions and returns. This is experimental:
+Python remains authoritative and there is no switch-over. Diagnostic recovery
+parity and several semantic domains remain unimplemented.
+
+`website/site.pac` is a PEACOCK-authored static website exporter verified through
+the actual CLI and compiler/VM. It generates twelve HTML routes, CSS and an SVG
+asset from one `.pac` compilation unit (there is no user module system yet). Its
+browser output uses no JavaScript or external UI framework. The export command
+needs a 10,000,000-step VM budget; generated `website/dist/` is ignored. Tests
+check routes, links, semantic/accessibility markers, source examples and CSS;
+there is no browser screenshot suite. The following remain Python bootstrap
+implementations:
 
 - production lexer/parser/AST/diagnostics and parser recovery;
 - semantic analysis, name resolution and the production type model;
@@ -48,6 +59,7 @@ conditional and must be separately documented and version-pinned before use:
 
 | Target/workflow | Likely external tooling | Current status |
 |---|---|---|
+| Static website export | Browser for viewing; optional Python standard-library static HTTP server | Implemented by `website/site.pac` as HTML/CSS/SVG export, with actual CLI integration tests. No browser automation or visual-regression tooling is installed. Not the same as the frame `WebBackend`; no JS or general interactive UI runtime. |
 | WebAssembly | WASM assembler/runtime or a PEACOCK-authored emitter and browser ABI | No backend currently exists. Prefer specifying ABI and validating generated artifacts before choosing a tool. |
 | Desktop | OS window/input APIs and platform toolchains | No desktop shell currently exists. |
 | Android | Android SDK/NDK, Java/Kotlin or JNI boundary, signing/package tools | No Android build validated. |

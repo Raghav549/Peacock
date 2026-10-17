@@ -165,6 +165,9 @@ class LetStmt(Stmt):
     annotation: TypeExpr | None
     init: Expr
     slot: int = -1
+    # Filled by semantic analysis for tooling and differential validation.
+    ty: Any = None
+    symbol: Any = None
 
 
 @dataclass

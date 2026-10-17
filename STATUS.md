@@ -12,22 +12,22 @@ accepted.
 
 ```bash
 ./bin/peacock test
-# Ran 495 tests in 39.858s — OK (v0.1.0, 2026-10-17)
+# Ran 506 tests in 40.347s — OK (v0.1.0, 2026-10-17)
 ```
 
-The suite-category counts below are the earlier 490-test snapshot; the additional
-five tests cover the version flag and PEACOCK type-model shadow integration.
+This run is from the current uncommitted Arena working tree and includes the
+semantic-shadow, filesystem capability and PEACOCK-authored website regressions.
 
 | Suite | Tests | Result |
 |---|---:|---|
 | `tests/compiler` | 223 | OK |
 | `tests/ai` | 81 | OK |
 | `tests/frontend` | 74 | OK |
-| `tests/security` | 34 | OK |
-| `tests/integration` | 52 | OK |
+| `tests/security` | 37 | OK |
+| `tests/integration` | 65 | OK |
 | `tests/unit` | 20 | OK |
 | `tests/benchmarks` | 6 | OK |
-| **Total** | **490** | **OK** |
+| **Total** | **506** | **OK** |
 
 ```bash
 ./bin/peacock fuzz --iterations 1000 --seed 1
@@ -54,10 +54,15 @@ All commands were run from the repository root on the reference machine.
 | `./bin/peacock run examples/aurora.pac --grant fs` | writes `examples/out/aurora.png` (960×540, 162,337 bytes, valid PNG) |
 | `./bin/peacock run selfhost/tokenizer.pac --grant fs -- examples/tour.pac` | prints `367`, equal to the bootstrap lexer's token count minus EOF |
 | `./bin/peacock run selfhost/parser.pac --grant fs --root . --max-steps 100000000 -- examples/xor.pac` | AST digest identical to the bootstrap on the 14-file corpus; parses its own 1,085-line source with identical digest |
+| `./bin/peacock run selfhost/type_model.pac` | 56 PEACOCK assertions pass, including ErrorType iterable recovery |
+| `./bin/peacock check examples/tour.pac --semantic-shadow --json` | Experimental VM-executed semantic probes pass; JSON includes type/semantic/builtin probe counts |
 | `./bin/peacock run examples/present.pac --grant ui --present out/preview` | prints `presented 4 frames`; manifest lists 4 × 320×180 frames; `latest.png` decodes to 230,400 RGBA bytes |
 | `./bin/peacock run examples/present.pac --grant ui` (no backend) | PE4006, exit 3; the host, not the program, decides where frames go |
 | `./bin/peacock run examples/present.pac --grant ui --serve 8099 --linger 2` | `/manifest.json` reports 4 frames and a 320×180 latest frame; `/frame.png` decodes; `/` serves script-free HTML; the port closes after exit |
 | `./bin/peacock build examples/hello.pac -o /tmp/hello.pkb` | 598-byte verified artifact with SHA-256 |
+| `./bin/peacock check website/site.pac` | PEACOCK source checks; 32 functions, 4,574 instructions |
+| `./bin/peacock run website/site.pac --grant fs --root . --max-steps 10000000 -- website/dist` | Generates 12 HTML routes, responsive CSS and the project SVG through the real CLI/compiler/VM; no JS bundle |
+| `python -m unittest tests.integration.test_website -v` | 4 website export/audit tests pass |
 
 The integration suite re-runs the examples through the CLI, including the PNG
 decode, training report JSON, tokenizer parity, artifact tampering rejection and
@@ -78,7 +83,7 @@ capability-denial exit code.
   disassembler, capability audit;
 * stack VM with checked arithmetic, lists, strings, structs, ranges, try/catch,
   uncatchable panics and resource budgets;
-* capability sandbox: path traversal/absolute/symlink/NUL/file-size rejection;
+* capability sandbox: path traversal/absolute/symlink/NUL/file-size rejection; `fs.create_dir` is grant-gated and sandbox-rooted;
 * tensor engine with broadcasting, matmul, reductions, activations, softmax,
   reverse-mode autodiff; finite-difference checks pass;
 * Dense/Sequential models, XOR and spiral datasets, SGD/Adam, cross-entropy/MSE,
@@ -97,7 +102,13 @@ capability-denial exit code.
 * deterministic fuzzers for lexer/parser/artifact/model loaders;
 * PEACOCK-written tokenizer with bootstrap token parity;
 * PEACOCK-written full-grammar parser (stage 2a) with canonical AST-digest parity
-  on examples, Linguist samples and itself; strict first-error diagnostics.
+  on examples, Linguist samples and itself; strict first-error diagnostics;
+* PEACOCK-authored static website exporter (`website/site.pac`) with twelve
+  routes, reusable app-specific components, responsive CSS and SVG; actual CLI/
+  compiler/VM export and integration checks for links, structure and source;
+* opt-in semantic shadow checks on typed-AST relations, expressions, local
+  scopes/names, assignments, user-function calls/returns and loop conditions;
+  Python remains the authority and the kernel does not produce diagnostics.
 
 ### Documentation, research and tooling
 
@@ -115,22 +126,27 @@ capability-denial exit code.
 
 * **Language:** no user modules, generics, closures, enums/match, traits,
   concurrency, operator definitions, or first-class functions.
-* **Frontend:** 2-D only; no widget toolkit, text shaping, accessibility, 3D, or
-  GPU rasterisation. Motion/physics have no frame scheduler integration.
-* **Platforms:** both static-web (`--present`) and HTTP (`--serve`) presentation
-  are reachable from `.pac`, but there is no input, frame clock or vsync, and the
-  HTTP host is a development boundary, not a hardened server. No desktop window shell, Android, iOS or WASM
-  target.
+* **Frontend:** a twelve-route static site is now authored in `.pac` and exported
+  by the actual toolchain; it is not a general UI toolkit. No general widget
+  library, text shaping, native accessibility APIs, 3D, or GPU rasterisation.
+  Motion/physics have no frame scheduler integration.
+* **Platforms:** the `--present` static frame viewer and `--serve` HTTP frame host
+  are reachable from `.pac`; separately, `website/site.pac` produces static
+  application pages. There is no input, frame clock or vsync, and the HTTP frame
+  host is a development boundary, not a hardened server. No desktop window
+  shell, Android, iOS or WASM target.
 * **Models:** one input/output, Dense only, SGD/Adam, small synthetic datasets.
-* **Self-hosting:** tokenizer/parser syntax plus a PEACOCK-written type-algebra
-  kernel used by opt-in `compile_source(..., semantic_mode="shadow")`. It
-  extracts supported primitive/list/nominal/tensor annotations from parsed declarations,
-  compares assignability/broadcast results with the Python type model, then
-  leaves Python semantic analysis authoritative. Differential cases preserve
-  accept/reject and diagnostics on the tested corpus; this is not full semantic
-  analysis or a production switch. The parser still lacks error recovery,
-  `PE2xxx` parity and typed AST; production semantics, IR, code generation and
-  VM remain Python.
+* **Self-hosting:** the PEACOCK tokenizer and full-grammar parser have the
+  existing parity evidence; `selfhost/type_model.pac` now provides a broader
+  experimental type/expression/scope kernel. The opt-in compiler/CLI shadow
+  adapter emits VM-executed probes from the typed AST for supported expressions,
+  declarations, names, assignments, user-function signatures/calls, conditions
+  and returns. Tests cover the compiled `.pac` corpus, valid/invalid cases and
+  selected diagnostic equality, including ErrorType iterable recovery. Python
+  remains authoritative; the kernel does not generate diagnostics and is not a
+  production switch. The parser still lacks error recovery, full `PE2xxx`
+  diagnostic/span parity and a typed self-hosted AST; production semantics, IR,
+  code generation and VM remain Python.
 * **Diagnostics:** warning quality is intentionally minimal; no machine-readable
   fixes or LSP.
 
@@ -150,15 +166,18 @@ capability-denial exit code.
 * multi-tenant or adversarial host isolation beyond the tests listed;
 * large models/datasets, long-running training, memory pressure;
 * non-Linux hosts;
-* browser interaction beyond serving static HTML (no script, so no live input);
+* browser rendering/interaction and visual layout of the generated website (the
+  static HTML/CSS is audited by source-level integration tests; no browser or
+  screenshot automation has been run);
 * any claim of formal verification or cryptographic security.
 
 ## 4. Benchmarks (reference machine)
 
 Environment: CPython 3.11.2, Linux 6.1.158 x86_64, 2 vCPUs, 3.8 GiB RAM, no GPU,
-repository at commit `755fbc8` + working tree. Generated by
-`./bin/peacock bench --json benchmarks/reference-machine.json`; full JSON is
-checked in.
+historical reference snapshot generated at commit `755fbc8` on a dirty working
+tree (per the checked-in report metadata). It was not re-run as part of the
+current status update; full JSON is retained for reproducibility. Generate a new
+report with `./bin/peacock bench --json benchmarks/latest.json`.
 
 | Category | Measurement | Result |
 |---|---|---:|
@@ -193,7 +212,8 @@ and methodology. See `research/benchmark-methodology.md`.
 |---|---|---|
 | Linux headless | working | `tests/frontend/test_platforms.py` |
 | HTTP frame server | working | same suite, real HTTP requests |
-| Static web viewer | working | HTML + PNG, no JavaScript |
+| Static web viewer (`WebBackend`) | working | HTML + PNG, no JavaScript |
+| PEACOCK-authored static website exporter | working | 12 routes via `website/site.pac`; `tests/integration/test_website.py` (no browser visual suite) |
 | Desktop window | not implemented | needs a windowing boundary |
 | Android | not implemented | needs SDK/NDK + JNI/ABI bridge |
 | iOS | not implemented / blocked | requires macOS + Xcode, unavailable here |

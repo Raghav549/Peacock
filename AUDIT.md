@@ -1,4 +1,9 @@
-# Repository audit (2026-10-17)
+# Repository audit (base snapshot, 2026-10-17)
+
+> **Snapshot note:** the findings and branch/history metadata below describe an
+> earlier audit snapshot. The current follow-on verification is recorded at the
+> end of this file; `STATUS.md`, `ROADMAP.md` and `DEPENDENCIES.md` are the
+> canonical up-to-date component status and migration plan.
 
 ## Executive finding
 
@@ -63,7 +68,7 @@ Language/implementation: all tracked `.pac` examples/selfhost fixtures plus comp
 Quality/docs: all test modules; README and specification/architecture/status/roadmap/security; docs tree; research review, questions, ADRs, methods and bibliography.
 Identity/tooling: `assets/`, `editors/vscode/`, `linguist/`.
 
-## Follow-up migration increment (2026-10-17)
+## Earlier follow-up migration increment (historical snapshot)
 
 The type-algebra work is no longer only a standalone demonstration: the compiler
 API supports opt-in `semantic_mode="shadow"`. After parsing actual source
@@ -78,8 +83,33 @@ tests were added, `python -m compileall -q peacock tests` succeeded and
 new observed result; the earlier 490-test baseline above describes the audit's
 initial checkout state.
 
-## Immediate engineering priorities
+## Earlier engineering priorities (superseded by the current roadmap)
 
 1. Extend the shadow protocol to compound types and real expression/assignment sites; implement name/scope semantics and typed-AST diagnostics in PEACOCK before considering promotion.
 2. Add a lightweight CI matrix running `unittest`, examples, package install/entry point, syntax metadata and reproducible security/fuzz smoke tests.
 3. Keep unsupported native/web/mobile/3D/GPU capabilities explicitly unclaimed; improve host boundaries and benchmark/visual test coverage before expanding their promises.
+
+## Current follow-on verification (2026-10-17)
+
+This section supersedes the historical test count, migration summary and priority
+list above for the current working tree. The checkout is on
+`arena/c197f94a-peacock`, based on `afddb2d84c3281aac9100a40a1fd4fd59704cf3b`;
+changes are uncommitted. `./bin/peacock test` passes **506 tests** (40.347 s):
+223 compiler, 81 AI, 74 frontend, 37 security, 65 integration, 20 unit and 6
+benchmark tests.
+
+The semantic shadow now runs through experimental `check`/`build
+--semantic-shadow` flags and covers selected type/expression/scope/declaration/
+assignment/call/return/condition/iterable rules. ErrorType iterable recovery is
+regression-tested: an unresolved iterable yields only its primary Python
+`PE3002`, and the PEACOCK kernel agrees. The Python analyser remains authoritative;
+this is not full diagnostic parity or self-hosting.
+
+`website/site.pac` compiles and runs through the actual PEACOCK CLI/compiler/VM
+to generate twelve static HTML routes, responsive CSS and SVG; four integration
+tests validate paths, page structure, embedded `.pac` examples and CSS. The
+static generator is distinct from the frame `WebBackend`, has no JavaScript, and
+has not had browser-based visual testing. `fs.create_dir` is capability-gated,
+sandbox-rooted and covered by security regressions. See `STATUS.md` for current
+evidence, `ROADMAP.md` for dependency-ordered next steps, and
+`website/README.md` for the export boundary.

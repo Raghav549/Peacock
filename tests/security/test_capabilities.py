@@ -25,6 +25,13 @@ class StaticCapabilityTests(unittest.TestCase):
             "fs",
         )
 
+    def test_create_dir_requires_capability_declaration(self):
+        expect_diagnostic(
+            'use fs\nfn main() -> Unit { fs.create_dir("cache/nested"); }',
+            "PE3005",
+            "fs",
+        )
+
     def test_compute_requires_capability_declaration(self):
         expect_diagnostic(
             "use nn\nfn main() -> Unit { let w = nn.parameter([1.0]); }",
@@ -96,6 +103,22 @@ class RuntimeCapabilityTests(unittest.TestCase):
             with self.assertRaises(CapabilityError):
                 vm.run()
             self.assertFalse((other / "x.txt").exists())
+
+    def test_create_dir_is_grant_gated_and_creates_nested_paths(self):
+        source = '''\
+use fs
+fn main() -> Unit {
+    capability fs;
+    fs.create_dir("generated/pages/nested");
+}
+'''
+        with tempfile.TemporaryDirectory() as tmp:
+            denied = vm_for(source, grants=(), root=tmp)
+            with self.assertRaises(CapabilityError):
+                denied.run()
+            self.assertFalse((Path(tmp) / "generated").exists())
+            vm_for(source, grants=("fs",), root=tmp).run()
+            self.assertTrue((Path(tmp) / "generated/pages/nested").is_dir())
 
     def test_ui_grant_does_not_grant_filesystem_access(self):
         source = """
@@ -194,6 +217,17 @@ class SandboxTests(unittest.TestCase):
             vm = vm_for(source, grants=("fs",), root=root)
             with self.assertRaises(HostError):
                 vm.run()
+
+    def test_create_dir_cannot_escape_sandbox(self):
+        source = 'use fs\nfn main() -> Unit { capability fs; fs.create_dir("../outside/new"); }'
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "root"
+            root.mkdir()
+            vm = vm_for(source, grants=("fs",), root=root)
+            with self.assertRaises(HostError) as ctx:
+                vm.run()
+            self.assertIn("escapes", str(ctx.exception))
+            self.assertFalse((Path(tmp) / "outside").exists())
 
     def test_absolute_path(self):
         source = 'use fs\nfn main() -> Unit { capability fs; let x = fs.read_text("/etc/passwd"); }'

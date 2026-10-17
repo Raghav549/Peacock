@@ -794,6 +794,8 @@ class SemanticAnalyzer:
                 final_ty = ty
             sym = self._declare(stmt.name, final_ty, stmt.mutable, stmt.span)
             stmt.slot = sym.slot
+            stmt.ty = final_ty
+            stmt.symbol = sym
             return
         if isinstance(stmt, AssignStmt):
             self._check_assign(stmt)
@@ -1197,6 +1199,9 @@ class SemanticAnalyzer:
                     expr.span,
                     hint="annotate the binding, e.g. let xs: List<Int> = [];",
                 )
+            # Preserve the contextual element type on the AST so later compiler
+            # passes and shadow analyzers can inspect the fully resolved list.
+            expr.element_ty = expected_elem
             return T.ListType(expected_elem)
         element_types: list[T.Type] = []
         for i, element in enumerate(expr.elements):

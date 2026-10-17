@@ -55,8 +55,8 @@ Acceptance criteria:
 ## Phase 3 — Runtime and security — **done** (subset)
 
 Deliverables: stack VM, checked arithmetic, list/string/tensor operations, struct
-values, try/catch, capability gate, resource budgets, sandboxed filesystem,
-fuzzers, security regression suite.
+values, try/catch, capability gate, resource budgets, sandboxed filesystem
+(including grant-gated `fs.create_dir`), fuzzers and security regression suite.
 
 Acceptance criteria:
 
@@ -90,14 +90,20 @@ interface design and hardware availability).
 
 Delivered: perceptual colour pipeline (sRGB/XYZ/CIELAB/Oklab/Oklch, WCAG,
 palettes, mixing), software RGBA canvas with anti-aliasing, gradients, glow,
-aurora, PNG encode/decode, flex layout.
+aurora, PNG encode/decode and flex layout. A separate app-specific static
+website (`website/site.pac`) now defines twelve routes/components and exports
+semantic HTML, responsive CSS and SVG through the actual CLI/compiler/VM; it is
+covered by route/link/structure/source/CSS integration checks. It is not a
+reusable UI toolkit or the frame `WebBackend`.
 
 Acceptance criteria met: colour reference values, palette determinism, PNG
-round-trip and CRC rejection, canvas size limits, layout arithmetic.
+round-trip and CRC rejection, canvas size limits, layout arithmetic, and the
+website export's tested static routes and structural properties.
 
-Still required before "UI toolkit": widget tree, text measurement/shaping,
-input/event routing, focus/accessibility, theming, image decoding beyond our PNG,
-and a render/present loop.
+Still required before "UI toolkit": a reusable general-purpose widget system,
+text measurement/shaping, interactive input/event routing, integration with
+native accessibility APIs, theming and image decoding beyond our PNG. Browser
+layout uses HTML/CSS; there is no general PEACOCK browser event/runtime.
 
 ## Phase 6 — Motion and physics — **partial**
 
@@ -120,7 +126,10 @@ with a `--linger` window). Frames are written per present call, `latest.png`/
 
 Acceptance criteria met: PNG frames served over HTTP, viewer contains no script,
 health route works, malformed routes fail cleanly; a program presents four frames
-through the real VM and the manifest records all four.
+through the real VM and the manifest records all four. The independently
+PEACOCK-authored `website/site.pac` exporter also builds twelve static HTML/CSS
+routes, but is not a platform runtime or an interactive UI system (see
+[website/README.md](website/README.md)).
 
 Still planned:
 
@@ -159,26 +168,28 @@ path.
 Delivered: `selfhost/tokenizer.pac` with token parity, and
 `selfhost/parser.pac` (1,085 lines) covering the full 0.1 grammar, including
 model/training declarations. The parser produces a canonical AST digest that is
-byte-identical to the bootstrap parser's on all examples, all Linguist samples,
-a dedicated syntax fixture and its own source. This increment adds
-`selfhost/type_model.pac`: an executable, PEACOCK-native kernel for primitive
-and tensor assignability plus broadcast compatibility. `compile_source` now has
-an opt-in `semantic_mode="shadow"` which extracts supported primitive, simple
-list, declared nominal and tensor annotations from the parsed AST, runs generated relation assertions through the
-PEACOCK VM, and compares expected outcomes to Python `compiler/types.py`. Tests
-also compare Python and shadow-mode accept/reject decisions and diagnostic
-messages on representative valid/invalid inputs. Python semantic analysis still
-runs as authority; this is a relation-level differential prototype, not a
-replacement semantic analyser.
+byte-identical to the bootstrap parser on its 14-file core corpus (seven
+examples, six Linguist samples and a syntax fixture), plus self-parse. This
+increment expands `selfhost/type_model.pac` into an executable PEACOCK kernel for recursive type
+relations, expression result rules, lexical bindings, declarations, assignments,
+user-function signatures/calls, conditions, returns and iterable checks.
+`compile_source(..., semantic_mode="shadow")` and opt-in CLI `--semantic-shadow`
+flags translate supported typed-AST facts into generated PEACOCK probes, execute
+them in the VM, and compare against the Python oracle. Regressions cover valid
+and invalid inputs, selected diagnostic equality, the `.pac` corpus and
+ErrorType iterable recovery. Python semantic analysis remains authoritative;
+the kernel does not generate diagnostics, misses several semantic domains and
+is not a replacement analyser.
 
 Stages:
 
 1. tokenizer — **done**;
 2. parser + AST — **partial**: full-grammar syntax and AST-digest parity are
    done; error recovery, `PE2xxx` diagnostic/span parity and a typed AST are not;
-3. semantic analyser/type checker — **shadow prototype**: relation checks on
-   parsed primitive/tensor declaration types, with Python remaining authoritative;
-   expression typing, scopes, names and PEACOCK-authored diagnostics are not ported.
+3. semantic analyser/type checker — **shadow prototype**: selected types,
+   expressions, scope/name/assignment/call/return/condition/iterable rules are
+   probed; diagnostics, fields/methods, native overloads and model/training
+   analysis are not ported; Python remains authoritative;
 4. IR and bytecode emitter — planned;
 5. VM in PEACOCK with a minimal host ABI — planned;
 6. fixed point: the PEACOCK compiler compiles itself, and the resulting image
@@ -224,10 +235,14 @@ for the packaging and experiment infrastructure that Phases 3–4 make possible.
 
 ## Next three priorities
 
-1. **Finish the self-hosted parser stage** (recovery, `PE2xxx` diagnostic/span
-   parity, typed AST) and start the semantic analyser; add `enum`/`match` only
-   when the port demonstrates the need, with specification and tests first.
-2. **Wire host presentation**: add `graphics.present` and a VM→backend frame
-   path so `WebBackend`/`ServerBackend` display real program output.
-3. **Implement a native backend or WASM emitter** for the verified subset, with
-   an honest benchmark report against the VM.
+1. **Complete parser-stage parity**: error recovery, bootstrap `PE2xxx`
+   diagnostic/span parity on a fixed negative corpus, and a typed AST
+   representation; keep the existing parser oracle tests intact.
+2. **Close the semantic shadow gap incrementally**: broaden differential edge
+   cases and diagnostics while Python remains authoritative, then port the next
+   supported semantic domains only behind measured parity gates. Do not promote
+   the shadow kernel to production.
+3. **Specify the next compiler representation** (AST → typed IR → bytecode) and
+   define deterministic differential fixtures before implementing stage 4; the
+   existing VM/platform presentation path already works, and native/WASM targets
+   remain planned rather than claimed.

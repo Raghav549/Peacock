@@ -75,6 +75,14 @@ class CheckCommandTests(unittest.TestCase):
             self.assertIn("PE3002", result.stderr)
             self.assertIn("^", result.stderr)
 
+    def test_check_semantic_shadow_is_explicit_and_reports_probe_counts(self):
+        result = run_cli("check", "examples/tour.pac", "--semantic-shadow", "--json")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertTrue(payload["ok"])
+        self.assertGreater(payload["stats"]["selfhost_type_cases"], 0)
+        self.assertGreater(payload["stats"]["selfhost_semantic_cases"], 0)
+
     def test_check_rejects_wrong_extension(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "legacy.pk"
@@ -160,6 +168,16 @@ class BuildDisassembleAuditTests(unittest.TestCase):
             run = run_cli("run", str(output))
             self.assertEqual(run.returncode, 0, run.stderr)
             self.assertEqual(run.stdout.strip(), "Hello from PEACOCK")
+
+    def test_build_semantic_shadow_is_explicit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "hello-shadow.pkb"
+            build = run_cli(
+                "build", "examples/hello.pac", "--semantic-shadow", "-o", str(output)
+            )
+            self.assertEqual(build.returncode, 0, build.stderr)
+            self.assertTrue(output.exists())
+            self.assertIn("sha256", build.stdout)
 
     def test_run_tampered_artifact(self):
         with tempfile.TemporaryDirectory() as tmp:
