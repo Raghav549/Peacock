@@ -544,6 +544,9 @@ def main(argv: list[str] | None = None) -> int:
     if not argv or argv[0] in ("-h", "--help", "help"):
         print(USAGE)
         return EXIT_OK
+    # Conventional version flag alongside the explicit `version` subcommand.
+    if argv[0] in ("--version", "-V"):
+        return cmd_version(argv[1:])
     command = argv[0]
     if command not in COMMANDS:
         print(f"unknown command '{command}'\n", file=sys.stderr)

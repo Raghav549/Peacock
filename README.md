@@ -13,12 +13,14 @@ security, and multiple deployment hosts behind one coherent language.
 > **Honest status (v0.1.0, phase 1–3 of 10).** The lexer, parser, type checker,
 > typed IR, optimiser, bytecode compiler, stack VM, tensor/autodiff engine,
 > small-model trainer, colour pipeline, 2D software renderer, PNG codec, motion,
-> layout, and physics subsystems are implemented and exercised by **490 tests**.
+> layout, and physics subsystems are implemented and exercised by **495 tests**.
 > The web/headless/server presentation adapters are implemented. Native mobile
 > shells, a native code generator, GPU kernels, a full UI toolkit, 3D rendering,
 > and AGI research tooling are **not implemented**. The compiler is **not
-> self-hosting**; a PEACOCK lexer and a full-grammar parser are parity-tested
-> against the bootstrap, but semantics, IR and code generation remain Python.
+> self-hosting**; a PEACOCK lexer and full-grammar parser are parity-tested
+> against the bootstrap. A small PEACOCK type-relation kernel runs in opt-in
+> shadow checks on parsed declarations; production semantic analysis, IR and
+> code generation remain Python.
 > GitHub does **not** yet recognise `.pac`; a Linguist submission is prepared in
 > [`linguist/`](linguist/), not accepted. See [STATUS.md](STATUS.md) for evidence.
 
@@ -189,6 +191,8 @@ Start with the [documentation index](docs/README.md).
 - [ARCHITECTURE.md](ARCHITECTURE.md) — pipeline, VM, memory model, security,
   subsystem boundaries, external dependencies.
 - [ROADMAP.md](ROADMAP.md) — phases 0–10, dependencies, acceptance criteria.
+- [AUDIT.md](AUDIT.md) — repository-wide evidence-based audit, subsystem status,
+  observed commands, history/configuration findings and Linguist eligibility.
 - [STATUS.md](STATUS.md) — works / partial / planned / untested, with real test and
   benchmark results.
 - [docs/compiler/bootstrap.md](docs/compiler/bootstrap.md) — how the Python

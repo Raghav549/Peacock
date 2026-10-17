@@ -510,3 +510,21 @@ The following are **not** part of this version and must not be assumed to work:
 
 Anything in this list requires a specification change, positive and negative
 tests, diagnostics and documentation before it can be called implemented.
+
+---
+
+## 13. Self-hosted type-model prototype (non-normative)
+
+`selfhost/type_model.pac` is a PEACOCK-written migration prototype. It exercises
+primitive/list/declared-nominal equality, `Never` bottom assignment, `<error>`
+recovery, tensor dtype and known/unknown-shape assignment, and right-aligned
+broadcast compatibility.
+Its `TypeDesc` is a prototype representation, not a public source-level type.
+The compiler API's opt-in `semantic_mode="shadow"` adapts supported primitive,
+simple list, declared nominal and tensor annotations from parsed declarations, generates
+relation assertions, and runs those assertions in the PEACOCK VM. Python's
+`compiler/types.py` computes the expected results; any disagreement fails the
+shadow check. Python semantic analysis then remains authoritative. The prototype
+covers neither expression typing nor symbol/scope analysis, and it does not
+change normative v0.1 acceptance. It is experimental validation infrastructure,
+not a user-facing compiler mode or production replacement.

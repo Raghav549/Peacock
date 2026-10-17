@@ -160,14 +160,25 @@ Delivered: `selfhost/tokenizer.pac` with token parity, and
 `selfhost/parser.pac` (1,085 lines) covering the full 0.1 grammar, including
 model/training declarations. The parser produces a canonical AST digest that is
 byte-identical to the bootstrap parser's on all examples, all Linguist samples,
-a dedicated syntax fixture and its own source.
+a dedicated syntax fixture and its own source. This increment adds
+`selfhost/type_model.pac`: an executable, PEACOCK-native kernel for primitive
+and tensor assignability plus broadcast compatibility. `compile_source` now has
+an opt-in `semantic_mode="shadow"` which extracts supported primitive, simple
+list, declared nominal and tensor annotations from the parsed AST, runs generated relation assertions through the
+PEACOCK VM, and compares expected outcomes to Python `compiler/types.py`. Tests
+also compare Python and shadow-mode accept/reject decisions and diagnostic
+messages on representative valid/invalid inputs. Python semantic analysis still
+runs as authority; this is a relation-level differential prototype, not a
+replacement semantic analyser.
 
 Stages:
 
 1. tokenizer — **done**;
 2. parser + AST — **partial**: full-grammar syntax and AST-digest parity are
    done; error recovery, `PE2xxx` diagnostic/span parity and a typed AST are not;
-3. semantic analyser/type checker — planned;
+3. semantic analyser/type checker — **shadow prototype**: relation checks on
+   parsed primitive/tensor declaration types, with Python remaining authoritative;
+   expression typing, scopes, names and PEACOCK-authored diagnostics are not ported.
 4. IR and bytecode emitter — planned;
 5. VM in PEACOCK with a minimal host ABI — planned;
 6. fixed point: the PEACOCK compiler compiles itself, and the resulting image

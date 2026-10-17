@@ -1,7 +1,7 @@
 # PEACOCK Status
 
-Last verified: **2026-10-17** (working tree; commit `755fbc8` plus uncommitted v0.1
-work). Re-run the commands below before trusting any number.
+Last verified: **2026-10-17** (working tree on the Arena development branch;
+not committed). Re-run the commands below before trusting any number.
 
 Canonical source extension: `.pac`. The compiler is **not self-hosting**; the
 reference implementation is a Python bootstrap. GitHub does **not** yet
@@ -12,8 +12,11 @@ accepted.
 
 ```bash
 ./bin/peacock test
-# Ran 490 tests in 39.822s — OK (v0.1.0, 2026-10-17)
+# Ran 495 tests in 39.858s — OK (v0.1.0, 2026-10-17)
 ```
+
+The suite-category counts below are the earlier 490-test snapshot; the additional
+five tests cover the version flag and PEACOCK type-model shadow integration.
 
 | Suite | Tests | Result |
 |---|---:|---|
@@ -119,9 +122,15 @@ capability-denial exit code.
   HTTP host is a development boundary, not a hardened server. No desktop window shell, Android, iOS or WASM
   target.
 * **Models:** one input/output, Dense only, SGD/Adam, small synthetic datasets.
-* **Self-hosting:** tokenizer and parser syntax only. The parser has no
-  error recovery, no `PE2xxx` diagnostic parity and no typed AST; semantic
-  analysis, IR, code generation and the VM remain Python.
+* **Self-hosting:** tokenizer/parser syntax plus a PEACOCK-written type-algebra
+  kernel used by opt-in `compile_source(..., semantic_mode="shadow")`. It
+  extracts supported primitive/list/nominal/tensor annotations from parsed declarations,
+  compares assignability/broadcast results with the Python type model, then
+  leaves Python semantic analysis authoritative. Differential cases preserve
+  accept/reject and diagnostics on the tested corpus; this is not full semantic
+  analysis or a production switch. The parser still lacks error recovery,
+  `PE2xxx` parity and typed AST; production semantics, IR, code generation and
+  VM remain Python.
 * **Diagnostics:** warning quality is intentionally minimal; no machine-readable
   fixes or LSP.
 
