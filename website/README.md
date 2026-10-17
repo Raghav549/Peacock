@@ -42,8 +42,8 @@ the repo root with zero HTML files.
 
 This is fixed by:
 
-1. `vercel.json` at the repository root declaring `buildCommand` (`python3 ./bin/peacock run website/site.pac --grant fs --root . --max-steps 50000000 -- website/dist`), `outputDirectory: "website/dist"`, `framework: null`, and `cleanUrls: true`;
-2. tracking the verified `website/dist/` build output in Git and validating in `tests/integration/test_website.py` that `website/dist/` matches a fresh build of `website/site.pac`.
+1. `vercel.json` at the repository root declaring `buildCommand: ""`, `outputDirectory: "website/dist"`, and `cleanUrls: true` (empirically verified via Vercel commit statuses: running `python3 ./bin/peacock` inside Vercel's Node build container failed in `dpl_BGRmnyu8uyhFe6h5Nmw97WAGbEcr` because the bootstrap requires Python 3.11+, whereas serving pre-built `outputDirectory: "website/dist"` succeeded in `dpl_JC57G3jP4G3qBVVZ8cbdNgm94A9d`);
+2. fixing `.gitignore` (where both `website/dist/` and unanchored `dist/` previously excluded `website/dist/`), tracking the verified `website/dist/` output built by `./bin/peacock run website/site.pac`, and enforcing byte-exact parity between `website/site.pac` and `website/dist/` in `tests/integration/test_website.py` and GitHub Actions CI.
 
 Serve the exported files locally:
 

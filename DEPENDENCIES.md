@@ -34,9 +34,9 @@ the actual CLI and compiler/VM. It generates twelve HTML routes, CSS, SVG logo
 and a PEACOCK-rendered chromatic/3D PNG showcase (`assets/chromatic-3d-preview.png`)
 from one `.pac` compilation unit (there is no user module system yet). Its
 browser output uses no JavaScript or external UI framework. `vercel.json` at the
-repository root configures Vercel to build `website/site.pac` into `website/dist`
-and serve `outputDirectory: "website/dist"`, and `website/dist/` is tracked and
-checked for byte-exact parity with `website/site.pac` in `tests/integration/test_website.py`.
+repository root configures Vercel to serve `outputDirectory: "website/dist"`, and
+`website/dist/` is tracked and checked for byte-exact parity with `website/site.pac`
+in `tests/integration/test_website.py` and GitHub Actions CI.
 The following remain Python bootstrap implementations:
 
 - production lexer/parser/AST/diagnostics and parser recovery;

@@ -128,11 +128,16 @@ Key verified additions in this milestone:
 5. **Vercel 404 root-cause fix and PEACOCK website verification (`vercel.json`, `website/site.pac`, `website/dist/`):**
    Investigated the Vercel `404: NOT_FOUND` failure on `https://peacock-website-eight.vercel.app`
    (commit `92469d1` status `56604594874`): the repository lacked `vercel.json`,
-   had no root `index.html`, and excluded `website/dist/` in `.gitignore`,
-   causing Vercel to perform a 2-second zero-build deployment with no HTML
-   output. Added `vercel.json` (`buildCommand` running `website/site.pac`,
-   `outputDirectory: "website/dist"`, `cleanUrls: true`), tracked the verified
-   `website/dist/` build in Git, enriched `website/site.pac` with live PEACOCK
-   chromatic/3D rendering (`assets/chromatic-3d-preview.png`) and SHA-256 source
-   digests, and verified all 12 routes and assets over local HTTP (`200 OK`).
+   had no root `index.html`, and excluded `website/dist/` in `.gitignore` (via
+   both `website/dist/` and unanchored `dist/`), causing Vercel to perform a
+   2-second zero-build deployment of the repository root with no HTML output.
+   Empirically verified via Vercel commit statuses on `arena/0e213b6a-peacock`:
+   invoking `python3 ./bin/peacock` in Vercel's build container (`6977961`,
+   `dpl_BGRmnyu8uyhFe6h5Nmw97WAGbEcr`) fails because the bootstrap requires
+   Python 3.11+, whereas configuring `vercel.json` with `buildCommand: ""`,
+   `outputDirectory: "website/dist"`, and `cleanUrls: true` (`f7a3ef2`,
+   `dpl_JC57G3jP4G3qBVVZ8cbdNgm94A9d`) succeeds while `tests/integration/test_website.py`
+   and GitHub Actions CI enforce byte-exact parity between `website/site.pac`
+   and tracked `website/dist/`. All 12 routes and assets were also verified over
+   local HTTP (`200 OK`).
 
