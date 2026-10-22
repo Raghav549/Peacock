@@ -12,8 +12,21 @@ from peacock.compiler.pipeline import compile_source
 from peacock.sanskrit import (
     INTERNAL_TO_SOURCE,
     LEGACY_KEYWORDS,
+    LEGACY_STANDARD_WORDS,
     devanagari_digits,
 )
+
+
+# The stage-2 parser corpus predates the additive 0.3 catalogue. Only names
+# reserved by the 0.2 surface are unambiguously native internals here: new names
+# such as ``node``, ``left`` and ``weights`` may be ordinary user identifiers
+# and must retain their source spelling in the differential digest.
+_SELFHOST_INTERNAL_TO_SOURCE = {
+    internal: source
+    for internal, source in INTERNAL_TO_SOURCE.items()
+    if internal in LEGACY_STANDARD_WORDS
+    or internal in {"x", "y", "a", "b", "c", "t", "r", "g", "e", "x0", "x1", "y0", "y1"}
+}
 
 
 _AST_LABELS = {
@@ -41,7 +54,7 @@ _AST_LABELS = {
 
 
 def _source_word(word: str) -> str:
-    return INTERNAL_TO_SOURCE.get(word, LEGACY_KEYWORDS.get(word, word))
+    return _SELFHOST_INTERNAL_TO_SOURCE.get(word, LEGACY_KEYWORDS.get(word, word))
 
 
 def node(name: str, *parts: str) -> str:

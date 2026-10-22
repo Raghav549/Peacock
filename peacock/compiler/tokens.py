@@ -138,7 +138,10 @@ RESERVED_FUTURE = {
 # corresponding source spellings live in peacock.sanskrit and are never aliases.
 KNOWN_CAPABILITIES = ("compute", "fs", "ui")
 SOURCE_CAPABILITIES = tuple(INTERNAL_TO_SOURCE[name] for name in KNOWN_CAPABILITIES)
-KNOWN_NAMESPACES = ("math", "nn", "colour", "graphics", "motion")
+KNOWN_NAMESPACES = (
+    "math", "nn", "colour", "graphics", "motion", "vyakarana", "ui",
+    "scene3d", "agent",
+)
 
 #: Withdrawn English words are recognized only to issue PE1007.
 LEGACY_SOURCE_WORDS = LEGACY_KEYWORDS

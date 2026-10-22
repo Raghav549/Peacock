@@ -323,3 +323,148 @@ def sample_gradient(colors: list[Color], t: float, space: str = "oklab") -> Colo
     i = min(int(pos), len(colors) - 2)
     local = pos - i
     return colors[i].mix(colors[i + 1], local, space)
+
+
+# -- advanced mixing, difference and gamut mapping --------------------------
+def _weights(colors: list[Color], weights: list[float]) -> tuple[list[Color], list[float]]:
+    if not colors or len(colors) != len(weights):
+        raise ColorError("colour mixing needs equally sized, non-empty colour and weight lists")
+    if len(colors) > 256:
+        raise ColorError("a mixture is limited to 256 colours")
+    if any(not isinstance(color, Color) for color in colors):
+        raise ColorError("every mixture input must be a colour")
+    if any(not math.isfinite(weight) or weight < 0.0 for weight in weights):
+        raise ColorError("mixture weights must be finite and non-negative")
+    total = sum(weights)
+    if total <= 0.0:
+        raise ColorError("at least one mixture weight must be positive")
+    return colors, [weight / total for weight in weights]
+
+
+def mix_weighted(colors: list[Color], weights: list[float], space: str = "oklab") -> Color:
+    """Mix any number of colours with normalized non-negative weights.
+
+    ``subtractive`` selects the documented three-channel Kubelka–Munk
+    approximation in :func:`mix_subtractive`; other spaces are direct component
+    mixtures.  Oklch hue uses a weighted circular mean, avoiding a 0°/360° seam.
+    """
+
+    colors, weights = _weights(colors, weights)
+    if space == "subtractive":
+        return mix_subtractive(colors, weights)
+    alpha = sum(color.alpha * weight for color, weight in zip(colors, weights))
+    if space == "oklab":
+        components = [color.oklab() for color in colors]
+        values = [sum(component[i] * weight for component, weight in zip(components, weights)) for i in range(3)]
+        return Color.from_oklab(*values, alpha)
+    if space == "oklch":
+        components = [color.oklch() for color in colors]
+        lightness = sum(component[0] * weight for component, weight in zip(components, weights))
+        chroma = sum(component[1] * weight for component, weight in zip(components, weights))
+        x = sum(math.cos(math.radians(component[2])) * weight for component, weight in zip(components, weights))
+        y = sum(math.sin(math.radians(component[2])) * weight for component, weight in zip(components, weights))
+        hue = math.degrees(math.atan2(y, x)) % 360.0 if math.hypot(x, y) > 1e-12 else 0.0
+        return Color.from_oklch(lightness, chroma, hue, alpha)
+    if space == "linear":
+        return Color(
+            sum(color.r * weight for color, weight in zip(colors, weights)),
+            sum(color.g * weight for color, weight in zip(colors, weights)),
+            sum(color.b * weight for color, weight in zip(colors, weights)),
+            alpha,
+        )
+    if space == "srgb":
+        components = [color.srgb() for color in colors]
+        values = [sum(component[i] * weight for component, weight in zip(components, weights)) for i in range(3)]
+        return Color.from_srgb(*values, alpha)
+    raise ColorError(f"unknown colour mixing space '{space}'")
+
+
+def mix_subtractive(colors: list[Color], weights: list[float]) -> Color:
+    """Approximate pigment mixing with single-constant Kubelka–Munk curves.
+
+    Linear sRGB channels are treated as three broad reflectance bands.  This is
+    useful for art tools but is **not** a spectral or measured-paint simulation.
+    Weights are normalized here as well as by :func:`mix_weighted`, so direct
+    Python callers receive the same result as native callers.
+    """
+
+    colors, weights = _weights(colors, weights)
+    reflectances = []
+    for channel in ("r", "g", "b"):
+        ks = 0.0
+        for color, weight in zip(colors, weights):
+            reflectance = min(1.0 - 1e-7, max(1e-7, getattr(color, channel)))
+            ks += weight * (1.0 - reflectance) ** 2 / (2.0 * reflectance)
+        reflectances.append(1.0 + ks - math.sqrt(ks * ks + 2.0 * ks))
+    alpha = sum(color.alpha * weight for color, weight in zip(colors, weights))
+    return Color(*reflectances, alpha)
+
+
+def map_gamut(color: Color) -> Color:
+    """Map to sRGB by reducing Oklch chroma at nearly constant L and hue."""
+
+    if color.in_gamut():
+        return color
+    lightness, chroma, hue = color.oklch()
+    lightness = _clamp01(lightness)
+    low, high = 0.0, max(0.0, chroma)
+    best = Color.from_oklch(lightness, 0.0, hue, color.alpha)
+    for _ in range(28):
+        middle = (low + high) / 2.0
+        candidate = Color.from_oklch(lightness, middle, hue, color.alpha)
+        if candidate.in_gamut(tolerance=1e-6):
+            best = candidate
+            low = middle
+        else:
+            high = middle
+    return best if best.in_gamut(tolerance=1e-5) else best.clipped()
+
+
+def delta_e_2000(a: Color, b: Color) -> float:
+    """CIEDE2000 colour difference between two CIELAB/D65 representations."""
+
+    L1, a1, b1 = a.lab()
+    L2, a2, b2 = b.lab()
+    C1, C2 = math.hypot(a1, b1), math.hypot(a2, b2)
+    Cbar = (C1 + C2) / 2.0
+    cbar7 = Cbar ** 7
+    G = 0.5 * (1.0 - math.sqrt(cbar7 / (cbar7 + 25.0 ** 7)))
+    a1p, a2p = (1.0 + G) * a1, (1.0 + G) * a2
+    C1p, C2p = math.hypot(a1p, b1), math.hypot(a2p, b2)
+    h1p = math.degrees(math.atan2(b1, a1p)) % 360.0
+    h2p = math.degrees(math.atan2(b2, a2p)) % 360.0
+    dLp, dCp = L2 - L1, C2p - C1p
+    difference = h2p - h1p
+    if C1p * C2p == 0.0:
+        dhp = 0.0
+    elif abs(difference) <= 180.0:
+        dhp = difference
+    elif difference > 180.0:
+        dhp = difference - 360.0
+    else:
+        dhp = difference + 360.0
+    dHp = 2.0 * math.sqrt(C1p * C2p) * math.sin(math.radians(dhp) / 2.0)
+    Lbarp, Cbarp = (L1 + L2) / 2.0, (C1p + C2p) / 2.0
+    if C1p * C2p == 0.0:
+        hbarp = h1p + h2p
+    elif abs(difference) <= 180.0:
+        hbarp = (h1p + h2p) / 2.0
+    elif h1p + h2p < 360.0:
+        hbarp = (h1p + h2p + 360.0) / 2.0
+    else:
+        hbarp = (h1p + h2p - 360.0) / 2.0
+    T = (
+        1.0
+        - 0.17 * math.cos(math.radians(hbarp - 30.0))
+        + 0.24 * math.cos(math.radians(2.0 * hbarp))
+        + 0.32 * math.cos(math.radians(3.0 * hbarp + 6.0))
+        - 0.20 * math.cos(math.radians(4.0 * hbarp - 63.0))
+    )
+    dtheta = 30.0 * math.exp(-((hbarp - 275.0) / 25.0) ** 2)
+    cbarp7 = Cbarp ** 7
+    Rc = 2.0 * math.sqrt(cbarp7 / (cbarp7 + 25.0 ** 7))
+    Sl = 1.0 + 0.015 * (Lbarp - 50.0) ** 2 / math.sqrt(20.0 + (Lbarp - 50.0) ** 2)
+    Sc, Sh = 1.0 + 0.045 * Cbarp, 1.0 + 0.015 * Cbarp * T
+    Rt = -math.sin(math.radians(2.0 * dtheta)) * Rc
+    l_term, c_term, h_term = dLp / Sl, dCp / Sc, dHp / Sh
+    return math.sqrt(max(0.0, l_term * l_term + c_term * c_term + h_term * h_term + Rt * c_term * h_term))

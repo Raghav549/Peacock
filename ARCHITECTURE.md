@@ -1,6 +1,6 @@
 # PEACOCK Architecture
 
-Status: describes the v0.2 bootstrap implementation. The language definition is
+Status: describes the v0.3 bootstrap implementation. The language definition is
 independent of this implementation; the Python toolchain is a temporary host
 (ADR-0001). Components marked **planned** do not exist yet.
 
@@ -9,14 +9,16 @@ independent of this implementation; the Python toolchain is a temporary host
 PEACOCK is being built as an AI-native language and computing ecosystem:
 
 * a statically typed language with first-class tensors, differentiable
-  computation, model declarations, colour, 2D graphics, motion and physics;
+  computation, model declarations, bounded agents, Sanskrit grammar tools,
+  advanced colour, 2D/3D graphics, UI documents, motion and physics;
 * an original compiler pipeline and bytecode runtime with capability-based
   security and enforced resource budgets;
 * an ecosystem that can eventually host its own compiler and tools.
 
-Non-goals for v0.2: being a general-purpose replacement for Python, shipping a
-production UI toolkit, matching GPU performance, or claiming AGI. The reference
-implementation is deliberately small enough to audit and test.
+Non-goals for v0.3: being a general-purpose replacement for Python, claiming a
+complete interactive native-window UI, matching GPU performance, interpreting
+every Pāṇinian rule, or claiming AGI. The reference implementation remains
+small enough to audit and test.
 
 ## 2. System map
 
@@ -239,6 +241,10 @@ This is best-effort process-level isolation, **not** a kernel sandbox. See
 * `optim.py`: original SGD (optional momentum) and Adam.
 * `serialization.py`: `.ज्ञान` v1 with per-parameter dtype/shape, float payload,
   metadata, SHA-256, and int8 quantisation helpers.
+* `agent.py`: inspectable string blackboards, condition/action/effect rules,
+  positive-cost Dijkstra planning with cumulative-salience tie-breaking, bounded
+  state expansion, execution and before/after traces. No arbitrary host tools or
+  hidden network calls are embedded in the agent abstraction.
 
 Gradient correctness is checked against finite differences in tests
 (`test_tensor.py`, `test_training.py`) with tolerances around 1e-9 for the
@@ -246,8 +252,9 @@ small analytic cases. This is numerical validation, not a proof.
 
 ## 6. Frontend engine
 
-* `colour.py`: sRGB transfer functions, XYZ, CIELAB, Oklab/Oklch, WCAG
-  luminance/contrast, mixing, hue rotation, palettes, gradients.
+* `colour.py`: sRGB transfer functions, XYZ, CIELAB, Oklab/Oklch, WCAG,
+  CIEDE2000, weighted linear/perceptual/polar/subtractive mixing, circular hue
+  means, palettes, gradients and Oklch gamut mapping.
 * `canvas.py`: premultiplied RGBA software framebuffer; 4×4 supersampled
   rectangles/circles/lines; additive glow; perceptual gradients; procedural
   aurora; explicit dimension/pixel limits.
@@ -258,11 +265,22 @@ small analytic cases. This is numerical validation, not a proof.
   sizes and overflow reporting.
 * `physics.py`: fixed-step AABB rigid bodies with gravity, restitution,
   friction and positional correction.
+* `ui.py`: retained UI nodes, flow/grid layout, absolute hit testing, contrast/
+  overflow/touch-target audits and escaped responsive Sanskrit HTML export.
+* `scene3d.py`: cube/UV-sphere meshes, Euler transforms, perspective projection,
+  back-face culling, reciprocal-depth buffering and coloured point lights.
 
-The graphics renderer is 2D and CPU-only. Text shaping, a reusable widget
-system, native accessibility integration, 3D and GPU backends are planned. The
-separate static website exporter emits semantic HTML and accessibility-oriented
-structure, but it is not a native accessibility system or general UI toolkit.
+The 2-D and 3-D renderers are CPU-only. The UI toolkit currently targets static
+component/layout/HTML workflows; text shaping, input/event dispatch and native
+accessibility/window integration remain planned. The separate static website
+exporter is an application of the toolchain, not a substitute for those host
+APIs.
+
+`peacock/vyakarana/` is a sibling native engine, independent of the compiler:
+`corpus.py` loads the attributed 3,983-text corpus and inheritance references;
+`pratyahara.py` interprets Māheśvara ranges; `sandhi.py` implements four traced
+vowel-boundary rules. Complete text coverage and executable rule coverage are
+separate architectural metrics.
 
 ## 7. Host boundaries and platforms
 
@@ -351,7 +369,7 @@ compiler stages, and (b) host services. The self-hosting plan reimplements (a)
 in `.सूत्र` while keeping OS access behind natives:
 
 1. tokenizer — **done** (`selfhost/tokenizer.सूत्र`, parity-tested);
-2. parser and AST — **partial** (`selfhost/parser.सूत्र`): full 0.1 syntax,
+2. parser and AST — **partial** (`selfhost/parser.सूत्र`): full 0.3 syntax,
    including model/training declarations, with canonical AST-digest parity on the
    14-file corpus and self-parse; strict first-error reporting, no recovery or
    `PE2xxx` diagnostic parity yet, and no typed AST nodes;
@@ -376,7 +394,10 @@ See `docs/compiler/bootstrap.md` and ADR-0003.
 * No user modules, generics, closures, or first-class functions.
 * No native code generation.
 * No GPU tensors, no convolution/attention layers, no data loader pipeline.
-* No UI toolkit, text shaping, accessibility, 3D, or native windowing.
+* No UI event runtime, native text shaping/accessibility/windowing, GPU 3D,
+  smooth mesh normals or texture pipeline.
+* The complete sūtra corpus is searchable, but only the documented pratyāhāra
+  and four sandhi operations are executable; there is no full Pāṇinian deriver.
 * Capability isolation is process-level and best effort; it is not a hardened
   multi-tenant sandbox.
 * The Python bootstrap adds latency and memory overhead that the native path is

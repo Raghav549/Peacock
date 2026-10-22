@@ -1,4 +1,4 @@
-"""PEACOCK's static type model (v0.2).
+"""PEACOCK's static type model (v0.3).
 
 The model is deliberately small and explicit. There is no implicit numeric
 conversion between ``Int`` and ``Float``; tensor dtypes follow the promotion
@@ -96,6 +96,9 @@ CanvasType = OpaqueType("Canvas")
 ModelType = OpaqueType("Model")
 DatasetType = OpaqueType("Dataset")
 RangeType = OpaqueType("Range")
+UIType = OpaqueType("UI")
+Scene3DType = OpaqueType("Scene3D")
+AgentType = OpaqueType("Agent")
 NamespaceType = OpaqueType("<namespace>")
 
 #: Scalar types accepted as tensor dtypes.

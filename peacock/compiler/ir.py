@@ -5,7 +5,7 @@ for named locals. Control flow is expressed with labels, conditional branches an
 jumps. Values that must survive a control-flow join are stored in slots, never in
 temporaries, which keeps the representation simple to verify.
 
-The IR is intentionally *not* SSA in 0.2. A documented future optimisation is an
+The IR is intentionally *not* SSA in 0.3. A documented future optimisation is an
 SSA construction pass (see ROADMAP.md). The verifier performs structural checks
 and limited type checking; full dominance-based verification is future work and
 is labelled as such in docs/compiler/ir.md.

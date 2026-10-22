@@ -7,8 +7,8 @@ from peacock.compiler import builtins
 
 class VersionTests(unittest.TestCase):
     def test_package_metadata(self):
-        self.assertEqual(peacock.__version__, "0.2.0")
-        self.assertEqual(peacock.LANGUAGE_VERSION, "0.2")
+        self.assertEqual(peacock.__version__, "0.3.0")
+        self.assertEqual(peacock.LANGUAGE_VERSION, "0.3")
         self.assertEqual(peacock.__codename__, "Fledgling")
 
     def test_capabilities_are_documented_and_small(self):

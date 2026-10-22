@@ -271,6 +271,106 @@ _LEXICON: dict[str, str] = {
     "optimisation": "अनुकूलन",
 }
 
+# Additive 0.3 vocabulary. These internal names were never valid English source
+# words in 0.2, so they must not join the withdrawn-0.1 rejection inventory:
+# existing user identifiers such as ``left``, ``weights`` and ``node`` stay valid.
+_V03_LEXICON: dict[str, str] = {
+    # Sanskrit grammar, UI, 3-D and agent types/namespaces.
+    "UI": "दृश्यरचना",
+    "Scene3D": "त्रिअयामदृश्य",
+    "Agent": "अभिकर्तृप्रकार",
+    "scene3d": "त्रिअयाम",
+    "vyakarana": "व्याकरण",
+    "agent": "अभिकर्तृ",
+    # Advanced colour operations.
+    "mix_many": "बहुमिश्रय",
+    "delta_e": "वर्णान्तर",
+    "gamut_map": "वर्णक्षेत्रीकरण",
+    "subtractive": "व्यवकलन",
+    # Native UI builder.
+    "create": "सृज",
+    "panel": "पटल",
+    "button": "नोदक",
+    "link": "सम्पर्क",
+    "flow": "प्रवाह",
+    "grid": "जालक",
+    "bounds": "परिसीमा",
+    "hit_test": "स्पर्शपरीक्षा",
+    "audit": "अन्वीक्षा",
+    "to_html": "एचटीएमएलपाठ्य",
+    "node_count": "ग्रन्थिसंख्या",
+    "node": "ग्रन्थि",
+    "parent": "जनक",
+    "label": "नामपट्ट",
+    "href": "गन्तव्य",
+    "foreground": "अग्रवर्ण",
+    "background": "पृष्ठवर्ण",
+    "direction": "दिशा",
+    "gap": "अन्तर",
+    "padding": "अन्तराल",
+    "columns": "स्तम्भानि",
+    "row": "पङ्क्ति",
+    "column": "स्तम्भ",
+    # Software 3-D renderer.
+    "cube": "घन",
+    "sphere": "गोलक",
+    "light": "प्रकाश",
+    "rotate": "भ्रमय",
+    "render": "अङ्कन",
+    "triangle_count": "त्रिभुजसंख्या",
+    "z": "जेड",
+    "segments": "खण्डानि",
+    "rings": "वलयानि",
+    "intensity": "तीव्रता",
+    "yaw": "पार्श्वभ्रम",
+    "pitch": "अनुभ्रम",
+    "distance": "दूरी",
+    "fov": "दृष्टिकोण",
+    # Deterministic agent construction and planning.
+    "fact": "तथ्य",
+    "rule": "नियम",
+    "plan": "योजना",
+    "status": "स्थिति",
+    "trace": "अनुसरण",
+    "facts": "तथ्यावली",
+    "goal_key": "लक्ष्यसूची",
+    "goal_value": "लक्ष्यमूल्य",
+    "max_steps": "अधिकतमचरण",
+    "when_key": "यदासूची",
+    "when_value": "यदामूल्य",
+    "action": "क्रिया",
+    "set_key": "स्थापनसूची",
+    "set_value": "स्थापनमूल्य",
+    "priority": "प्राथमिकता",
+    "cost": "व्यय",
+    "key": "कुञ्जिका",
+    "weights": "भारावली",
+    "space": "वर्णावकाश",
+    "scene": "त्रिअयाममूल्य",
+    "title": "शीर्षक",
+    "color": "वर्णमूल्य",
+    "ready": "सज्ज",
+    "succeeded": "सिद्ध",
+    "stalled": "स्थगित",
+    # Executable Pāṇinian tools and complete sūtra text lookup.
+    "sutra": "सूत्र",
+    "sutra_count": "सूत्रसंख्या",
+    "search": "अन्वेषय",
+    "pratyahara": "प्रत्याहार",
+    "sandhi": "संधि",
+    "sandhi_rule": "संधिसूत्र",
+    "anuvritti": "अनुवृत्ति",
+    "adhikara_info": "अधिकारविवरण",
+    "literature": "साहित्य",
+    "coverage": "आच्छादन",
+    "left": "वाम",
+    "right": "दक्षिण",
+    "query": "अन्वेषण",
+    "limit": "अवधि",
+    "id": "परिचय",
+}
+_LEXICON.update(_V03_LEXICON)
+
 # Sanskrit string values accepted where an algorithm name is a value rather than
 # an identifier (training declarations, nn.train/nn.loss and motion.ease).
 _ENUM_VALUES = {
@@ -283,6 +383,8 @@ _ENUM_VALUES = {
         "ease_in_quart", "ease_out_quart", "ease_in_sine",
         "ease_out_sine", "ease_in_out_sine", "ease_in_expo",
         "ease_out_expo", "smoothstep", "ease_in_back", "ease_out_back",
+        "oklab", "oklch", "srgb", "subtractive", "row", "column",
+        "ready", "succeeded", "stalled",
     )
 }
 
@@ -291,7 +393,8 @@ _ENUM_VALUES = {
 # Mathematical single-letter names remain available as user identifiers; the
 # rest of the withdrawn English standard vocabulary receives PE1007.
 LEGACY_STANDARD_WORDS = frozenset(
-    set(_LEXICON) - {"x", "y", "a", "b", "c", "t", "r", "g", "e", "x0", "x1", "y0", "y1"}
+    set(_LEXICON) - set(_V03_LEXICON)
+    - {"x", "y", "a", "b", "c", "t", "r", "g", "e", "x0", "x1", "y0", "y1"}
 )
 
 LEGACY_KEYWORDS: dict[str, str] = {

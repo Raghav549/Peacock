@@ -74,6 +74,10 @@ def type_name(value) -> str:
         return INTERNAL_TO_SOURCE["Range"]
     if isinstance(value, StructInstance):
         return value.type_name
+    from peacock.frontend.ui import UIBuilder
+
+    if isinstance(value, UIBuilder):
+        return INTERNAL_TO_SOURCE["UI"]
     # Opaque engine objects expose a class name; translate standard identities.
     name = type(value).__name__
     return INTERNAL_TO_SOURCE.get(name, name)

@@ -17,9 +17,26 @@ peacock <command> [options]
 | `audit <file.सूत्र>` | static capability report; `--json` |
 | `tokens <file.सूत्र>` | token dump (debug) |
 | `ast <file.सूत्र>` | AST dump (debug) |
+| `व्याकरण <operation>` | offline sūtra lookup/search, pratyāhāra, sandhi, literature and coverage |
 | `bench` | reproducible benchmark suite; `--json PATH`, `--quick` |
 | `fuzz` | deterministic fuzzers; `--iterations`, `--seed`, `--json` |
 | `test` | run the unittest suite; `-p PATTERN`, `--quiet` |
+
+## Sanskrit grammar operations
+
+```bash
+./bin/peacock व्याकरण सूत्र 1.1.1
+./bin/peacock व्याकरण अन्वेषय गुण --अवधि 5
+./bin/peacock व्याकरण प्रत्याहार अच्
+./bin/peacock व्याकरण संधि राम इन्द्रः
+./bin/peacock व्याकरण साहित्य
+./bin/peacock व्याकरण आच्छादन
+```
+
+These operations use the installed offline corpus and need no capability grant.
+Unknown sūtras, invalid pratyāhāras and unsupported sandhi boundaries produce a
+controlled error, not a guessed form. Coverage reports 3,983 sūtra texts and the
+separate executable-rule count; see [language/vyakarana.md](language/vyakarana.md).
 
 ## Semantic shadow checks (experimental)
 
@@ -43,7 +60,7 @@ Nothing is granted by default.
 ```bash
 ./bin/peacock run app.सूत्र --grant सञ्चय
 ./bin/peacock run app.सूत्र --grant गणना --root ./sandbox
-./bin/peacock run app.सूत्र --grant सञ्चय,compute
+./bin/peacock run app.सूत्र --grant सञ्चय,गणना
 ./bin/peacock run app.सूत्र --grant दृश्य --present out/preview
 ```
 
@@ -89,7 +106,7 @@ Arguments after `--` are passed to `प्रक्रिया.तर्का�
 | Code | Meaning |
 |---:|---|
 | 0 | success |
-| 1 | compilation diagnostics or failing tests |
+| 1 | compilation/grammar operation diagnostics or failing tests |
 | 2 | usage error (bad extension, unknown grant/command) |
 | 3 | runtime fault, capability denial, invalid artifact |
 | 4 | internal compiler error (bug) |

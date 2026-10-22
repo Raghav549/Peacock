@@ -34,8 +34,8 @@ labels, terminators and binop operand types.
 {
   "format": "peacock-bytecode",
   "format_version": 1,
-  "language_version": "0.2",
-  "compiler_version": "0.2.0",
+  "language_version": "0.3",
+  "compiler_version": "0.3.0",
   "module": "hello",
   "uses": ["nn"],
   "source_path": "examples/hello.सूत्र",

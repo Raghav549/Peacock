@@ -2,7 +2,7 @@
   "name": "peacock-language",
   "displayName": "PEACOCK",
   "description": "Syntax highlighting and language configuration for PEACOCK (.सूत्र). Prepared tooling; PEACOCK is not yet recognised by GitHub Linguist.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publisher": "peacock-language",
   "license": "MIT",
   "engines": {

@@ -580,3 +580,55 @@ than AGI.
 need for multilingual reserved aliases or a different canonical lexical policy,
 with corresponding artifact, editor, diagnostic, and compatibility tests. No
 alias should be introduced ad hoc.
+
+## ADR-0023: Add native 0.3 engines without implicit authority or false coverage
+
+**Status.** Accepted. This updates ADR-0022's version metadata and its statement
+that no natural-language sandhi exists outside the lexer; it retains the single
+Sanskrit source language and stable internal ABI.
+
+**Context.** The 0.3 expansion needs working grammar, agent, UI, advanced-colour
+and 3-D libraries, not a research-only syntax skin. Those libraries must use the
+existing compiler, verified bytecode VM and host policy. Adding every new
+internal English name to the withdrawn-0.1 reserved-word inventory would also
+break existing user identifiers such as `left`, `node` and `weights`.
+
+**Decision.**
+
+1. Language metadata is 0.3 and toolchain metadata is 0.3.0; `.बीज` and `.ज्ञान`
+   container format versions remain 1. New native namespaces are dispatched by
+   the existing verifier and VM rather than by source-to-Python translation.
+2. Additive 0.3 vocabulary does not retroactively become withdrawn English
+   reserved vocabulary. Existing non-reserved identifiers stay valid. Sanskrit
+   native names still canonicalise to stable internal IDs, and English calls do
+   not become aliases for the new natives. The stage-2 parser-digest oracle uses
+   the stable 0.2 native-name subset for its fixed legacy corpus.
+3. No implicit authority is introduced. Agent planning/execution requires
+   `गणना`; UI HTML and 3-D PNG file writes use the existing `सञ्चय` sandbox;
+   frame presentation remains `दृश्य`. Grammar lookup and in-memory construction
+   need no host authority.
+4. The grammar package vendors an attributed 3,983-text corpus and separately
+   reports executable coverage. Generic pratyāhāra expansion and four traced
+   vowel-sandhi rules do not license a claim of complete Pāṇinian coverage.
+   Sandhi remains outside compiler tokenisation; no probabilistic splitting is
+   added.
+5. Agents are bounded symbolic production-rule systems, UI is a retained static
+   document/layout/HTML system, and 3-D is a deterministic CPU mesh renderer.
+   LLM/AGI, interactive native windows and GPU claims require separate evidence.
+
+**Alternatives.** (a) Reserve every new English internal word—rejected for
+source incompatibility. (b) Give each library direct host file/network access—
+rejected because it bypasses the capability model. (c) Describe corpus size as
+executable grammar coverage or symbolic planning as AGI—rejected as untrue.
+(d) Add external AI/UI/GPU frameworks—rejected for the dependency-free native
+boundary and reproducibility.
+
+**Consequences.** Existing source and self-host parity remain intact while the
+new libraries run as real native calls. Security documentation can reason about
+three capabilities instead of an expanding set of ad hoc permissions. Coverage,
+rendering and agent limits must remain explicit in manuals and status reports.
+
+**Reversal trigger.** A versioned proposal with compatibility evidence for a
+different vocabulary policy, or a separately reviewed host capability whose
+authority cannot be represented safely by the existing three. Any broader
+grammar, agent or UI claim still requires its own acceptance tests.

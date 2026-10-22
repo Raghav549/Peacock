@@ -1,4 +1,4 @@
-"""PIR optimisation passes for PEACOCK 0.2.
+"""PIR optimisation passes for PEACOCK 0.3.
 
 Passes are deliberately conservative and evidence-backed:
 

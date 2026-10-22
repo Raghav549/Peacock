@@ -10,19 +10,20 @@ security, and multiple deployment hosts behind one coherent language.
 **Canonical source extension: `.सूत्र`.** Compiled programs use `.बीज`; models use
 `.ज्ञान`. `.pk` and `.peacock` are **not** accepted by the toolchain.
 
-> **Honest status (v0.2.0; phases 0–4 substantially implemented, 5–7 and 9 partial).**
-> The lexer, parser, type checker, typed IR, optimiser, bytecode compiler, stack
-> VM, tensor/autodiff engine, small-model trainer, colour pipeline, 2D software
-> renderer, PNG codec, motion, layout, physics and web/headless/server
-> presentation adapters are exercised by **511 passing tests**. A twelve-route
-> static website is also authored in PEACOCK and exported by the actual CLI.
-> Native mobile shells, native code generation, GPU kernels, a general UI toolkit,
-> 3D rendering and AGI research tooling are **not implemented**. The compiler is
-> **not self-hosting**; the tokenizer/parser have parity evidence and an
-> experimental semantic-shadow kernel is compared with Python on supported
-> cases. Python remains authoritative for production semantics, IR and codegen.
-> GitHub does **not** yet recognise `.सूत्र`; a Linguist submission is prepared in
-> [`linguist/`](linguist/), not accepted. See [STATUS.md](STATUS.md) for evidence.
+> **Honest status (v0.3.0; phases 0–4 substantially implemented, 5–7 and 9 partial).**
+> The compiler/VM, tensor/autodiff trainer, bounded agent planner, advanced
+> colour engine, 2D/CPU-3D renderers, retained UI/HTML builder, grammar tools,
+> and host adapters are exercised by the test suite. A twelve-route static
+> website is also authored in PEACOCK and exported by the actual CLI. The native
+> grammar package contains all **3,983 sūtra texts**, generic pratyāhāra
+> expansion and four explicitly traced sandhi rules; complete text coverage is
+> not misrepresented as a complete Pāṇinian interpreter. Native mobile shells,
+> native code generation, GPU kernels, UI event/window runtimes, a complete
+> executable Aṣṭādhyāyī and AGI are **not implemented**. The compiler is **not
+> self-hosting**; Python remains authoritative for production semantics, IR and
+> codegen. GitHub does **not** yet recognise `.सूत्र`; a Linguist submission is
+> prepared in [`linguist/`](linguist/), not accepted. See [STATUS.md](STATUS.md)
+> for the current verified test count and evidence.
 
 ## What works today
 
@@ -37,6 +38,11 @@ security, and multiple deployment hosts behind one coherent language.
 | Dense models, training, evaluation | Working (small models) | `tests/ai/test_training.py` |
 | Model save/load, int8 quantisation | Working (custom `.ज्ञान` v1) | `tests/ai/test_training.py` |
 | Colour science (sRGB/XYZ/Oklab/Oklch/Lab) | Working | `tests/frontend/test_colour.py` |
+| CIEDE2000, weighted/pigment mixing, gamut mapping | Working | `tests/frontend/test_colour_advanced.py`, `examples/colour_lab.सूत्र` |
+| Bounded agents, Dijkstra plans, traces | Working; no arbitrary tools/AGI claim | `tests/ai/test_agent.py`, `examples/agents.सूत्र` |
+| Sūtra corpus, pratyāhāra, traced vowel sandhi | Working; 3,983 texts, 4 sandhi rules | `tests/unit/test_vyakarana.py`, `examples/vyakarana.सूत्र` |
+| Retained Sanskrit UI, layout, audits, HTML | Working static toolkit | `tests/frontend/test_ui.py`, `examples/ui_builder.सूत्र` |
+| CPU 3D meshes, perspective, depth and lights | Working | `tests/frontend/test_scene3d.py`, `examples/scene3d.सूत्र` |
 | Software 2D rasteriser, PNG encode/decode | Working | `tests/frontend/test_canvas_png.py` |
 | Easing, springs, timelines, flex layout, 2D physics | Working | `tests/frontend/test_motion.py` |
 | Headless, static-web, HTTP frame hosts | Working library adapters | `tests/frontend/test_platforms.py` |
@@ -45,7 +51,8 @@ security, and multiple deployment hosts behind one coherent language.
 | PEACOCK-written full-grammar parser | Working (syntax); strict errors, no recovery yet | `selfhost/parser.सूत्र`, `tests/integration/test_selfhost_parser.py` |
 | Semantic-shadow kernel | Experimental; typed-AST probes, Python remains authoritative | `selfhost/type_model.सूत्र`, `--semantic-shadow` |
 | PEACOCK-authored static website | Working export; 12 HTML routes, CSS and SVG, no JS bundle | `website/site.सूत्र`, `tests/integration/test_website.py` |
-| Native UI toolkit, 3D, GPU, native codegen | **Not implemented** | Roadmap phases 5–8 |
+| UI events/native windows, GPU, native codegen | **Not implemented** | Roadmap phases 5–8 |
+| Complete executable Pāṇini, autonomous LLM agents, AGI | **Not implemented** | Grammar/agent manuals and roadmap |
 | Android/iOS/desktop shells | **Not implemented** | `docs/platforms/README.md` |
 | Official GitHub language recognition | **Not accepted** | `linguist/SUBMISSION.md` |
 
@@ -78,6 +85,16 @@ planned self-hosted compiler (ADR-0001 in
 # Serve frames over HTTP while the program runs (then keep the last one)
 ./bin/peacock run examples/present.सूत्र --grant दृश्य --serve 8099 --linger 30
 # -> http://127.0.0.1:8099/  /frame.png  /manifest.json  /healthz
+
+# Grammar corpus/pratyāhāra/sandhi, bounded agents and advanced colour
+./bin/peacock run examples/vyakarana.सूत्र
+./bin/peacock व्याकरण संधि राम इन्द्रः
+./bin/peacock run examples/agents.सूत्र
+./bin/peacock run examples/colour_lab.सूत्र
+
+# Export a Sanskrit UI document and a lit, depth-buffered 3-D scene
+./bin/peacock run examples/ui_builder.सूत्र --grant दृश्य
+./bin/peacock run examples/scene3d.सूत्र --grant दृश्य
 
 # Export the PEACOCK-authored twelve-route website (static HTML/CSS/SVG)
 ./bin/peacock run website/site.सूत्र --grant सञ्चय --root . \
@@ -162,9 +179,11 @@ authority.
    English compatibility spellings are rejected rather than creating two dialects.
    Stable internal opcode and artifact IDs are not a second source syntax.
 2. **AI is part of the language.** Tensor types carry dtype and shape; arithmetic
-   builds a reverse-mode graph; models and training runs are declarations.
-3. **Frontend is a core subsystem.** Colour is a first-class perceptual value; the
-   rasteriser is original, deterministic, and documented.
+   builds a reverse-mode graph; models and training runs are declarations;
+   bounded agents expose explicit rules, costs, plans and traces.
+3. **Frontend is a core subsystem.** Colour is a first-class perceptual value;
+   retained UI, 2-D and CPU 3-D renderers are original, deterministic and
+   documented, with native-host/GPU boundaries stated explicitly.
 4. **Security is architectural.** Capabilities are declared, statically checked,
    checked again by the VM, and independently granted by the host. Filesystem
    access is confined to a sandbox root and resource budgets are enforced.
@@ -181,13 +200,14 @@ authority.
 ```
 peacock/compiler/       lexer, parser, AST, types, semantics, IR, optimiser, bytecode
 peacock/runtime/        VM, host policy, natives, artifacts, disassembler
-peacock/intelligence/   tensors, autodiff, datasets, layers, training, evaluation, .ज्ञान
-peacock/frontend/       colour, rasteriser, PNG, easing, spring, timeline, layout, physics
+peacock/intelligence/   tensors, autodiff, training, evaluation, bounded agents, .ज्ञान
+peacock/frontend/       advanced colour, 2D/CPU-3D, retained UI, PNG, motion, physics
+peacock/vyakarana/      attributed sūtra corpus, pratyāhāra, sandhi, literature catalogue
 peacock/platforms/      headless, static-web and HTTP frame hosts
-peacock/cli.py          run, check, build, disasm, audit, bench, fuzz, test, tokens, ast
+peacock/cli.py          compiler/VM tools, व्याकरण, bench, fuzz and test commands
 selfhost/               PEACOCK tokenizer, parser and semantic-shadow kernel with parity fixtures
 website/                PEACOCK-authored static website source and build guide
-examples/               canonical .सूत्र programs (all compile and run in tests, incl. presentation)
+examples/               canonical .सूत्र programs, including grammar/agents/UI/3-D demonstrations
 tests/                  unittest suite: compiler, ai, frontend, security, integration, unit, benchmarks
 linguist/               prepared GitHub Linguist language definition, grammar and samples (not accepted)
 editors/vscode/         prepared TextMate grammar package (not published)
@@ -205,9 +225,12 @@ Start with the [documentation index](docs/README.md).
   capabilities, runtime semantics, and diagnostics.
 - [Sanskrit grammar and literature](docs/language/sanskrit.md) — native lexical
   design, Pāṇinian inspiration, Unicode rules, and research boundaries.
+- Native manuals: [व्याकरण](docs/language/vyakarana.md),
+  [agents](docs/ai-engine/agents.md), [UI](docs/frontend/ui-builder.md),
+  [3-D](docs/frontend/scene3d.md), and [advanced colour](docs/frontend/colour.md).
 - [ARCHITECTURE.md](ARCHITECTURE.md) — pipeline, VM, memory model, security,
   subsystem boundaries, external dependencies.
-- [ROADMAP.md](ROADMAP.md) — phases 0–10, dependencies, acceptance criteria.
+- [ROADMAP.md](ROADMAP.md) — phases 0–11, dependencies, acceptance criteria.
 - [AUDIT.md](AUDIT.md) — repository-wide evidence-based audit, subsystem status,
   observed commands, history/configuration findings and Linguist eligibility.
 - [STATUS.md](STATUS.md) — works / partial / planned / untested, with real test and

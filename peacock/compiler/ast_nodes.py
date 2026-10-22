@@ -1,4 +1,4 @@
-"""Abstract syntax tree for PEACOCK 0.2.
+"""Abstract syntax tree for PEACOCK 0.3.
 
 Nodes are plain (non-slotted) dataclasses so the semantic analyser can attach
 resolution information (``node.ty``, ``node.symbol``, ...) without copying trees.

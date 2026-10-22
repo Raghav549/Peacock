@@ -1,6 +1,6 @@
-# PEACOCK Language Specification — version 0.2
+# PEACOCK Language Specification — version 0.3
 
-Status: **implemented subset**. This document describes what the v0.2 toolchain
+Status: **implemented subset**. This document describes what the v0.3 toolchain
 actually accepts and executes. It is not a description of every feature PEACOCK
 will eventually have. Anything not specified here is either rejected by the
 compiler or reserved for a later version.
@@ -24,12 +24,12 @@ use-decl       = "उपयोग" IDENT [ ";" ]
 ```
 
 * `प्रकरण` is optional but, if present, MUST be the first item.
-* A module name does not create a namespace for values; v0.2 has one flat
+* A module name does not create a namespace for values; v0.3 has one flat
   value namespace per program.
 * `उपयोग` imports a standard-library namespace: `गणित`, `तन्त्रजाल`, `रङ्ग`,
   `चित्र`, `गति`, `सञ्चय`, `पाठ्य`, or `प्रक्रिया`. Aliases (`उपयोग तन्त्रजाल रूपेण n`) are
   rejected (PE2005). A namespace MUST be imported before its members are used.
-* There are no user-defined file imports in 0.2. The whole program is one file.
+* There are no user-defined file imports in 0.3. The whole program is one file.
 * Declarations are order-independent: a function may call one declared later.
 * Names are Unicode identifiers. The first character is `_` or a Unicode
   letter; later characters may also be Unicode decimal digits or combining
@@ -84,7 +84,7 @@ produce PE1003/PE1004 with an explanation. Logical negation is the keyword
 
 ## 3. Grammar (EBNF)
 
-The following is the complete v0.2 grammar. `[ x ]` is optional, `{ x }` is
+The following is the complete v0.3 grammar. `[ x ]` is optional, `{ x }` is
 repetition, and alternatives are separated by `|`.
 ```
 program        = [ module-decl ] { item } EOF
@@ -222,13 +222,14 @@ p.x = 5;
 ```
 
 Constructors take every field positionally, exactly once. Fields are mutable.
-Structs have no methods, inheritance, generics, or visibility modifiers in 0.2.
+Structs have no methods, inheritance, generics, or visibility modifiers in 0.3.
 
 ### 4.5 Opaque host types
 
-`वर्ण`, `चित्रपट`, `प्रतिमानप्रकार`, `दत्तसमूह`, and `सीमा` are values created by native
-functions. They can be passed to natives and accessed through the properties and
-methods in §8. They cannot be constructed directly.
+`वर्ण`, `चित्रपट`, `प्रतिमानप्रकार`, `दत्तसमूह`, `सीमा`, `दृश्यरचना`,
+`त्रिअयामदृश्य`, and `अभिकर्तृप्रकार` are values created by native functions.
+They can be passed to natives and accessed through the properties and methods in
+§8. They cannot be constructed directly with struct literal syntax.
 
 ---
 
@@ -285,7 +286,7 @@ Semantics:
 ### 6.1 Errors
 
 `क्षिप expr;` raises a catchable runtime value; the expression must be a
-`अक्षरमाला` in 0.2. `यत्न { ... } गृह्ण (e) { ... }` binds the message as `अक्षरमाला`.
+`अक्षरमाला` in 0.3. `यत्न { ... } गृह्ण (e) { ... }` binds the message as `अक्षरमाला`.
 An uncaught `क्षिप` terminates the run with `PE4020`, a stack trace and exit
 code 3; this is what a `.सूत्र` program sees when it raises without a handler.
 Runtime faults (arithmetic, bounds, assertions, native failures) are catchable
@@ -300,12 +301,12 @@ message when `cond` is false. The message defaults to `"assertion failed"`.
 
 ## 7. Capabilities
 
-A capability is a named authority granted by the embedding host. v0.2 defines:
+A capability is a named authority granted by the embedding host. v0.3 defines:
 
 | Capability | Protects |
 |---|---|
-| `गणना` | tensor parameter creation, autodiff, model init/training, model predict, save/load |
-| `सञ्चय` | all file reads and writes, including `चित्र.रक्ष` |
+| `गणना` | tensor/autodiff/model operations and agent planning/execution |
+| `सञ्चय` | all file reads and writes, including `चित्र.रक्ष` and `दृश्य.रक्ष` |
 | `दृश्य` | handing rendered frames to a host presentation backend (`चित्र.प्रदर्शय`) |
 
 Rules:
@@ -321,7 +322,7 @@ Rules:
 5. `peacock audit` reports declared and statically visible privileged calls. It
    does not replace the runtime check.
 6. `दृश्य` governs *presentation*, not input: a program can hand a frame to the
-   host, but v0.2 exposes no window, pointer, keyboard or display query. A host
+   host, but v0.3 exposes no window, pointer, keyboard or display query. A host
    may grant `दृश्य` while attaching no backend; the call then fails with PE4006
    (a host configuration error, not a capability denial).
 
@@ -372,8 +373,12 @@ not an OS-level sandbox.
 `एसआरजीबी(r, g, b, अपारदर्शिता)`, `ओकलैब(l, a, b, अपारदर्शिता)`, `ओकएलसीएच(l, c, h, अपारदर्शिता)`,
 `षोडशात्("#rrggbb[aa]")`, `मिश्रय(a, b, t)`, `दीप्तय(c, परिमाण)`, `मन्दय(c, परिमाण)`,
 `वर्णभ्रमय(c, अंश)`, `पूरकवर्ण(c)`, `द्युति(c)`, `विरोधद्युति(a, b)`,
-`वर्णावली(संख्या, बीज)`, `शैलीपाठ्य(c)`. Colours are linear-light internally and
-Oklab/Oklch-aware.
+`वर्णावली(संख्या, बीज)`, `शैलीपाठ्य(c)`, `बहुमिश्रय(वर्णावलीः, भारावली, वर्णावकाश)`,
+`वर्णान्तर(अ, ब)`, and `वर्णक्षेत्रीकरण(वर्णमूल्य)`. Colours are linear-light
+internally and Oklab/Oklch-aware. Weighted mixing supports `रैखिक`, `ओकलैब`,
+`ओकएलसीएच`, `एसआरजीबी`, and approximate three-channel `व्यवकलन` modes.
+`वर्णान्तर` is CIEDE2000; gamut mapping reduces Oklch chroma. The subtractive
+mode is not a spectral or measured-paint simulation.
 
 ### 8.7 `चित्र` (saving requires `सञ्चय`, presenting requires `दृश्य`)
 
@@ -389,7 +394,7 @@ decides (static-web frames, HTTP server, or an embedding host). Without a host
 grant the call fails with PE4001; with a grant but no backend it fails with
 PE4006. Both are catchable and neither presents a frame. The native does not
 mutate the canvas, so a program may keep drawing and present again (a frame
-sequence). There is no frame clock, input or vsync in 0.2.
+sequence). There is no frame clock, input or vsync in 0.3.
 
 चित्रपट properties: `विस्तार`, `औन्नत्य`. Methods: `रक्ष(पथ)` (capability `सञ्चय`).
 Dimensions are 1–4096 per side with a total-pixel safety limit; colours are
@@ -419,6 +424,45 @@ Unknown easing names are runtime faults. Names include `रैखिक`,
 `क्रमय`, `विपर्यय`. अक्षरमाला methods: `दैर्घ्य`, `बृहदक्षर`, `लघ्वक्षर`, `शोधय`, `अन्तर्भूत`,
 `आरम्भयुक्त`, `अन्तयुक्त`, `विभाजय`, `प्रतिस्थापय`, `उपपाठ्य(आरम्भ, अन्त)`.
 
+### 8.10 `व्याकरण`
+
+`सूत्र(परिचय)`, `सूत्रसंख्या()`, `अन्वेषय(अन्वेषण, अवधि)`, `प्रत्याहार(नाम)`,
+`संधि(वाम, दक्षिण)`, `संधिसूत्र(वाम, दक्षिण)`, `अनुवृत्ति(परिचय)`,
+`अधिकारविवरण(परिचय)`, `साहित्य()`, and `आच्छादन()` operate offline. The installed
+corpus contains all 3,983 sūtra texts and inheritance references. Pratyāhāra
+expansion is generic. Four vowel-sandhi rule IDs have explicit computational
+implementations; text coverage must not be confused with full Pāṇinian
+executable coverage. See [docs/language/vyakarana.md](docs/language/vyakarana.md).
+
+### 8.11 `दृश्य` native UI builder
+
+`सृज` creates `दृश्यरचना`; `पटल`, `पाठ्य`, `नोदक`, and `सम्पर्क` add nodes and
+return integer IDs. `प्रवाह` and `जालक` perform native layout; `परिसीमा` and
+`स्पर्शपरीक्षा` expose geometry; `अन्वीक्षा` reports overflow, empty labels,
+contrast and touch-target findings. `एचटीएमएलपाठ्य` exports responsive escaped
+`<html lang="sa">` without JavaScript, and `रक्ष` writes it with capability
+`सञ्चय`. Button event dispatch, native text shaping and native window/accessibility
+integration are not defined in 0.3. See [docs/frontend/ui-builder.md](docs/frontend/ui-builder.md).
+
+### 8.12 `त्रिअयाम`
+
+`सृज` creates `त्रिअयामदृश्य`. `घन`, `गोलक`, `भ्रमय`, `प्रकाश`,
+`त्रिभुजसंख्या`, and `अङ्कन` implement bounded meshes, object rotation, coloured
+point lights and CPU perspective rendering into `चित्रपट`. Rasterisation uses
+back-face culling and a reciprocal-depth buffer. Smooth normals, textures, ray
+tracing and GPU execution are not defined. See
+[docs/frontend/scene3d.md](docs/frontend/scene3d.md).
+
+### 8.13 `अभिकर्तृ` (planning/execution requires `गणना`)
+
+`सृज` creates `अभिकर्तृप्रकार` with a goal and step bound. `तथ्य`, `नियम`,
+`प्राप्नु`, and `तथ्यावली` manage a string blackboard and positive-cost
+condition/action/effect rules. `योजना` performs bounded Dijkstra search;
+`चलाय` applies the plan; `स्थिति`, `अनुसरण`, and `तथ्यावली` expose the result.
+Planning is deterministic and limited to 1024 steps/rules and 4096 expanded
+states. This is not an arbitrary tool execution or AGI interface. See
+[docs/ai-engine/agents.md](docs/ai-engine/agents.md).
+
 ---
 
 ## 9. Models and training declarations
@@ -433,7 +477,7 @@ Unknown easing names are runtime faults. Names include `रैखिक`,
 }
 ```
 
-* Exactly one input and one output are supported in 0.2.
+* Exactly one input and one output are supported in 0.3.
 * Inputs/outputs must be floating tensors with a statically known shape. The
   model's feature dimension is the last input dimension.
 * The stack must be non-empty. `सघन(एककानि: N, सक्रियण: A)` is the only
@@ -458,7 +502,7 @@ Training fields and defaults:
 | `समूहमान` | पूर्णाङ्क | 16 | ≥ 1 |
 | `बीज` | पूर्णाङ्क | 0 | any पूर्णाङ्क |
 
-Values must be literals in 0.2 (PE3010). Unknown fields are rejected.
+Values must be literals in 0.3 (PE3010). Unknown fields are rejected.
 
 ---
 
@@ -475,8 +519,9 @@ explicit value stack and a fixed slot frame per call.
 * **Recursion** is limited by the host call-depth budget.
 * **Steps** are limited per run; the limit is not catchable.
 * **Output** is limited by the host character budget.
-* **Values** are reference values for सूची, आयाम, structs, चित्रपट, प्रतिमानप्रकार and
-  दत्तसमूह; पूर्णाङ्क, दशमलव, सत्यता, अक्षरमाला, एकक and सीमा are value-like.
+* **Values** are reference values for सूची, आयाम, structs, चित्रपट, प्रतिमानप्रकार,
+  दत्तसमूह, दृश्यरचना, त्रिअयामदृश्य and अभिकर्तृप्रकार; पूर्णाङ्क, दशमलव, सत्यता,
+  अक्षरमाला, एकक and सीमा are value-like.
 
 Diagnostic classes: PE1xxx lexical, PE2xxx syntactic, PE3xxx semantic,
 PE4xxx runtime/security, PE5xxx host/artifact, PE6xxx intelligence engine,
@@ -499,7 +544,7 @@ layout.
 
 ---
 
-## 12. Not in 0.2
+## 12. Not in 0.3
 
 The following are **not** part of this version and must not be assumed to work:
 
@@ -511,7 +556,11 @@ The following are **not** part of this version and must not be assumed to work:
 * a native code generator, LLVM/Wasm backend, GPU kernels;
 * multiple model inputs/outputs, layers other than सघन, convolution/attention
   layers, optimisers other than SGD/Adam;
-* a general UI widget toolkit, 3D rendering, text shaping, or native accessibility integration;
+* UI event dispatch, native text shaping, native accessibility/window integration;
+* GPU/ray-traced 3D, smooth-normal interpolation, textures or mesh file formats;
+* a complete executable Aṣṭādhyāyī, Sanskrit sentence segmentation, declension,
+  conjugation or automatic samāsa analysis;
+* autonomous LLM/network agents or AGI;
 * Android/iOS/desktop native shells;
 * self-hosting (the bootstrap compiler is Python; tokenizer, parser and
   experimental semantic-shadow components are PEACOCK programs, not a self-hosted

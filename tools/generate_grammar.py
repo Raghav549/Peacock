@@ -58,7 +58,7 @@ def build_grammar() -> dict:
     primitive = [_native(name) for name in ("Int", "Float", "Bool", "String", "Unit", "Never", "Any")]
     compound = [_native(name) for name in (
         "Tensor", "List", "Color", "Canvas", "Model", "Dataset", "Range",
-        "Float32", "Float64", "Int32",
+        "UI", "Scene3D", "Agent", "Float32", "Float64", "Int32",
     )]
     contextual = [_native(name) for name in (
         "input", "output", "stack", "Dense", "units", "activation", "objective",
