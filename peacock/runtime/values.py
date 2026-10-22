@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 
 from peacock.frontend.colour import Color
 from peacock.intelligence.tensor import Tensor
+from peacock.sanskrit import INTERNAL_TO_SOURCE, surface_type
 
 
 class Unit:
@@ -54,28 +55,28 @@ def is_int(value) -> bool:
 
 def type_name(value) -> str:
     if value is UNIT:
-        return "Unit"
+        return INTERNAL_TO_SOURCE["Unit"]
     if isinstance(value, bool):
-        return "Bool"
+        return INTERNAL_TO_SOURCE["Bool"]
     if isinstance(value, int):
-        return "Int"
+        return INTERNAL_TO_SOURCE["Int"]
     if isinstance(value, float):
-        return "Float"
+        return INTERNAL_TO_SOURCE["Float"]
     if isinstance(value, str):
-        return "String"
+        return INTERNAL_TO_SOURCE["String"]
     if isinstance(value, list):
-        return "List"
+        return INTERNAL_TO_SOURCE["List"]
     if isinstance(value, Tensor):
-        return f"Tensor<{value.dtype}>"
+        return surface_type(f"Tensor<{value.dtype}>")
     if isinstance(value, Color):
-        return "Color"
+        return INTERNAL_TO_SOURCE["Color"]
     if isinstance(value, RangeValue):
-        return "Range"
+        return INTERNAL_TO_SOURCE["Range"]
     if isinstance(value, StructInstance):
         return value.type_name
-    # Opaque engine objects expose a class name; use their public identity.
+    # Opaque engine objects expose a class name; translate standard identities.
     name = type(value).__name__
-    return name
+    return INTERNAL_TO_SOURCE.get(name, name)
 
 
 def format_float(value: float) -> str:
@@ -92,9 +93,9 @@ def format_value(value, nested: bool = False) -> str:
     from peacock.intelligence.layers import Model
 
     if value is UNIT:
-        return "Unit"
+        return INTERNAL_TO_SOURCE["Unit"]
     if isinstance(value, bool):
-        return "true" if value else "false"
+        return "सत्य" if value else "असत्य"
     if isinstance(value, int):
         return str(value)
     if isinstance(value, float):
@@ -111,18 +112,18 @@ def format_value(value, nested: bool = False) -> str:
             body = format_value(value.tolist(), True)
         else:
             body = f"<{value.size} values>"
-        return f"Tensor({value.dtype}{list(value.shape)}, {body})"
+        return f"{INTERNAL_TO_SOURCE['Tensor']}({surface_type(value.dtype)}{list(value.shape)}, {body})"
     if isinstance(value, Color):
         return value.to_css()
     if isinstance(value, RangeValue):
-        return f"Range({value.start}..{value.end})"
+        return f"{INTERNAL_TO_SOURCE['Range']}({value.start}..{value.end})"
     if isinstance(value, StructInstance):
         body = ", ".join(f"{name}={format_value(value.fields[name], True)}" for name in value.field_order)
         return f"{value.type_name}({body})"
     if isinstance(value, Canvas):
-        return f"Canvas({value.width}x{value.height})"
+        return f"{INTERNAL_TO_SOURCE['Canvas']}({value.width}x{value.height})"
     if isinstance(value, Dataset):
-        return f"Dataset({value.name}, samples={len(value)}, features={value.feature_dim})"
+        return f"{INTERNAL_TO_SOURCE['Dataset']}({value.name}, samples={len(value)}, features={value.feature_dim})"
     if isinstance(value, Model):
-        return f"Model({value.summary()})"
+        return f"{INTERNAL_TO_SOURCE['Model']}({value.summary()})"
     return f"<{type_name(value)}>"

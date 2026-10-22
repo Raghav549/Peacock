@@ -1,5 +1,9 @@
+import json
+import struct
 import tempfile
 import unittest
+
+import peacock
 from pathlib import Path
 
 from peacock.intelligence.datasets import Dataset, make_dataset, spiral_dataset, xor_dataset
@@ -245,6 +249,10 @@ class SerializationRoundTripTests(unittest.TestCase):
         data = Tensor.from_nested([[0.2, -0.4], [0.9, 0.1]])
         before = self.model.forward(data).tolist()
         blob = model_to_bytes(self.model)
+        header_length = struct.unpack("<I", blob[10:14])[0]
+        header = json.loads(blob[14:14 + header_length])
+        self.assertEqual(header["format_version"], 1)
+        self.assertEqual(header["language_version"], peacock.LANGUAGE_VERSION)
         restored, metadata = model_from_bytes(blob)
         after = restored.forward(data).tolist()
         for row_before, row_after in zip(before, after):
@@ -273,7 +281,7 @@ class SerializationRoundTripTests(unittest.TestCase):
 
     def test_save_and_load_file(self):
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "model.pkm"
+            path = Path(tmp) / "model.ज्ञान"
             size = save_model(self.model, str(path))
             self.assertEqual(size, path.stat().st_size)
             restored = load_model(str(path))

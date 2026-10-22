@@ -24,5 +24,5 @@ Memory: PEACOCK values are Python objects; there is no language-level GC in
 0.1. Cycles are not collected and memory is bounded by host/process limits and
 the tensor/canvas budgets.
 
-Artifact loading: `.pkb` magic/version/digest → `verify_image` → execution. A
+Artifact loading: `.बीज` magic/version/digest → `verify_image` → execution. A
 failure before the first instruction is an artifact error, not a program fault.

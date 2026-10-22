@@ -1,9 +1,11 @@
-"""Token definitions and reserved words for PEACOCK 0.1."""
+"""Token definitions and reserved words for the Sanskrit-native language."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+
+from peacock.sanskrit import INTERNAL_TO_SOURCE, LEGACY_KEYWORDS
 
 from .diagnostics import Span
 
@@ -15,47 +17,47 @@ class TokenKind(str, Enum):
     IDENT = "IDENT"
     EOF = "EOF"
 
-    # Keywords that participate in implemented grammar.
-    MODULE = "module"
-    USE = "use"
-    AS = "as"
-    FN = "fn"
-    LET = "let"
-    MUT = "mut"
-    IF = "if"
-    ELSE = "else"
-    WHILE = "while"
-    FOR = "for"
-    IN = "in"
-    RETURN = "return"
-    BREAK = "break"
-    CONTINUE = "continue"
-    STRUCT = "struct"
-    MODEL = "model"
-    TRAINING = "training"
-    CAPABILITY = "capability"
-    TRY = "try"
-    CATCH = "catch"
-    THROW = "throw"
-    ASSERT = "assert"
-    TRUE = "true"
-    FALSE = "false"
-    AND = "and"
-    OR = "or"
-    NOT = "not"
-    # Reserved for future phases. The parser rejects them with an explicit message.
-    ENUM = "enum"
-    MATCH = "match"
-    IMPL = "impl"
-    PUB = "pub"
-    CONST = "const"
-    IMPORT = "import"
-    ASYNC = "async"
-    AWAIT = "await"
-    SPAWN = "spawn"
-    YIELD = "yield"
+    # Keywords that participate in the implemented grammar.
+    MODULE = "प्रकरण"
+    USE = "उपयोग"
+    AS = "रूपेण"
+    FN = "कार्य"
+    LET = "स्थापय"
+    MUT = "परिवर्तनीय"
+    IF = "यदि"
+    ELSE = "अन्यथा"
+    WHILE = "यावत्"
+    FOR = "प्रति"
+    IN = "मध्ये"
+    RETURN = "प्रत्यानय"
+    BREAK = "विच्छिन्दु"
+    CONTINUE = "अनुवर्तय"
+    STRUCT = "संघटन"
+    MODEL = "प्रतिमान"
+    TRAINING = "अभ्यास"
+    CAPABILITY = "अधिकार"
+    TRY = "यत्न"
+    CATCH = "गृह्ण"
+    THROW = "क्षिप"
+    ASSERT = "निश्चिनु"
+    TRUE = "सत्य"
+    FALSE = "असत्य"
+    AND = "तथा"
+    OR = "वा"
+    NOT = "न"
+    # Reserved for future phases; the parser rejects them explicitly.
+    ENUM = "सूचीभेद"
+    MATCH = "मिलान"
+    IMPL = "कार्यान्वयन"
+    PUB = "सार्वजनिक"
+    CONST = "स्थिर"
+    IMPORT = "आयात"
+    ASYNC = "असामकालिक"
+    AWAIT = "प्रतीक्षा"
+    SPAWN = "जनय"
+    YIELD = "उत्पादय"
 
-    # Punctuation and operators.
+    # Mathematical punctuation and operators are script-independent.
     PLUS = "+"
     MINUS = "-"
     STAR = "*"
@@ -95,73 +97,51 @@ class TokenKind(str, Enum):
 
 
 _DISPLAY = {
-    TokenKind.EOF: "end of file",
-    TokenKind.IDENT: "identifier",
-    TokenKind.INT: "integer literal",
-    TokenKind.FLOAT: "floating-point literal",
-    TokenKind.STRING: "string literal",
+    TokenKind.EOF: "सूत्रान्त",
+    TokenKind.IDENT: "नाम",
+    TokenKind.INT: "पूर्णाङ्कनिधि",
+    TokenKind.FLOAT: "दशमलवनिधि",
+    TokenKind.STRING: "अक्षरमालानिधि",
 }
 
 KEYWORDS: dict[str, TokenKind] = {
-    "module": TokenKind.MODULE,
-    "use": TokenKind.USE,
-    "as": TokenKind.AS,
-    "fn": TokenKind.FN,
-    "let": TokenKind.LET,
-    "mut": TokenKind.MUT,
-    "if": TokenKind.IF,
-    "else": TokenKind.ELSE,
-    "while": TokenKind.WHILE,
-    "for": TokenKind.FOR,
-    "in": TokenKind.IN,
-    "return": TokenKind.RETURN,
-    "break": TokenKind.BREAK,
-    "continue": TokenKind.CONTINUE,
-    "struct": TokenKind.STRUCT,
-    "model": TokenKind.MODEL,
-    "training": TokenKind.TRAINING,
-    "capability": TokenKind.CAPABILITY,
-    "try": TokenKind.TRY,
-    "catch": TokenKind.CATCH,
-    "throw": TokenKind.THROW,
-    "assert": TokenKind.ASSERT,
-    "true": TokenKind.TRUE,
-    "false": TokenKind.FALSE,
-    "and": TokenKind.AND,
-    "or": TokenKind.OR,
-    "not": TokenKind.NOT,
-    # Reserved for future phases, rejected with a targeted diagnostic.
-    "enum": TokenKind.ENUM,
-    "match": TokenKind.MATCH,
-    "impl": TokenKind.IMPL,
-    "pub": TokenKind.PUB,
-    "const": TokenKind.CONST,
-    "import": TokenKind.IMPORT,
-    "async": TokenKind.ASYNC,
-    "await": TokenKind.AWAIT,
-    "spawn": TokenKind.SPAWN,
-    "yield": TokenKind.YIELD,
+    kind.value: kind
+    for kind in (
+        TokenKind.MODULE, TokenKind.USE, TokenKind.AS, TokenKind.FN,
+        TokenKind.LET, TokenKind.MUT, TokenKind.IF, TokenKind.ELSE,
+        TokenKind.WHILE, TokenKind.FOR, TokenKind.IN, TokenKind.RETURN,
+        TokenKind.BREAK, TokenKind.CONTINUE, TokenKind.STRUCT, TokenKind.MODEL,
+        TokenKind.TRAINING, TokenKind.CAPABILITY, TokenKind.TRY, TokenKind.CATCH,
+        TokenKind.THROW, TokenKind.ASSERT, TokenKind.TRUE, TokenKind.FALSE,
+        TokenKind.AND, TokenKind.OR, TokenKind.NOT, TokenKind.ENUM,
+        TokenKind.MATCH, TokenKind.IMPL, TokenKind.PUB, TokenKind.CONST,
+        TokenKind.IMPORT, TokenKind.ASYNC, TokenKind.AWAIT, TokenKind.SPAWN,
+        TokenKind.YIELD,
+    )
 }
 
-#: Keywords that are lexed but not accepted by the 0.1 parser.
+#: Sanskrit keywords that are lexed but not accepted by the current parser.
 RESERVED_FUTURE = {
-    "enum",
-    "match",
-    "impl",
-    "pub",
-    "const",
-    "import",
-    "async",
-    "await",
-    "spawn",
-    "yield",
+    TokenKind.ENUM.value,
+    TokenKind.MATCH.value,
+    TokenKind.IMPL.value,
+    TokenKind.PUB.value,
+    TokenKind.CONST.value,
+    TokenKind.IMPORT.value,
+    TokenKind.ASYNC.value,
+    TokenKind.AWAIT.value,
+    TokenKind.SPAWN.value,
+    TokenKind.YIELD.value,
 }
 
-#: Capability names recognised by the 0.1 static checker.
+# Stable internal capability/namespace names stored in verified bytecode.  The
+# corresponding source spellings live in peacock.sanskrit and are never aliases.
 KNOWN_CAPABILITIES = ("compute", "fs", "ui")
-
-#: Standard-library namespaces requiring a matching ``use`` declaration.
+SOURCE_CAPABILITIES = tuple(INTERNAL_TO_SOURCE[name] for name in KNOWN_CAPABILITIES)
 KNOWN_NAMESPACES = ("math", "nn", "colour", "graphics", "motion")
+
+#: Withdrawn English words are recognized only to issue PE1007.
+LEGACY_SOURCE_WORDS = LEGACY_KEYWORDS
 
 
 @dataclass(frozen=True, slots=True)

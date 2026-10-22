@@ -1,6 +1,6 @@
 # PEACOCK for VS Code (prepared)
 
-A minimal, declarative extension: language registration for `.pac`, bracket and
+A minimal, declarative extension: language registration for `.सूत्र`, bracket and
 comment behaviour, and a TextMate grammar shared with the proposed Linguist
 submission. There is no language server, formatter or debugger yet.
 

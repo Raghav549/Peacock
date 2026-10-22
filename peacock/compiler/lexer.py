@@ -6,8 +6,19 @@ Lexical rules are documented in ``SPECIFICATION.md`` §3.
 
 from __future__ import annotations
 
+from peacock.sanskrit import (
+    INTERNAL_TO_SOURCE,
+    LEGACY_STANDARD_WORDS,
+    ascii_digits,
+    internalise,
+    is_decimal_digit,
+    is_identifier_continue,
+    is_identifier_start,
+    normalize_identifier,
+)
+
 from .diagnostics import DiagnosticBag, Span
-from .tokens import KEYWORDS, RESERVED_FUTURE, Token, TokenKind
+from .tokens import KEYWORDS, LEGACY_SOURCE_WORDS, Token, TokenKind
 
 _ESCAPES = {
     "n": "\n",
@@ -100,12 +111,12 @@ class Lexer:
             if ch == "/" and self._peek(1) == "*":
                 self._block_comment(start, line, col)
                 continue
-            if ch.isdigit():
+            if is_decimal_digit(ch):
                 tok = self._number(start, line, col)
                 if tok is not None:
                     tokens.append(tok)
                 continue
-            if ch.isalpha() or ch == "_":
+            if is_identifier_start(ch):
                 tokens.append(self._identifier(start, line, col))
                 continue
             if ch == '"':
@@ -127,9 +138,9 @@ class Lexer:
             if ch in "&|":
                 self.diag.error(
                     "PE1003",
-                    f"bitwise/logical operator {ch!r} is not part of PEACOCK 0.1",
+                    f"bitwise/logical operator {ch!r} is not part of PEACOCK 0.2",
                     self._span_from(start, line, col),
-                    hint="use the keywords 'and' and 'or' for boolean logic",
+                    hint="use the keywords 'तथा' and 'वा' for boolean logic",
                 )
             elif ch == "!":
                 self.diag.error(
@@ -140,14 +151,14 @@ class Lexer:
             elif ch == "=" and self._peek(1) == ">":
                 self.diag.error(
                     "PE1005",
-                    "match arms ('=>') are reserved but match expressions are not implemented in 0.1",
+                    "match arms ('=>') are reserved but match expressions are not implemented in 0.2",
                     self._span_from(start, line, col),
                 )
                 self._advance()
                 self._advance()
                 continue
             elif ch == "@":
-                self.diag.error("PE1006", "decorators ('@') are not part of PEACOCK 0.1", self._span_from(start, line, col))
+                self.diag.error("PE1006", "decorators ('@') are not part of PEACOCK 0.2", self._span_from(start, line, col))
             else:
                 self.diag.error(
                     "PE1002",
@@ -187,16 +198,27 @@ class Lexer:
             )
 
     def _identifier(self, start: int, line: int, col: int) -> Token:
-        while self.pos < self.length and (self._peek().isalnum() or self._peek() == "_"):
+        while self.pos < self.length and is_identifier_continue(self._peek()):
             self._advance()
         text = self.source[start : self.pos]
+        normalised = normalize_identifier(text)
         span = self._span_from(start, line, col)
-        kind = KEYWORDS.get(text)
+        kind = KEYWORDS.get(normalised)
         if kind is not None:
-            token = Token(kind, text, None, span)
-        else:
-            token = Token(TokenKind.IDENT, text, text, span)
-        return token
+            return Token(kind, text, None, span)
+        legacy_replacement = LEGACY_SOURCE_WORDS.get(normalised)
+        if legacy_replacement is None and normalised in LEGACY_STANDARD_WORDS:
+            legacy_replacement = INTERNAL_TO_SOURCE.get(normalised)
+        if legacy_replacement is not None:
+            self.diag.error(
+                "PE1007",
+                f"English source word '{normalised}' is not accepted; use Sanskrit '{legacy_replacement}'",
+                span,
+                hint="PEACOCK 0.2 has one native Sanskrit source language, not an English compatibility dialect",
+            )
+        # Standard Sanskrit names canonicalise to stable internal identifiers;
+        # all user-defined Unicode names retain their NFC spelling.
+        return Token(TokenKind.IDENT, text, internalise(normalised), span)
 
     def _number(self, start: int, line: int, col: int) -> Token | None:
         # Radix prefixes.
@@ -223,7 +245,7 @@ class Lexer:
                     self._span_from(start, line, col),
                 )
                 return None
-            digits = raw_digits.replace("_", "")
+            digits = ascii_digits(raw_digits.replace("_", ""))
             if not digits:
                 self.diag.error(
                     "PE1010",
@@ -242,29 +264,29 @@ class Lexer:
                 return None
             return Token(TokenKind.INT, self.source[start : self.pos], value, self._span_from(start, line, col))
 
-        while self.pos < self.length and (self._peek().isdigit() or self._peek() == "_"):
+        while self.pos < self.length and (is_decimal_digit(self._peek()) or self._peek() == "_"):
             self._advance()
         is_float = False
-        if self._peek() == "." and self._peek(1).isdigit():
+        if self._peek() == "." and is_decimal_digit(self._peek(1)):
             is_float = True
             self._advance()
-            while self.pos < self.length and (self._peek().isdigit() or self._peek() == "_"):
+            while self.pos < self.length and (is_decimal_digit(self._peek()) or self._peek() == "_"):
                 self._advance()
         if self._peek() in ("e", "E"):
             # Exponent must be followed by an optional sign and at least one digit.
             j = 1
             if self._peek(j) in ("+", "-"):
                 j += 1
-            if self._peek(j).isdigit():
+            if is_decimal_digit(self._peek(j)):
                 is_float = True
                 self._advance()
                 if self._peek() in ("+", "-"):
                     self._advance()
-                while self.pos < self.length and (self._peek().isdigit() or self._peek() == "_"):
+                while self.pos < self.length and (is_decimal_digit(self._peek()) or self._peek() == "_"):
                     self._advance()
 
         text = self.source[start : self.pos]
-        clean = text.replace("_", "")
+        clean = ascii_digits(text.replace("_", ""))
         if (
             "__" in text
             or text.startswith("_")

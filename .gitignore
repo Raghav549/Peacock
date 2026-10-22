@@ -1,6 +1,6 @@
 __pycache__/
 *.py[cod]
-*.pkb
+*.बीज
 examples/out/
 website/dist/
 benchmarks/latest.json

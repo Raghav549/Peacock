@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import json
 import re
+import subprocess
+import sys
 import unittest
 from pathlib import Path
 
@@ -70,25 +72,56 @@ class DocumentationTests(unittest.TestCase):
     def test_linguist_metadata_and_grammar(self) -> None:
         languages = (ROOT / "linguist" / "languages.yml").read_text(encoding="utf-8")
         self.assertIn("Peacock:", languages)
-        self.assertIn('".pac"', languages)
+        self.assertIn('".सूत्र"', languages)
         self.assertIn("tm_scope: source.peacock", languages)
         grammar = json.loads((ROOT / "linguist" / "peacock.tmLanguage.json").read_text(encoding="utf-8"))
         self.assertEqual(grammar["scopeName"], "source.peacock")
-        self.assertIn("pac", grammar["fileTypes"])
+        self.assertEqual(grammar["fileTypes"], ["सूत्र"])
+        self.assertNotIn("pac", grammar["fileTypes"])
         self.assertIn("patterns", grammar)
-        # The editor package ships the same grammar.
+        rendered = json.dumps(grammar, ensure_ascii=False)
+        self.assertIn("कार्य", rendered)
+        self.assertIn("पूर्णाङ्क", rendered)
+        self.assertIn(r"\p{Nd}", rendered)
+        # The editor package ships exactly the same generated grammar.
         packaged = json.loads(
             (ROOT / "editors" / "vscode" / "syntaxes" / "peacock.tmLanguage.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(packaged["scopeName"], grammar["scopeName"])
+        self.assertEqual(packaged, grammar)
+        generated = subprocess.run(
+            [sys.executable, "tools/generate_grammar.py", "--check"],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(generated.returncode, 0, generated.stdout + generated.stderr)
 
     def test_linguist_samples_compile_with_the_real_compiler(self) -> None:
-        samples = sorted((ROOT / "linguist" / "samples").glob("*.pac"))
+        samples = sorted((ROOT / "linguist" / "samples").glob("*.सूत्र"))
         self.assertGreaterEqual(len(samples), 4)
         for path in samples:
             source = path.read_text(encoding="utf-8")
             result = compile_source(source, str(path))
             self.assertTrue(result.ok, f"{path.name} failed to compile:\n{result.diagnostics.render_all(source)}")
+
+    def test_peacock_fenced_examples_compile(self) -> None:
+        paths = [ROOT / "README.md", *sorted((ROOT / "docs").rglob("*.md"))]
+        blocks = []
+        for path in paths:
+            text = path.read_text(encoding="utf-8")
+            for index, match in enumerate(
+                re.finditer(r"```peacock\n(.*?)\n```", text, re.DOTALL), start=1
+            ):
+                blocks.append((path, index, match.group(1)))
+        self.assertGreaterEqual(len(blocks), 8)
+        for path, index, source in blocks:
+            with self.subTest(document=path.relative_to(ROOT), example=index):
+                result = compile_source(source, f"{path.relative_to(ROOT)}#{index}")
+                self.assertTrue(
+                    result.ok,
+                    f"documentation example failed to compile:\n{result.diagnostics.render_all(source)}",
+                )
 
     def test_icon_is_a_valid_256px_png(self) -> None:
         data = (ROOT / "assets" / "peacock-256.png").read_bytes()

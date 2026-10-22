@@ -41,7 +41,7 @@ matching, closures, traits, concurrency.
 ## Phase 2 — Compiler and bytecode — **done**
 
 Deliverables: typed PIR, verifier, constant folding/branch folding/DCE/peephole
-optimiser, bytecode emitter, image verifier, `.pkb` container with SHA-256,
+optimiser, bytecode emitter, image verifier, `.बीज` container with SHA-256,
 disassembler.
 
 Acceptance criteria:
@@ -56,7 +56,7 @@ Acceptance criteria:
 
 Deliverables: stack VM, checked arithmetic, list/string/tensor operations, struct
 values, try/catch, capability gate, resource budgets, sandboxed filesystem
-(including grant-gated `fs.create_dir`), fuzzers and security regression suite.
+(including grant-gated `सञ्चय.निधिरचना`), fuzzers and security regression suite.
 
 Acceptance criteria:
 
@@ -73,7 +73,7 @@ memory accounting and collection, deterministic scheduling.
 
 Deliverables: tensor engine with broadcasting and reverse-mode autodiff, Dense
 layers, SGD/Adam, cross-entropy/MSE, XOR and spiral datasets, training reports,
-evaluation metrics, `.pkm` serialisation and int8 quantisation.
+evaluation metrics, `.ज्ञान` serialisation and int8 quantisation.
 
 Acceptance criteria:
 
@@ -91,7 +91,7 @@ interface design and hardware availability).
 Delivered: perceptual colour pipeline (sRGB/XYZ/CIELAB/Oklab/Oklch, WCAG,
 palettes, mixing), software RGBA canvas with anti-aliasing, gradients, glow,
 aurora, PNG encode/decode and flex layout. A separate app-specific static
-website (`website/site.pac`) now defines twelve routes/components and exports
+website (`website/site.सूत्र`) now defines twelve routes/components and exports
 semantic HTML, responsive CSS and SVG through the actual CLI/compiler/VM; it is
 covered by route/link/structure/source/CSS integration checks. It is not a
 reusable UI toolkit or the frame `WebBackend`.
@@ -118,8 +118,8 @@ integration with a real frame scheduler.
 ## Phase 7 — Platform hosts — **partial**
 
 Delivered: platform-neutral `Frame`/`Backend` contract; headless PNG host;
-static web viewer; stdlib HTTP frame server; and `graphics.present(canvas)` with
-the `ui` capability, which drives an attached backend from a real `.pac` program
+static web viewer; stdlib HTTP frame server; and `चित्र.प्रदर्शय(चित्रपट्ट)` with
+the `दृश्य` capability, which drives an attached backend from a real `.सूत्र` program
 (`--present DIR` attaches `WebBackend`; `--serve PORT` attaches `ServerBackend`
 with a `--linger` window). Frames are written per present call, `latest.png`/
 `index.html` are updated, and `manifest.json` is written on close.
@@ -127,7 +127,7 @@ with a `--linger` window). Frames are written per present call, `latest.png`/
 Acceptance criteria met: PNG frames served over HTTP, viewer contains no script,
 health route works, malformed routes fail cleanly; a program presents four frames
 through the real VM and the manifest records all four. The independently
-PEACOCK-authored `website/site.pac` exporter also builds twelve static HTML/CSS
+PEACOCK-authored `website/site.सूत्र` exporter also builds twelve static HTML/CSS
 routes, but is not a platform runtime or an interactive UI system (see
 [website/README.md](website/README.md)).
 
@@ -135,8 +135,8 @@ Still planned:
 
 | Host | Status | Prerequisite |
 |---|---|---|
-| Headless/server (Linux) | working; reachable from `.pac` via `--serve` | — |
-| Static web viewer | working and reachable from `.pac` via `--present` | — |
+| Headless/server (Linux) | working; reachable from `.सूत्र` via `--serve` | — |
+| Static web viewer | working and reachable from `.सूत्र` via `--present` | — |
 | Desktop window shell | planned | windowing toolkit or OS API bindings |
 | Android | not implemented | Android SDK/NDK, JNI bridge, packaging |
 | iOS | **blocked** | macOS + Xcode toolchain (unavailable here) |
@@ -165,18 +165,18 @@ path.
 
 ## Phase 9 — Self-hosting — **partial**
 
-Delivered: `selfhost/tokenizer.pac` with token parity, and
-`selfhost/parser.pac` (1,085 lines) covering the full 0.1 grammar, including
+Delivered: `selfhost/tokenizer.सूत्र` with token parity, and
+`selfhost/parser.सूत्र` (1,131 lines) covering the full 0.2 grammar, including
 model/training declarations. The parser produces a canonical AST digest that is
 byte-identical to the bootstrap parser on its 14-file core corpus (seven
 examples, six Linguist samples and a syntax fixture), plus self-parse. This
-increment expands `selfhost/type_model.pac` into an executable PEACOCK kernel for recursive type
+increment expands `selfhost/type_model.सूत्र` into an executable PEACOCK kernel for recursive type
 relations, expression result rules, lexical bindings, declarations, assignments,
 user-function signatures/calls, conditions, returns and iterable checks.
 `compile_source(..., semantic_mode="shadow")` and opt-in CLI `--semantic-shadow`
 flags translate supported typed-AST facts into generated PEACOCK probes, execute
 them in the VM, and compare against the Python oracle. Regressions cover valid
-and invalid inputs, selected diagnostic equality, the `.pac` corpus and
+and invalid inputs, selected diagnostic equality, the `.सूत्र` corpus and
 ErrorType iterable recovery. Python semantic analysis remains authoritative;
 the kernel does not generate diagnostics, misses several semantic domains and
 is not a replacement analyser.

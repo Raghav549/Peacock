@@ -9,8 +9,8 @@ language is stable enough to justify it.
 ```
 linguist/
   languages.yml      # proposed language entry (name, type, extensions, tm_scope, ace_mode)
-  peacock.tmLanguage.json   # TextMate grammar for .pac
-  samples/           # representative .pac programs
+  peacock.tmLanguage.json   # TextMate grammar for .सूत्र
+  samples/           # representative .सूत्र programs
   SUBMISSION.md      # submission checklist and current requirements
 ```
 
@@ -18,7 +18,7 @@ linguist/
 
 * Name: `Peacock`
 * Type: `programming`
-* Extensions: `.pac`
+* Extensions: `.सूत्र`
 * `tm_scope`: `source.peacock`
 * `ace_mode`: `text`
 * `codemirror_mode`/`codemirror_mime_type`: omitted until a mode exists
@@ -36,7 +36,7 @@ and grammar registry before submitting.
 | Step | State |
 |---|---|
 | Investigate Linguist requirements | done (documented in `linguist/SUBMISSION.md`) |
-| Language definition and `.pac` mapping | prepared |
+| Language definition and `.सूत्र` mapping | prepared |
 | TextMate grammar | prepared |
 | Representative samples | present in `linguist/samples/` (compiled by the real compiler) |
 | Distinctive logo/icon | present in `assets/` |

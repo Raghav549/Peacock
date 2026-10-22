@@ -11,7 +11,7 @@ diagnostics, documentation and status report agree.
 * Check [ROADMAP.md](ROADMAP.md) for the current phase and prerequisites.
 * For anything that changes the language, open a design issue first. Explain the
   syntax, semantics, typing rules, capability impact, failure modes, grammar
-  delta and compatibility with existing `.pac` files.
+  delta and compatibility with existing `.सूत्र` files.
 
 ## Development setup
 
@@ -21,8 +21,8 @@ Requirements: Python 3.11+ and a POSIX shell. No third-party packages.
 git clone <repository>
 cd Peacock
 ./bin/peacock test
-./bin/peacock check examples/hello.pac
-./bin/peacock run examples/aurora.pac --grant fs
+./bin/peacock check examples/hello.सूत्र
+./bin/peacock run examples/aurora.सूत्र --grant सञ्चय
 ```
 
 There is no build step and no network access needed for tests.
@@ -61,7 +61,7 @@ There is no build step and no network access needed for tests.
   invent a code without updating this repository's code map and tests.
 * Use deterministic seeds for tests and examples. Tests must not depend on wall
   clock time, network access, user home directories or machine performance.
-* Do not commit generated artifacts (`__pycache__`, `.pkb`, `examples/out/`,
+* Do not commit generated artifacts (`__pycache__`, `.बीज`, `examples/out/`,
   `benchmarks/latest.json`). `benchmarks/reference-machine.json` is checked in as
   evidence and must be regenerated only from the documented command.
 

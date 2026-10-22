@@ -3,7 +3,7 @@
 The bridge is intentionally an oracle adapter, not a second implementation in
 Python: it extracts already-parsed/typed facts, serialises type descriptors and
 semantic events as PEACOCK source, then asks the real compiler and VM to execute
-`selfhost/type_model.pac`. The Python analyser remains authoritative. Probes cover
+`selfhost/type_model.सूत्र`. The Python analyser remains authoritative. Probes cover
 assignability/broadcasting, expression result types, local scopes and names,
 declarations/assignments, conditions/returns, and user-function signatures.
 
@@ -14,8 +14,11 @@ claimed as migrated; they are skipped until a later migration increment.
 from __future__ import annotations
 
 import io
+import re
 from pathlib import Path
 from typing import Any
+
+from peacock.sanskrit import INTERNAL_TO_SOURCE, LEGACY_KEYWORDS
 
 from . import types as T
 from .ast_nodes import (
@@ -52,6 +55,22 @@ class SelfHostTypeMismatch(RuntimeError):
 
 _MAX_TYPES = 128
 _MAX_PROBES = 20_000
+_GENERATED_WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+def _native_generated(source: str) -> str:
+    """Render internally generated probe IR with the canonical Sanskrit notation.
+
+    This is an emitter, not a legacy-source acceptance path.  Probe facts may
+    contain internal type and identifier names; every one is rendered back to
+    its native spelling before the real Sanskrit compiler sees the program.
+    """
+
+    def replace(match: re.Match[str]) -> str:
+        word = match.group(0)
+        return INTERNAL_TO_SOURCE.get(word, LEGACY_KEYWORDS.get(word, word))
+
+    return _GENERATED_WORD.sub(replace, source)
 
 
 def _quote(text: str) -> str:
@@ -557,8 +576,8 @@ def shadow_check(module, typed) -> dict[str, int]:
 
     type_lines, type_cases = _make_type_relation_probes(types)
     main_lines: list[str] = [
-        "    let __shadow_builtin_cases = run_builtin_checks();",
-        "    let mut __shadow_functions: List<FunctionSignature> = [];",
+        '    स्थापय __shadow_builtin_cases = run_builtin_checks();',
+        '    स्थापय परिवर्तनीय __shadow_functions: सूची<FunctionSignature> = [];',
     ]
     for signature in typed.functions.values():
         param_names = "[" + ", ".join(_quote(param.name) for param in signature.decl.params) + "]"
@@ -591,12 +610,13 @@ def shadow_check(module, typed) -> dict[str, int]:
         )
     if type_lines:
         main_lines[1:1] = type_lines
-    generated = "fn main() -> Unit {\n" + "\n".join(main_lines) + "\n}\n"
+    generated = 'कार्य मुख्य() -> एकक {\n' + "\n".join(main_lines) + "\n}\n"
+    generated = _native_generated(generated)
 
     repo_root = Path(__file__).resolve().parents[2]
-    library_path = repo_root / "selfhost" / "type_model.pac"
+    library_path = repo_root / "selfhost" / "type_model.सूत्र"
     library = library_path.read_text(encoding="utf-8")
-    marker = "fn main() -> Unit {"
+    marker = 'कार्य मुख्य() -> एकक {'
     main_start = library.find(marker)
     if main_start < 0:
         raise SelfHostTypeMismatch(f"{library_path} does not define its test main")

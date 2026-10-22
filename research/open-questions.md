@@ -283,7 +283,7 @@ a full rigid-body engine speculatively.
 ## OQ-013 — Is the tokenizer port a reliable predictor of full self-hosting cost?
 
 **Why.** Self-hosting is the largest architectural commitment. The tokenizer is
-235 lines of `.pac`; the parser and type checker are much larger.
+235 lines of `.सूत्र`; the parser and type checker are much larger.
 
 **Hypothesis.** Lines-of-code ratio (PEACOCK/Python) for the parser will be
 1.2–2.0×, and missing language features (enums, modules, maps) will account for
@@ -298,7 +298,7 @@ features, defects and parity on the corpus. Do not claim self-hosting.
 parity and the required language additions can be specified and tested without
 destabilising v0.1.
 
-**Status:** Partial. The parser port (`selfhost/parser.pac`, 1,085 lines) reaches
+**Status:** Partial. The parser port (`selfhost/parser.सूत्र`, 1,085 lines) reaches
 100 % AST-digest parity on the 14-file corpus and self-parses. Measured source
 ratio is about 0.94 against `lexer.py` + `parser.py` (1,150 Python lines), but the
 port emits strings rather than typed nodes, so this is not yet a like-for-like

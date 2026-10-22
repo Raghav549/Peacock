@@ -1,6 +1,6 @@
 """Command-line interface for the PEACOCK bootstrap toolchain.
 
-Canonical source extension: ``.pac``. Compiled program artifact: ``.pkb``.
+Canonical source extension: ``.सूत्र``. Compiled program artifact: ``.बीज``.
 
 Exit codes:
     0  success
@@ -24,10 +24,16 @@ import time
 from pathlib import Path
 
 from peacock import LANGUAGE_VERSION, __version__
+from peacock.sanskrit import (
+    ARTIFACT_EXTENSION,
+    SOURCE_EXTENSION,
+    internalise,
+    surface,
+)
 from peacock.compiler.diagnostics import DiagnosticBag, PeacockError
 from peacock.compiler.lexer import lex
 from peacock.compiler.parser import parse
-from peacock.compiler.tokens import KNOWN_CAPABILITIES
+from peacock.compiler.tokens import SOURCE_CAPABILITIES
 from peacock.compiler.pipeline import InternalCompilerError, compile_source
 from peacock.compiler import builtins as B
 from peacock.runtime.artifact import ArtifactFormatError, artifact_fingerprint, load_image, save_image
@@ -37,8 +43,6 @@ from peacock.runtime.host import HostPolicy
 from peacock.runtime.native import method_capability, native_capability
 from peacock.runtime.vm import VM
 
-SOURCE_EXTENSION = ".pac"
-ARTIFACT_EXTENSION = ".pkb"
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 EXIT_OK = 0
@@ -63,7 +67,7 @@ def _read_source(path: Path, require_extension: bool = True) -> str:
     if require_extension and path.suffix != SOURCE_EXTENSION:
         raise CLIError(
             f"'{path}' does not use the canonical PEACOCK source extension '{SOURCE_EXTENSION}'. "
-            "Rename the file (for example, hello.pac)."
+            f"Rename the file (for example, hello{SOURCE_EXTENSION}). Only canonical Sanskrit source files are accepted."
         )
     try:
         data = path.read_bytes()
@@ -110,16 +114,19 @@ def _load_image(path: Path) -> dict:
 
 def _grant_set(values: list[str]) -> frozenset[str]:
     grants: set[str] = set()
+    unknown: set[str] = set()
     for value in values:
         for item in value.split(","):
             item = item.strip()
             if item:
-                grants.add(item)
-    unknown = grants - set(KNOWN_CAPABILITIES)
+                if item not in SOURCE_CAPABILITIES:
+                    unknown.add(item)
+                else:
+                    grants.add(internalise(item))
     if unknown:
-        known = ", ".join(KNOWN_CAPABILITIES)
+        known = ", ".join(SOURCE_CAPABILITIES)
         raise CLIError(
-            f"unknown grant(s): {', '.join(sorted(unknown))}; known grants: {known}"
+            f"unknown grant(s): {', '.join(sorted(unknown))}; known Sanskrit grants: {known}"
         )
     return frozenset(grants)
 
@@ -197,8 +204,8 @@ def cmd_check(argv: list[str]) -> int:
 def cmd_run(argv: list[str]) -> int:
     main_argv, program_args = _split_program_args(argv)
     parser = argparse.ArgumentParser(prog="peacock run")
-    parser.add_argument("file", type=Path, help=".pac source or .pkb artifact")
-    parser.add_argument("--grant", action="append", default=[], help="host capability grants (fs, compute, ui)")
+    parser.add_argument("file", type=Path, help=".सूत्र source or .बीज artifact")
+    parser.add_argument("--grant", action="append", default=[], help="Sanskrit host capability grants (सञ्चय, गणना, दृश्य)")
     parser.add_argument("--root", default=".", help="filesystem sandbox root (default: cwd)")
     parser.add_argument("--no-opt", action="store_true")
     parser.add_argument("--max-steps", type=int, default=2_000_000)
@@ -208,14 +215,14 @@ def cmd_run(argv: list[str]) -> int:
         "--present",
         type=Path,
         default=None,
-        help="attach a static-web presentation backend writing frames to DIR (requires --grant ui)",
+        help="attach a static-web presentation backend writing frames to DIR (requires --grant दृश्य)",
     )
     parser.add_argument(
         "--serve",
         type=int,
         default=None,
         metavar="PORT",
-        help="serve presented frames over HTTP on PORT while the program runs (requires --grant ui)",
+        help="serve presented frames over HTTP on PORT while the program runs (requires --grant दृश्य)",
     )
     parser.add_argument(
         "--serve-host",
@@ -426,16 +433,19 @@ def cmd_audit(argv: list[str]) -> int:
         print(json.dumps(payload, indent=2))
     else:
         print(f"capability audit for {args.file}")
-        print(f"declared capabilities: {', '.join(payload['capabilities_used']) or 'none'}")
-        print(f"imports: {', '.join(payload['uses']) or 'none'}")
+        print(f"declared capabilities: {', '.join(surface(c) for c in payload['capabilities_used']) or 'none'}")
+        print(f"imports: {', '.join(surface(u) for u in payload['uses']) or 'none'}")
         for name, info in functions.items():
-            caps = ", ".join(info["declared_capabilities"]) or "none"
-            calls = ", ".join(f"{c['name']}({c['capability']})" for c in info["capability_calls"]) or "none"
-            print(f"  fn {name}: declared={caps}; privileged calls={calls}")
+            caps = ", ".join(surface(c) for c in info["declared_capabilities"]) or "none"
+            calls = ", ".join(
+                f"{surface(c['name'])}({surface(c['capability'])})"
+                for c in info["capability_calls"]
+            ) or "none"
+            print(f"  कार्य {surface(name)}: declared={caps}; privileged calls={calls}")
         if payload["models"]:
-            print(f"models: {', '.join(payload['models'])}")
+            print(f"models: {', '.join(surface(m) for m in payload['models'])}")
         if payload["trainings"]:
-            print(f"training declarations: {', '.join(payload['trainings'])}")
+            print(f"training declarations: {', '.join(surface(t) for t in payload['trainings'])}")
     return EXIT_OK
 
 
@@ -544,13 +554,13 @@ USAGE = """PEACOCK AI bootstrap toolchain
 usage: peacock <command> [options]
 
 commands:
-  run <file.pac|file.pkb>   compile (if needed) and execute
-  check <file.pac>          lex, parse, type check, lower and verify
-  build <file.pac>          write a .pkb bytecode artifact
+  run <file.सूत्र|file.बीज>   compile (if needed) and execute
+  check <file.सूत्र>          lex, parse, type check, lower and verify
+  build <file.सूत्र>          write a .बीज bytecode artifact
   disasm <file>             disassemble a source file or artifact
-  audit <file.pac>          static capability audit
-  tokens <file.pac>         dump the token stream (debugging)
-  ast <file.pac>            dump the syntax tree (debugging)
+  audit <file.सूत्र>          static capability audit
+  tokens <file.सूत्र>         dump the token stream (debugging)
+  ast <file.सूत्र>            dump the syntax tree (debugging)
   bench                     run the reproducible benchmark suite
   fuzz                      run deterministic fuzzers
   test                      run the unit/integration test suite
@@ -558,7 +568,7 @@ commands:
 
 Run options: --grant fs,compute,ui  --root DIR  --max-steps N  --json  --report FILE
              --present DIR | --serve PORT [--serve-host ADDR] [--linger SECONDS]
-Program arguments: peacock run app.pac --grant fs -- arg1 arg2
+Program arguments: peacock run app.सूत्र --grant fs -- arg1 arg2
 """
 
 

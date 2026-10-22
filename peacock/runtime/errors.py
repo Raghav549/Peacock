@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from peacock.sanskrit import surface
+
 from peacock.compiler.diagnostics import (
     CapabilityError,
     HostError,
@@ -46,5 +48,5 @@ def format_error(exc: PeacockError) -> str:
     if trace:
         lines.append("stack trace (most recent call last):")
         for function, line, column in reversed(trace):
-            lines.append(f"  at {function} (line {line}, column {column})")
+            lines.append(f"  at {surface(function)} (line {line}, column {column})")
     return "\n".join(lines)

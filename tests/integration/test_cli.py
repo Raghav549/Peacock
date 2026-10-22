@@ -30,14 +30,14 @@ class CLIBasicsTests(unittest.TestCase):
         result = run_cli("version")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("PEACOCK AI", result.stdout)
-        self.assertIn(".pac", result.stdout)
+        self.assertIn(".सूत्र", result.stdout)
         self.assertIn("NOT self-hosting", result.stdout)
 
     def test_version_flag(self):
         result = run_cli("--version")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("PEACOCK AI", result.stdout)
-        self.assertIn(".pac", result.stdout)
+        self.assertIn(".सूत्र", result.stdout)
         self.assertIn("NOT self-hosting", result.stdout)
 
     def test_help(self):
@@ -54,12 +54,12 @@ class CLIBasicsTests(unittest.TestCase):
 
 class CheckCommandTests(unittest.TestCase):
     def test_check_success(self):
-        result = run_cli("check", "examples/hello.pac")
+        result = run_cli("check", "examples/hello.सूत्र")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("OK examples/hello.pac", result.stdout)
+        self.assertIn("OK examples/hello.सूत्र", result.stdout)
 
     def test_check_json(self):
-        result = run_cli("check", "examples/tour.pac", "--json")
+        result = run_cli("check", "examples/tour.सूत्र", "--json")
         self.assertEqual(result.returncode, 0, result.stderr)
         payload = json.loads(result.stdout)
         self.assertTrue(payload["ok"])
@@ -68,15 +68,15 @@ class CheckCommandTests(unittest.TestCase):
 
     def test_check_failure_exit_code_and_caret(self):
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "bad.pac"
-            path.write_text("fn main() -> Unit { let x = missing; }\n", encoding="utf-8")
+            path = Path(tmp) / "bad.सूत्र"
+            path.write_text('कार्य मुख्य() -> एकक { स्थापय क्ष = missing; }\n', encoding="utf-8")
             result = run_cli("check", str(path))
             self.assertEqual(result.returncode, 1)
             self.assertIn("PE3002", result.stderr)
             self.assertIn("^", result.stderr)
 
     def test_check_semantic_shadow_is_explicit_and_reports_probe_counts(self):
-        result = run_cli("check", "examples/tour.pac", "--semantic-shadow", "--json")
+        result = run_cli("check", "examples/tour.सूत्र", "--semantic-shadow", "--json")
         self.assertEqual(result.returncode, 0, result.stderr)
         payload = json.loads(result.stdout)
         self.assertTrue(payload["ok"])
@@ -86,72 +86,72 @@ class CheckCommandTests(unittest.TestCase):
     def test_check_rejects_wrong_extension(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "legacy.pk"
-            path.write_text("fn main() -> Unit { }\n", encoding="utf-8")
+            path.write_text('कार्य मुख्य() -> एकक { }\n', encoding="utf-8")
             result = run_cli("check", str(path))
             self.assertEqual(result.returncode, 2)
             self.assertIn("canonical PEACOCK source extension", result.stderr)
 
     def test_check_missing_file(self):
-        result = run_cli("check", "examples/does_not_exist.pac")
+        result = run_cli("check", "examples/does_not_exist.सूत्र")
         self.assertEqual(result.returncode, 2)
         self.assertIn("cannot read", result.stderr)
 
     def test_ast_and_tokens(self):
-        tokens = run_cli("tokens", "examples/hello.pac")
+        tokens = run_cli("tokens", "examples/hello.सूत्र")
         self.assertEqual(tokens.returncode, 0)
         self.assertIn("FN", tokens.stdout)
-        tree = run_cli("ast", "examples/hello.pac")
+        tree = run_cli("ast", "examples/hello.सूत्र")
         self.assertEqual(tree.returncode, 0)
         self.assertIn("FunctionDecl", tree.stdout)
 
 
 class RunCommandTests(unittest.TestCase):
     def test_run_hello(self):
-        result = run_cli("run", "examples/hello.pac")
+        result = run_cli("run", "examples/hello.सूत्र")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), "Hello from PEACOCK")
 
     def test_run_json(self):
-        result = run_cli("run", "examples/hello.pac", "--json")
+        result = run_cli("run", "examples/hello.सूत्र", "--json")
         payload = json.loads(result.stdout)
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["output"].strip(), "Hello from PEACOCK")
         self.assertGreater(payload["steps"], 0)
 
     def test_run_tour(self):
-        result = run_cli("run", "examples/tour.pac")
+        result = run_cli("run", "examples/tour.सूत्र")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("caught: doubled() does not accept negative numbers", result.stdout)
         self.assertIn("sum: 55", result.stdout)
-        self.assertIn("types: String, Float, List", result.stdout)
+        self.assertIn("types: अक्षरमाला, दशमलव, सूची", result.stdout)
 
     def test_capability_denied(self):
-        result = run_cli("run", "examples/tensors.pac")
+        result = run_cli("run", "examples/tensors.सूत्र")
         self.assertEqual(result.returncode, 3)
         self.assertIn("PE4001", result.stderr)
-        self.assertIn("compute", result.stderr)
+        self.assertIn("गणना", result.stderr)
 
     def test_capability_granted(self):
-        result = run_cli("run", "examples/tensors.pac", "--grant", "compute")
+        result = run_cli("run", "examples/tensors.सूत्र", "--grant", "गणना")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("max abs difference: 0.0", result.stdout)
 
     def test_unknown_grant(self):
-        result = run_cli("run", "examples/hello.pac", "--grant", "root")
+        result = run_cli("run", "examples/hello.सूत्र", "--grant", "root")
         self.assertEqual(result.returncode, 2)
         self.assertIn("unknown grant", result.stderr)
 
     def test_runtime_error_exit_code(self):
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "crash.pac"
-            path.write_text('fn main() -> Unit { let x = 1 / 0; }\n', encoding="utf-8")
+            path = Path(tmp) / "crash.सूत्र"
+            path.write_text('कार्य मुख्य() -> एकक { स्थापय क्ष = 1 / 0; }\n', encoding="utf-8")
             result = run_cli("run", str(path))
             self.assertEqual(result.returncode, 3)
             self.assertIn("division by zero", result.stderr)
 
     def test_program_arguments(self):
         result = run_cli(
-            "run", "selfhost/tokenizer.pac", "--grant", "fs", "--root", ".", "--", "examples/tour.pac"
+            "run", "selfhost/tokenizer.सूत्र", "--grant", "सञ्चय", "--root", ".", "--", "examples/tour.सूत्र"
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), "367")
@@ -160,8 +160,8 @@ class RunCommandTests(unittest.TestCase):
 class BuildDisassembleAuditTests(unittest.TestCase):
     def test_build_and_run_artifact(self):
         with tempfile.TemporaryDirectory() as tmp:
-            output = Path(tmp) / "hello.pkb"
-            build = run_cli("build", "examples/hello.pac", "-o", str(output))
+            output = Path(tmp) / "hello.बीज"
+            build = run_cli("build", "examples/hello.सूत्र", "-o", str(output))
             self.assertEqual(build.returncode, 0, build.stderr)
             self.assertTrue(output.exists())
             self.assertIn("sha256", build.stdout)
@@ -171,9 +171,9 @@ class BuildDisassembleAuditTests(unittest.TestCase):
 
     def test_build_semantic_shadow_is_explicit(self):
         with tempfile.TemporaryDirectory() as tmp:
-            output = Path(tmp) / "hello-shadow.pkb"
+            output = Path(tmp) / "hello-shadow.बीज"
             build = run_cli(
-                "build", "examples/hello.pac", "--semantic-shadow", "-o", str(output)
+                "build", "examples/hello.सूत्र", "--semantic-shadow", "-o", str(output)
             )
             self.assertEqual(build.returncode, 0, build.stderr)
             self.assertTrue(output.exists())
@@ -181,8 +181,8 @@ class BuildDisassembleAuditTests(unittest.TestCase):
 
     def test_run_tampered_artifact(self):
         with tempfile.TemporaryDirectory() as tmp:
-            output = Path(tmp) / "hello.pkb"
-            run_cli("build", "examples/hello.pac", "-o", str(output))
+            output = Path(tmp) / "hello.बीज"
+            run_cli("build", "examples/hello.सूत्र", "-o", str(output))
             data = bytearray(output.read_bytes())
             data[-1] ^= 0xFF
             output.write_bytes(bytes(data))
@@ -191,14 +191,14 @@ class BuildDisassembleAuditTests(unittest.TestCase):
             self.assertIn("invalid artifact", result.stderr)
 
     def test_disasm(self):
-        result = run_cli("disasm", "examples/xor.pac")
+        result = run_cli("disasm", "examples/xor.सूत्र")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("function main", result.stdout)
+        self.assertIn("function मुख्य", result.stdout)
         self.assertIn("MODEL_INIT", result.stdout)
         self.assertIn("TRAINING_METHOD", result.stdout)
 
     def test_audit_json(self):
-        result = run_cli("audit", "examples/xor.pac", "--json")
+        result = run_cli("audit", "examples/xor.सूत्र", "--json")
         self.assertEqual(result.returncode, 0, result.stderr)
         payload = json.loads(result.stdout)
         self.assertEqual(payload["capabilities_used"], ["compute"])
@@ -212,7 +212,7 @@ class BuildDisassembleAuditTests(unittest.TestCase):
 class ExampleSuiteTests(unittest.TestCase):
     def test_every_example_is_pac_and_compiles(self):
         examples = sorted((REPO_ROOT / "examples").glob("*"))
-        sources = [p for p in examples if p.suffix == ".pac"]
+        sources = [p for p in examples if p.suffix == ".सूत्र"]
         self.assertGreaterEqual(len(sources), 7)
         self.assertFalse(list((REPO_ROOT / "examples").glob("*.pk")))
         for path in sources:
@@ -222,7 +222,7 @@ class ExampleSuiteTests(unittest.TestCase):
     def test_aurora_writes_png(self):
         with tempfile.TemporaryDirectory() as tmp:
             result = run_cli(
-                "run", "examples/aurora.pac", "--grant", "fs", "--root", tmp, timeout=300
+                "run", "examples/aurora.सूत्र", "--grant", "सञ्चय", "--root", tmp, timeout=300
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             png = Path(tmp) / "examples" / "out" / "aurora.png"
@@ -234,12 +234,12 @@ class ExampleSuiteTests(unittest.TestCase):
             self.assertEqual(len(set(rgba[::97])), len(set(rgba[::97])))  # decode succeeded
 
     def test_xor_training(self):
-        result = run_cli("run", "examples/xor.pac", "--grant", "compute")
+        result = run_cli("run", "examples/xor.सूत्र", "--grant", "गणना")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("accuracy: 1.0", result.stdout)
 
     def test_spiral_training(self):
-        result = run_cli("run", "examples/spiral.pac", "--grant", "compute", timeout=300)
+        result = run_cli("run", "examples/spiral.सूत्र", "--grant", "गणना", timeout=300)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("accuracy: 1.0", result.stdout)
 
@@ -247,7 +247,7 @@ class ExampleSuiteTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             report = Path(tmp) / "report.json"
             result = run_cli(
-                "run", "examples/spiral.pac", "--grant", "compute", "--report", str(report), timeout=300
+                "run", "examples/spiral.सूत्र", "--grant", "गणना", "--report", str(report), timeout=300
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             payload = json.loads(report.read_text())
@@ -259,29 +259,29 @@ class ExampleSuiteTests(unittest.TestCase):
 class SelfHostParityTests(unittest.TestCase):
     def test_tokenizer_counts_match_bootstrap_lexer(self):
         with tempfile.TemporaryDirectory() as tmp:
-            sample = Path(tmp) / "sample.pac"
-            source = (REPO_ROOT / "examples" / "tour.pac").read_text(encoding="utf-8")
+            sample = Path(tmp) / "sample.सूत्र"
+            source = (REPO_ROOT / "examples" / "tour.सूत्र").read_text(encoding="utf-8")
             sample.write_text(source, encoding="utf-8")
             result = run_cli(
-                "run", "selfhost/tokenizer.pac", "--grant", "fs", "--root", tmp, "--", "sample.pac"
+                "run", "selfhost/tokenizer.सूत्र", "--grant", "सञ्चय", "--root", tmp, "--", "sample.सूत्र"
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(int(result.stdout.strip()), len(lex(source)[0]) - 1)
 
     def test_tokenizer_dump_matches_non_string_tokens(self):
         with tempfile.TemporaryDirectory() as tmp:
-            sample = Path(tmp) / "sample.pac"
-            source = 'module demo\nfn main() -> Unit { let x = 0x2A + 1.5e3; }\n'
+            sample = Path(tmp) / "sample.सूत्र"
+            source = 'प्रकरण demo\nकार्य मुख्य() -> एकक { स्थापय क्ष = 0x2A + 1.5e3; }\n'
             sample.write_text(source, encoding="utf-8")
             result = run_cli(
                 "run",
-                "selfhost/tokenizer.pac",
+                "selfhost/tokenizer.सूत्र",
                 "--grant",
-                "fs",
+                "सञ्चय",
                 "--root",
                 tmp,
                 "--",
-                "sample.pac",
+                "sample.सूत्र",
                 "--dump",
             )
             self.assertEqual(result.returncode, 0, result.stderr)

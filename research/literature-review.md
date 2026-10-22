@@ -54,7 +54,7 @@ than an inferred one with unclear failure modes.
 **Garbage collection.** The runtime currently relies on the host's memory
 management. The literature on tracing, generational and real-time collectors
 [wilson1992gc], [ungar1984generation], [jones2011gc], [bacon2004unified] defines
-what a native runtime will need. There is no PEACOCK GC in 0.1; cycles are not
+what a native runtime will need. There is no PEACOCK GC in 0.2; cycles are not
 collected, and memory is bounded by host limits and tensor/canvas budgets.
 
 **Self-hosting.** The staged plan (tokenizer → parser → semantic analyser → IR
@@ -123,7 +123,7 @@ MLIR [lattner2020mlir], JAX [frostig2018jax] and differentiable programming
 languages [innes2019differentiable] show where an AI-native language could go:
 shapes and kernels as first-class concepts, transformations as language
 primitives, and compilation across host/accelerator boundaries. PEACOCK's
-`Model`/`Training` declarations are a small, surface-level step in that
+`प्रतिमान`/`अभ्यास` declarations are a small, surface-level step in that
 direction; they are not a tensor compiler.
 
 ## 4. Training, architectures and evaluation
@@ -142,7 +142,7 @@ residual networks [he2016deep], recurrent networks and LSTM [elman1990finding],
 [hochreiter1997lstm], attention and transformers [bahdanau2014neural],
 [vaswani2017attention], generative models [kingma2014auto],
 [goodfellow2014generative], [ho2020denoising] — informs the roadmap. **None of
-these architectures is implemented in v0.1.** The engine supports Dense layers
+these architectures is implemented in v0.2.** The engine supports Dense layers
 with linear/ReLU/sigmoid/tanh/softmax activations, MSE and cross-entropy, SGD
 with momentum and Adam. Claiming "AI-native" does not mean claiming a transformer
 implementation.
@@ -242,7 +242,46 @@ Testing practice draws on fuzzing [miller1990empirical], property-based testing
 The repository has deterministic fuzzers for the lexer, parser, artifact and
 model loaders, but no coverage-guided fuzzer and no mutation score.
 
-## 10. AGI research tooling and safety
+## 10. Sanskrit grammar, native vocabulary, and language technology
+
+PEACOCK 0.2 uses Sanskrit as its actual reserved source vocabulary rather than
+as a file-extension label. The linguistic design is documented with the original
+sūtra numbers in [`../docs/language/sanskrit.md`](../docs/language/sanskrit.md).
+The strongest transferable ideas are exact technical designation (`saṃjñā`),
+explicit domains for rules, ordered correspondence, and deterministic conflict
+resolution. The implementation does **not** equate these ideas with a complete
+simulation of the *Aṣṭādhyāyī*.
+
+The primary-text anchors are `वृद्धिरादैच्` (1.1.1)
+[panini1x1x1], `उपदेशेऽजनुनासिक इत्` (1.3.2) [panini1x3x2],
+`यथासंख्यमनुदेशः समानाम्` (1.3.10) [panini1x3x10],
+`विप्रतिषेधे परं कार्यम्` (1.4.2) [panini1x4x2],
+`समर्थः पदविधिः` (2.1.1) [panini2x1x1], and `प्रत्ययः`
+(3.1.1) [panini3x1x1]. Patañjali's *Mahābhāṣya* and Kātyāyana's `vārttika`
+tradition motivate critical interpretation and regression evidence
+[patanjalimahabhashya]; Bhartṛhari's *Vākyapadīya* is relevant to the distinction
+between formal expression and meaning, not to a concrete VM algorithm
+[bhartrharivakyapadiya].
+
+The computational literature separates two problems that must not be conflated.
+Krishna and Goyal use `anuvṛtti`, inheritance networks, and strict rule ordering
+for Pāṇinian derivative-noun generation [krishna2015derivative], while Rama and
+Lakshmanan model sandhi computation [rama2009sandhi]. In contrast, work on neural
+sandhi splitting explicitly identifies non-uniqueness and context dependence
+[dave2020sandhi]. Sanskrit segmentation/morphology systems
+[li2022segmentation], [sandhan2023sanskritshala], [nehrdich2024byt5] are valuable
+research tools but are not deterministic compiler lexers and are not PEACOCK
+dependencies. `Kāraka` research in multimodal grounding is a future structured-
+representation direction, not an implemented agent capability [gorthi2022karaka].
+Jayanti's native technical-writing work supports intentional Indic terminology
+rather than automatic borrowing of English computing vocabulary
+[jayanti2026indic].
+
+The implementation consequence is deliberately strict: Unicode NFC identifiers,
+explicit combining-mark handling, Unicode decimal digits, one auditable Sanskrit
+lexicon, and no probabilistic tokenisation or automatic sandhi splitting.
+
+## 11. AGI research tooling and safety
 
 The planned "AGI research tooling" phase is informed by the safety literature:
 concrete problems [amodei2016concrete], reward modelling [leike2018scalable],
@@ -254,7 +293,7 @@ Evaluation design draws on the measurement-of-intelligence debate
 ReAct [yao2022react], tool use [schick2023toolformer], retrieval [lewis2020retrieval])
 is roadmap material.
 
-**What exists in v0.1:** deterministic datasets, seeded training, evaluation
+**What exists in v0.2:** deterministic datasets, seeded training, evaluation
 metrics, training reports with provenance, and model save/load. That is a
 reproducible experiment substrate for small models. It is not an AGI system, an
 agent framework, a reward-model trainer, an interpretability toolkit or an
@@ -266,7 +305,7 @@ Self-improvement ideas such as Gödel machines [schmidhuber2006godel] and univer
 intelligence [hutter2005universal] are background for framing; no implementation
 exists or is planned within the current roadmap.
 
-## 11. Gaps in this review and in the implementation
+## 12. Gaps in this review and in the implementation
 
 1. **No formal semantics.** The specification is precise but not mechanised. The
    type-soundness literature [wright1994syntactic] describes proofs PEACOCK does

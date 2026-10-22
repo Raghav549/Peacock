@@ -102,7 +102,7 @@ def fuzz_artifact(iterations: int = 300, seed: int = 3, valid_artifact: bytes | 
 
     report = FuzzReport("artifact", iterations, seed)
     if valid_artifact is None:
-        result = compile_source("module fuzz\nfn main() -> Unit { print(\"ok\"); }", "fuzz.pac")
+        result = compile_source('प्रकरण fuzz\nकार्य मुख्य() -> एकक { मुद्रय("ok"); }', "fuzz.सूत्र")
         if not result.ok:
             report.crashes.append("could not build seed artifact")
             return report

@@ -1,4 +1,4 @@
-"""Differential tests for the PEACOCK-written parser (`selfhost/parser.pac`).
+"""Differential tests for the PEACOCK-written parser (`selfhost/parser.सूत्र`).
 
 The bootstrap parser is the oracle: both parsers must produce the same canonical
 AST digest for the core-language corpus. The self-hosted parser additionally
@@ -6,7 +6,7 @@ self-parses its own source and the tokenizer, which is the strongest available
 evidence that it handles the language it is written in.
 
 Scope: the parity corpus now includes model and training declarations
-(`examples/xor.pac`, `examples/spiral.pac`). The bootstrap parser remains the
+(`examples/xor.सूत्र`, `examples/spiral.सूत्र`). The bootstrap parser remains the
 diagnostics and recovery oracle; the self-hosted parser is strict.
 """
 
@@ -21,37 +21,37 @@ from pathlib import Path
 from tests.integration.ast_digest import module_digest
 from tests.support import REPO_ROOT
 
-PARSER = "selfhost/parser.pac"
+PARSER = "selfhost/parser.सूत्र"
 MAX_STEPS = "300000000"
 
 CORE_CORPUS = [
-    "examples/hello.pac",
-    "examples/tour.pac",
-    "examples/tensors.pac",
-    "examples/motion.pac",
-    "examples/aurora.pac",
-    "examples/xor.pac",
-    "examples/spiral.pac",
-    "linguist/samples/hello.pac",
-    "linguist/samples/types.pac",
-    "linguist/samples/colour.pac",
-    "linguist/samples/motion.pac",
-    "linguist/samples/capabilities.pac",
-    "linguist/samples/tensors.pac",
-    "selfhost/fixtures/core_syntax.pac",
+    "examples/hello.सूत्र",
+    "examples/tour.सूत्र",
+    "examples/tensors.सूत्र",
+    "examples/motion.सूत्र",
+    "examples/aurora.सूत्र",
+    "examples/xor.सूत्र",
+    "examples/spiral.सूत्र",
+    "linguist/samples/hello.सूत्र",
+    "linguist/samples/types.सूत्र",
+    "linguist/samples/colour.सूत्र",
+    "linguist/samples/motion.सूत्र",
+    "linguist/samples/capabilities.सूत्र",
+    "linguist/samples/tensors.सूत्र",
+    "selfhost/fixtures/core_syntax.सूत्र",
 ]
 
 SELF_PARSE_CORPUS = [
-    "selfhost/tokenizer.pac",
-    "selfhost/parser.pac",
+    "selfhost/tokenizer.सूत्र",
+    "selfhost/parser.सूत्र",
 ]
 
 INVALID_SYNTAX = {
-    "selfhost/fixtures/invalid/missing_semicolon.pac": "expected ';'",
-    "selfhost/fixtures/invalid/chained_comparison.pac": "chained comparisons",
-    "selfhost/fixtures/invalid/unclosed_block.pac": "expected '}'",
-    "selfhost/fixtures/invalid/unterminated_string.pac": "unterminated string",
-    "selfhost/fixtures/invalid/bad_model_section.pac": "expected 'input', 'output' or 'stack'",
+    "selfhost/fixtures/invalid/missing_semicolon.सूत्र": "expected ';'",
+    "selfhost/fixtures/invalid/chained_comparison.सूत्र": "chained comparisons",
+    "selfhost/fixtures/invalid/unclosed_block.सूत्र": "expected '}'",
+    "selfhost/fixtures/invalid/unterminated_string.सूत्र": "unterminated string",
+    "selfhost/fixtures/invalid/bad_model_section.सूत्र": "expected 'निवेश', 'निर्गम' or 'क्रम'",
 }
 
 
@@ -74,7 +74,7 @@ def run_cli(*args: str, timeout: int = 300) -> subprocess.CompletedProcess:
 def run_selfhost_parser(path: str, *, grant: bool = True) -> subprocess.CompletedProcess:
     args = ["run", PARSER]
     if grant:
-        args += ["--grant", "fs"]
+        args += ["--grant", "सञ्चय"]
     args += ["--root", ".", "--max-steps", MAX_STEPS, "--", path]
     return run_cli(*args)
 
@@ -112,18 +112,18 @@ class SelfHostParserNegativeTests(unittest.TestCase):
                 self.assertIn("column ", result.stderr)
 
     def test_parser_requires_fs_grant(self) -> None:
-        result = run_selfhost_parser("examples/hello.pac", grant=False)
+        result = run_selfhost_parser("examples/hello.सूत्र", grant=False)
         self.assertEqual(result.returncode, 3)
         self.assertIn("PE4001", result.stderr)
-        self.assertIn("fs", result.stderr)
+        self.assertIn("सञ्चय", result.stderr)
         self.assertEqual(result.stdout.strip(), "")
 
     def test_usage_without_arguments(self) -> None:
         result = run_cli(
-            "run", PARSER, "--grant", "fs", "--root", ".", "--max-steps", MAX_STEPS
+            "run", PARSER, "--grant", "सञ्चय", "--root", ".", "--max-steps", MAX_STEPS
         )
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("usage: parser.pac", result.stdout)
+        self.assertIn("usage: parser.सूत्र", result.stdout)
 
 
 if __name__ == "__main__":

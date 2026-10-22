@@ -14,7 +14,7 @@ The Python code implements two different things, and they must not be confused:
 | **Language definition and toolchain** | lexer, parser, types, semantics, IR, optimiser, bytecode emitter, disassembler, VM | PEACOCK itself |
 | **Host services** | process start, file I/O, time, standard streams, memory allocation, platform window/HTTP | the host platform, behind a small ABI |
 
-Self-hosting means the first layer is written in `.pac` and can compile itself.
+Self-hosting means the first layer is written in `.सूत्र` and can compile itself.
 It does **not** mean PEACOCK must implement a CPU, kernel or libc. Host services
 remain external, as they are for every practical language implementation.
 
@@ -37,20 +37,20 @@ Rules already enforced by review and tests:
 * the compiler has no platform-specific file I/O;
 * host access goes through `HostPolicy`/natives, never through compiler code;
 * the bytecode format is documented and versioned independently of Python;
-* `.pac` examples are compiled by the real pipeline, never translated to Python;
+* `.सूत्र` examples are compiled by the real pipeline, never translated to Python;
 * the language specification does not mention Python types or semantics
   (integer division and remainder are PEACOCK's, not Python's).
 
 ## 3. Completed stage: tokenizer
 
-`selfhost/tokenizer.pac` is a PEACOCK tokenizer that:
+`selfhost/tokenizer.सूत्र` is a PEACOCK tokenizer that:
 
 * is compiled by the actual compiler and executed by the actual VM;
-* reads a `.pac` file through the `fs` capability and arguments through
-  `process.args`;
+* reads a `.सूत्र` file through the `सञ्चय` capability and arguments through
+  `प्रक्रिया.तर्कावली`;
 * counts tokens and optionally dumps labels;
 * is compared in `tests/integration/test_cli.py` with the bootstrap lexer:
-  token count on `examples/tour.pac` is identical (367), and the full non-string
+  token count on `examples/tour.सूत्र` is identical (367), and the full non-string
   token label stream on a sample matches.
 
 This is a genuine self-hosted component, not a Python file with a new extension.
@@ -65,16 +65,16 @@ no Python translation layer.
 
 ### Stage 2 — Parser and AST (partial)
 
-`selfhost/parser.pac` (1,085 lines, 55 functions) is a recursive-descent parser
-written in PEACOCK. It lexes and parses the full 0.1 grammar — module/use/struct,
+`selfhost/parser.सूत्र` (1,131 lines, 55 functions) is a recursive-descent parser
+written in PEACOCK. It lexes and parses the full 0.2 grammar — प्रकरण/उपयोग/संघटन,
 functions, statements, expressions, model and training declarations — and prints
 a canonical S-expression AST digest.
 
 **Done:**
 
 * byte-identical AST digest with the bootstrap parser on all seven `examples/`,
-  all six `linguist/samples/`, `selfhost/fixtures/core_syntax.pac`, and on its own
-  source plus `selfhost/tokenizer.pac`;
+  all six `linguist/samples/`, `selfhost/fixtures/core_syntax.सूत्र`, and on its own
+  source plus `selfhost/tokenizer.सूत्र`;
 * model, training and layer declarations, including named layer arguments and
   bare symbolic arguments (`activation: relu`);
 * strict first-error reporting with `PE4020`, line and column;
@@ -102,12 +102,12 @@ layer (met).
 
 ### Stage 3 — Semantic analyser and type checker (shadow prototype)
 
-`selfhost/type_model.pac` now implements recursive type relations and selected
+`selfhost/type_model.सूत्र` now implements recursive type relations and selected
 expression, lexical-binding, declaration/assignment, user-function signature/
 call, condition, return and iterable rules. The opt-in `compile_source(...,
 semantic_mode="shadow")` adapter and `--semantic-shadow` CLI flags derive probes
 from the Python typed AST, then execute them through the PEACOCK compiler and VM.
-Positive/negative programs and the `.pac` example corpus are tested, including
+Positive/negative programs and the `.सूत्र` example corpus are tested, including
 ErrorType iterable recovery. Python semantic analysis and diagnostics remain the
 authority; the kernel is not a production replacement and does not yet generate
 diagnostics. Field/member resolution, native overloads, model/training analysis,
@@ -129,7 +129,7 @@ Port PIR construction, verification, folding/DCE and the bytecode layout.
 Deterministic output is mandatory: the same source must produce byte-identical
 images across implementations.
 
-Acceptance: byte-for-byte equality of `.pkb` images for the corpus, or a
+Acceptance: byte-for-byte equality of `.बीज` images for the corpus, or a
 documented canonicalisation if a representation detail differs.
 
 ### Stage 5 — VM in PEACOCK
@@ -179,6 +179,6 @@ through capabilities:
 
 * Removing Python before the fixed point is proven.
 * Implementing an OS, kernel or libc in PEACOCK.
-* Claiming "self-hosting" because one component is written in `.pac`.
+* Claiming "self-hosting" because one component is written in `.सूत्र`.
 * Copying another compiler's architecture or code; borrowed ideas are cited in
   `research/references.bib`.

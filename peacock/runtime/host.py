@@ -13,6 +13,7 @@ from pathlib import Path
 
 from peacock.compiler.diagnostics import HostError
 from peacock.compiler.tokens import KNOWN_CAPABILITIES as _LANGUAGE_CAPABILITIES
+from peacock.sanskrit import surface
 
 #: The runtime accepts exactly the capabilities the language defines.
 KNOWN_CAPABILITIES = frozenset(_LANGUAGE_CAPABILITIES)
@@ -30,7 +31,7 @@ class HostPolicy:
     max_training_epochs: int = 10_000
     max_file_bytes: int = 64 * 1024 * 1024
     #: Optional callable that receives a Canvas when a program calls
-    #: ``graphics.present``. Attached by the CLI or an embedding host.
+    #: ``चित्र.प्रदर्शय``. Attached by the CLI or an embedding host.
     presenter: object | None = None
 
     def __post_init__(self):
@@ -50,7 +51,7 @@ class HostPolicy:
     def require(self, capability: str) -> None:
         if capability not in self.grants:
             raise HostError(
-                f"host has not granted capability '{capability}'",
+                f"host has not granted capability '{surface(capability)}'",
                 "PE4001",
             )
 
@@ -61,7 +62,7 @@ class HostPolicy:
     def present(self, canvas) -> None:
         """Hand a frame to the attached presentation backend.
 
-        Requires the ``ui`` grant. A granted capability without an attached
+        Requires the ``दृश्य`` grant. A granted capability without an attached
         backend is a configuration error (PE4006), not a capability denial.
         Backend failures surface as host errors so programs cannot corrupt the
         VM by raising arbitrary exceptions.
@@ -81,7 +82,7 @@ class HostPolicy:
 
     def resolve_path(self, path: str, *, write: bool = False) -> Path:
         if not isinstance(path, str):
-            raise HostError("path must be a String", "PE5002")
+            raise HostError("path must be an अक्षरमाला", "PE5002")
         if "\x00" in path:
             raise HostError("path contains a NUL byte", "PE5002")
         if not path:

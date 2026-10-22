@@ -11,7 +11,7 @@ import hashlib
 from dataclasses import dataclass
 from typing import Any
 
-from peacock import __version__
+from peacock import LANGUAGE_VERSION, __version__
 
 from . import builtins as B
 from .ir import IRFunction, IRModule
@@ -87,7 +87,7 @@ class BytecodeCompiler:
         image = {
             "format": "peacock-bytecode",
             "format_version": 1,
-            "language_version": "0.1",
+            "language_version": LANGUAGE_VERSION,
             "compiler_version": __version__,
             "module": self.module.name or "",
             "uses": list(self.module.uses),

@@ -1,4 +1,4 @@
-"""Name resolution, type checking and capability checking for PEACOCK 0.1.
+"""Name resolution, type checking and capability checking for PEACOCK 0.2.
 
 The analyser annotates the AST in place (``expr.ty``, ``name.symbol``,
 ``call.target``, ...) and returns a :class:`TypedProgram` that the IR builder
@@ -10,7 +10,7 @@ Static rules worth calling out:
 * capability requirements are checked against the *declared* capabilities of the
   enclosing function (the runtime re-checks them against host grants);
 * a model must have exactly one input and one output tensor with statically
-  known shapes in 0.1;
+  known shapes in 0.2;
 * training option values are compile-time literals.
 """
 
@@ -58,6 +58,8 @@ from .ast_nodes import (
     Unary,
     WhileStmt,
 )
+from peacock.sanskrit import internalise_enum, surface, surface_enum, surface_type
+
 from .diagnostics import DiagnosticBag, Span
 from .tokens import KNOWN_CAPABILITIES, KNOWN_NAMESPACES
 
@@ -248,9 +250,9 @@ class SemanticAnalyzer:
             if len(use.path) != 1:
                 self.diag.error(
                     "PE3006",
-                    "only whole standard-library namespaces can be imported in 0.1",
+                    "only whole standard-library namespaces can be imported in 0.2",
                     use.span,
-                    hint="write 'use nn;' rather than 'use nn.train;'",
+                    hint="write 'उपयोग तन्त्रजाल;' rather than 'उपयोग तन्त्रजाल.अभ्यासय;'",
                 )
                 continue
             ns = use.path[0]
@@ -260,11 +262,11 @@ class SemanticAnalyzer:
                     "PE3006",
                     f"unknown module '{ns}'",
                     use.span,
-                    hint=f"did you mean 'use {suggestion};'?" if suggestion else f"known modules: {', '.join(sorted(B.NAMESPACES))}",
+                    hint=f"did you mean 'उपयोग {surface(suggestion)};'?" if suggestion else f"known modules: {', '.join(surface(n) for n in sorted(B.NAMESPACES))}",
                 )
                 continue
             if ns in seen:
-                self.diag.error("PE3001", f"module '{ns}' is imported more than once", use.span)
+                self.diag.error("PE3001", f"module '{surface(ns)}' is imported more than once", use.span)
             seen.add(ns)
             self.namespaces.add(ns)
 
@@ -286,7 +288,7 @@ class SemanticAnalyzer:
                 seen.add(f.name)
                 ty = self.resolve_type(f.annotation)
                 if ty == T.UnitType:
-                    self._error("PE3003", "struct fields may not have type Unit", f.annotation.span)
+                    self._error("PE3003", "struct fields may not have type एकक", f.annotation.span)
                 f.ty = ty
                 sym.field_names.append(f.name)
                 sym.field_types.append(ty)
@@ -326,16 +328,16 @@ class SemanticAnalyzer:
         if len(decl.params) != 0:
             self.diag.error(
                 "PE3013",
-                f"entry point 'main' must take no parameters, found {len(decl.params)}",
+                f"entry point 'मुख्य' must take no parameters, found {len(decl.params)}",
                 decl.name_span,
-                hint="read command-line arguments with process.args(); the host passes them there",
+                hint="read command-line arguments with प्रक्रिया.तर्कावली(); the host passes them there",
             )
         if symbol.return_type != T.UnitType:
             self.diag.error(
                 "PE3013",
-                "entry point 'main' must return Unit",
+                "entry point 'मुख्य' must return एकक",
                 decl.return_type.span if decl.return_type is not None else decl.name_span,
-                hint="terminate with 'return;' and report failures with throw/assert",
+                hint="terminate with 'प्रत्यानय;' and report failures with क्षिप/निश्चिनु",
             )
 
     def _name_conflict(self, name: str, span: Span) -> bool:
@@ -380,14 +382,14 @@ class SemanticAnalyzer:
         if isinstance(te, ListTypeExpr):
             elem = self.resolve_type(te.element)
             if elem == T.UnitType:
-                self._error("PE3003", "List<Unit> is not a valid type", te.span)
+                self._error("PE3003", "सूची<एकक> is not a valid type", te.span)
             return T.ListType(elem)
         if isinstance(te, NamedTypeExpr):
             name = te.name
             if te.args:
                 self._error(
                     "PE3012",
-                    f"user-defined generic types are not implemented in 0.1 ('{name}<...>')",
+                    f"user-defined generic types are not implemented in 0.2 ('{name}<...>')",
                     te.span,
                 )
                 return T.ErrorType
@@ -409,7 +411,7 @@ class SemanticAnalyzer:
                     "PE3012",
                     f"'{name}' is a declaration, not a type",
                     te.span,
-                    hint="use the opaque 'Model' type for model values",
+                    hint="use the opaque 'प्रतिमानप्रकार' type for model values",
                 )
                 return T.ErrorType
             suggestion = self._suggest(
@@ -439,14 +441,14 @@ class SemanticAnalyzer:
         if len(decl.inputs) != 1:
             self.diag.error(
                 "PE3009",
-                f"model '{decl.name}' must declare exactly one input in 0.1 (found {len(decl.inputs)})",
+                f"model '{decl.name}' must declare exactly one input in 0.2 (found {len(decl.inputs)})",
                 decl.name_span,
             )
             ok = False
         if len(decl.outputs) != 1:
             self.diag.error(
                 "PE3009",
-                f"model '{decl.name}' must declare exactly one output in 0.1 (found {len(decl.outputs)})",
+                f"model '{decl.name}' must declare exactly one output in 0.2 (found {len(decl.outputs)})",
                 decl.name_span,
             )
             ok = False
@@ -472,9 +474,9 @@ class SemanticAnalyzer:
                 if ty.shape is None:
                     self.diag.error(
                         "PE3009",
-                        f"model input '{field.name}' needs a statically known shape in 0.1",
+                        f"model input '{field.name}' needs a statically known shape in 0.2",
                         field.span,
-                        hint="write Tensor<Float32, [2]> rather than Tensor<Float32>",
+                        hint="write आयाम<दशमलव३२, [2]> rather than आयाम<दशमलव३२>",
                     )
                     ok = False
                 inputs.append(ty)
@@ -498,7 +500,7 @@ class SemanticAnalyzer:
                 if ty.shape is None:
                     self.diag.error(
                         "PE3009",
-                        f"model output '{field.name}' needs a statically known shape in 0.1",
+                        f"model output '{field.name}' needs a statically known shape in 0.2",
                         field.span,
                     )
                     ok = False
@@ -524,7 +526,7 @@ class SemanticAnalyzer:
                     "PE3009",
                     f"model output last dimension is {outputs[0].shape[-1]}, but the stack produces {current} units",
                     decl.outputs[0].span,
-                    hint="make the final Dense(units: ...) match the output shape",
+                    hint="make the final सघन(एककानि: ...) match the output shape",
                 )
                 ok = False
         if not ok:
@@ -536,9 +538,9 @@ class SemanticAnalyzer:
         if layer.name != "Dense":
             self.diag.error(
                 "PE3009",
-                f"unknown layer '{layer.name}'",
+                f"unknown layer '{surface(layer.name)}'",
                 layer.span,
-                hint="0.1 supports only Dense(units: N, activation: relu|sigmoid|tanh|softmax|linear)",
+                hint="0.2 supports only सघन(एककानि: N, सक्रियण: धनाङ्क|वक्रसीमा|अतिस्पर्शज्या|कोमलाधिकतम|रैखिक)",
             )
             return None
         seen: set[str] = set()
@@ -546,18 +548,18 @@ class SemanticAnalyzer:
         activation = "linear"
         for arg in layer.args:
             if arg.name in seen:
-                self.diag.error("PE3009", f"duplicate layer argument '{arg.name}'", arg.span)
+                self.diag.error("PE3009", f"duplicate layer argument '{surface(arg.name)}'", arg.span)
                 continue
             seen.add(arg.name)
             if arg.name == "units":
                 if not isinstance(arg.value, IntLit):
                     self.diag.error(
-                        "PE3009", "Dense 'units' must be an integer literal in 0.1", arg.span
+                        "PE3009", "सघन 'एककानि' must be an integer literal in 0.2", arg.span
                     )
                     continue
                 units = arg.value.value
                 if units <= 0:
-                    self.diag.error("PE3009", "Dense 'units' must be positive", arg.span)
+                    self.diag.error("PE3009", "सघन 'एककानि' must be positive", arg.span)
             elif arg.name == "activation":
                 if arg.symbol is not None:
                     activation = arg.symbol
@@ -566,26 +568,27 @@ class SemanticAnalyzer:
                 else:
                     self.diag.error(
                         "PE3009",
-                        "Dense 'activation' must be a bare name or string literal",
+                        "सघन 'सक्रियण' must be a bare name or string literal",
                         arg.span,
-                        hint="activation: relu",
+                        hint="सक्रियण: धनाङ्क",
                     )
+                activation = internalise_enum(activation)
                 if activation not in _ACTIVATIONS:
                     self.diag.error(
                         "PE3009",
-                        f"unknown activation '{activation}'",
+                        f"unknown activation '{surface_enum(activation)}'",
                         arg.span,
-                        hint=f"supported: {', '.join(sorted(_ACTIVATIONS))}",
+                        hint=f"supported: {', '.join(sorted(surface_enum(v) for v in _ACTIVATIONS))}",
                     )
             else:
                 self.diag.error(
                     "PE3009",
-                    f"unknown Dense argument '{arg.name}'",
+                    f"unknown सघन argument '{surface(arg.name)}'",
                     arg.span,
-                    hint="supported arguments: units, activation",
+                    hint="supported arguments: एककानि, सक्रियण",
                 )
         if units is None:
-            self.diag.error("PE3009", "Dense layer requires 'units'", layer.span)
+            self.diag.error("PE3009", "सघन layer requires 'एककानि'", layer.span)
             return None
         return ResolvedLayer("Dense", units, activation)
 
@@ -612,7 +615,7 @@ class SemanticAnalyzer:
         for field_node in decl.fields:
             if field_node.name in seen:
                 self.diag.error(
-                    "PE3010", f"duplicate training option '{field_node.name}'", field_node.span
+                    "PE3010", f"duplicate training option '{surface(field_node.name)}'", field_node.span
                 )
                 ok = False
                 continue
@@ -620,9 +623,9 @@ class SemanticAnalyzer:
             if field_node.name not in defaults:
                 self.diag.error(
                     "PE3010",
-                    f"unknown training option '{field_node.name}'",
+                    f"unknown training option '{surface(field_node.name)}'",
                     field_node.span,
-                    hint=f"supported options: {', '.join(sorted(defaults))}",
+                    hint=f"supported options: {', '.join(sorted(surface(k) for k in defaults))}",
                 )
                 ok = False
                 continue
@@ -631,36 +634,38 @@ class SemanticAnalyzer:
                 ok = False
                 continue
             config[field_node.name] = value
+        config["objective"] = internalise_enum(config["objective"])
+        config["optimiser"] = internalise_enum(config["optimiser"])
         if config["objective"] not in _OBJECTIVES:
             self.diag.error(
                 "PE3010",
-                f"unknown objective '{config['objective']}'",
+                f"unknown objective '{surface_enum(config['objective'])}'",
                 decl.name_span,
-                hint=f"supported: {', '.join(sorted(_OBJECTIVES))}",
+                hint=f"supported: {', '.join(sorted(surface_enum(v) for v in _OBJECTIVES))}",
             )
             ok = False
         if config["optimiser"] not in _OPTIMISERS:
             self.diag.error(
                 "PE3010",
-                f"unknown optimiser '{config['optimiser']}'",
+                f"unknown optimiser '{surface_enum(config['optimiser'])}'",
                 decl.name_span,
-                hint=f"supported: {', '.join(sorted(_OPTIMISERS))}",
+                hint=f"supported: {', '.join(sorted(surface_enum(v) for v in _OPTIMISERS))}",
             )
             ok = False
         for key in ("epochs", "batch_size"):
             if not isinstance(config[key], int) or isinstance(config[key], bool) or config[key] < 1:
                 self.diag.error(
-                    "PE3010", f"training option '{key}' must be an integer >= 1", decl.name_span
+                    "PE3010", f"training option '{surface(key)}' must be an integer >= 1", decl.name_span
                 )
                 ok = False
         lr = config["learning_rate"]
         if not isinstance(lr, (int, float)) or isinstance(lr, bool) or lr <= 0:
             self.diag.error(
-                "PE3010", "training option 'learning_rate' must be a positive number", decl.name_span
+                "PE3010", "training option 'अधिगमदर' must be a positive number", decl.name_span
             )
             ok = False
         if not isinstance(config["seed"], int) or isinstance(config["seed"], bool):
-            self.diag.error("PE3010", "training option 'seed' must be an integer", decl.name_span)
+            self.diag.error("PE3010", "training option 'बीज' must be an integer", decl.name_span)
             ok = False
         if not ok:
             return None
@@ -688,7 +693,7 @@ class SemanticAnalyzer:
                 return -operand
         self.diag.error(
             "PE3010",
-            "training option values must be numeric, string or boolean literals in 0.1",
+            "training option values must be numeric, string or boolean literals in 0.2",
             expr.span,
         )
         expr.ty = T.ErrorType
@@ -712,11 +717,11 @@ class SemanticAnalyzer:
                             "PE3005",
                             f"unknown capability '{name}'",
                             span,
-                            hint=f"known capabilities in 0.1: {', '.join(KNOWN_CAPABILITIES)}",
+                            hint=f"known capabilities in 0.2: {', '.join(surface(c) for c in KNOWN_CAPABILITIES)}",
                         )
                     elif name in caps:
                         self.diag.error(
-                            "PE3005", f"capability '{name}' is declared twice", span
+                            "PE3005", f"capability '{surface(name)}' is declared twice", span
                         )
                     else:
                         caps.add(name)
@@ -732,14 +737,14 @@ class SemanticAnalyzer:
                     "PE3008",
                     f"function '{fn.name}' does not return a value on all paths",
                     decl.name_span,
-                    hint=f"declare '-> Unit' if the function returns nothing, or add a return statement",
+                    hint=f"declare '-> एकक' if the function returns nothing, or add a प्रत्यानय statement",
                 )
         self._pop_scope()
         decl.slot_count = self.max_slots
         if self.next_slot > 255:
             self.diag.error(
                 "PE3012",
-                f"function '{fn.name}' needs {self.next_slot} local slots; the 0.1 VM supports at most 256",
+                f"function '{fn.name}' needs {self.next_slot} local slots; the 0.2 VM supports at most 256",
                 decl.name_span,
             )
         self.current_function = None
@@ -774,7 +779,7 @@ class SemanticAnalyzer:
         if isinstance(stmt, LetStmt):
             expected = self.resolve_type(stmt.annotation) if stmt.annotation is not None else None
             if expected is not None and expected == T.UnitType:
-                self._error("PE3003", "variables may not have type Unit", stmt.annotation.span)
+                self._error("PE3003", "variables may not have type एकक", stmt.annotation.span)
             ty = self._check_expr(stmt.init, expected)
             if expected is not None:
                 if not T.is_assignable(ty, expected):
@@ -842,7 +847,7 @@ class SemanticAnalyzer:
                     "PE3003",
                     f"for-loop iterable must be a List or Range, found {iterable_ty.display()}",
                     stmt.iterable.span,
-                    hint="use 'for i in 0..n' or iterate a List",
+                    hint="use 'प्रति i मध्ये 0..n' or iterate a सूची",
                 )
             self.loop_depth += 1
             self._push_scope()
@@ -873,7 +878,7 @@ class SemanticAnalyzer:
                         "PE3008",
                         f"function '{fn.name}' returns Unit but a value is returned",
                         stmt.value.span,
-                        hint="write 'return;'",
+                        hint="write 'प्रत्यानय;'",
                     )
                 elif not T.is_assignable(got, expected):
                     self._error(
@@ -959,7 +964,7 @@ class SemanticAnalyzer:
                     "PE3007",
                     f"cannot assign to immutable variable '{sym.name}'",
                     target.span,
-                    hint=f"declare it with 'let mut {sym.name} = ...'",
+                    hint=f"declare it with 'स्थापय परिवर्तनीय {surface(sym.name)} = ...'",
                 )
             expected = sym.ty
         elif isinstance(target, Field):
@@ -985,7 +990,7 @@ class SemanticAnalyzer:
                     "PE3007",
                     f"cannot assign through an index of {base_ty.display()}",
                     target.span,
-                    hint="0.1 supports index assignment only for List values; tensors are immutable",
+                    hint="0.2 supports index assignment only for सूची values; tensors are immutable",
                 )
             expected = target.ty
         else:
@@ -1094,9 +1099,9 @@ class SemanticAnalyzer:
                 return T.ErrorType
             return self._error(
                 "PE3003",
-                f"values of type {base_ty.display()} cannot be indexed in 0.1",
+                f"values of type {base_ty.display()} cannot be indexed in 0.2",
                 expr.span,
-                hint="use tensor methods such as .reshape(), or a List",
+                hint="use tensor methods such as .पुनराकृति(), or a सूची",
             )
         return self._error("PE3012", f"unsupported expression {type(expr).__name__}", expr.span)
 
@@ -1114,7 +1119,7 @@ class SemanticAnalyzer:
                 return T.BoolType, None
             if isinstance(left, T.TensorType) or isinstance(right, T.TensorType):
                 return T.ErrorType, (
-                    "tensor equality is not supported in 0.1; compare reductions such as .sum()"
+                    "tensor equality is not supported in 0.2; compare reductions such as .sum()"
                 )
             return T.ErrorType, (
                 f"cannot compare {left.display()} with {right.display()} using '{op}'"
@@ -1177,7 +1182,7 @@ class SemanticAnalyzer:
             if left == T.IntType and right == T.IntType:
                 return T.IntType, None
             return T.ErrorType, (
-                f"operator '%' is defined for Int only in 0.1, found {left.display()} and {right.display()}"
+                f"operator '%' is defined for Int only in 0.2, found {left.display()} and {right.display()}"
             )
         if op == "**":
             if left == T.IntType and right == T.IntType:
@@ -1197,7 +1202,7 @@ class SemanticAnalyzer:
                     "PE3003",
                     "cannot infer the type of an empty list",
                     expr.span,
-                    hint="annotate the binding, e.g. let xs: List<Int> = [];",
+                    hint="annotate the binding, e.g. स्थापय xs: सूची<पूर्णाङ्क> = [];",
                 )
             # Preserve the contextual element type on the AST so later compiler
             # passes and shadow analyzers can inspect the fully resolved list.
@@ -1251,7 +1256,7 @@ class SemanticAnalyzer:
         if kind == "function":
             return self._error(
                 "PE3012",
-                f"function '{expr.ident}' is not a first-class value in 0.1",
+                f"function '{expr.ident}' is not a first-class value in 0.2",
                 expr.span,
                 hint="call it directly instead of storing it",
             )
@@ -1272,7 +1277,7 @@ class SemanticAnalyzer:
                     "PE3006",
                     f"module '{expr.ident}' is used but not imported",
                     expr.span,
-                    hint=f"add 'use {expr.ident};'",
+                    hint=f"add 'उपयोग {surface(expr.ident)};'",
                 )
             expr.ty = T.NamespaceType
             return T.NamespaceType
@@ -1307,7 +1312,7 @@ class SemanticAnalyzer:
                     "PE3015",
                     f"struct '{struct.name}' has no field '{field.name}'",
                     field.name_span,
-                    hint=f"fields: {', '.join(struct.field_names)}",
+                    hint=f"fields: {', '.join(surface(n) for n in struct.field_names)}",
                 )
             idx = struct.field_index(field.name)
             field.field_kind = "struct_field"
@@ -1323,23 +1328,23 @@ class SemanticAnalyzer:
                 return prop
             if for_assignment:
                 return self._error(
-                    "PE3007", f"property '{field.name}' of {base_ty.display()} is read-only", field.name_span
+                    "PE3007", f"property '{surface(field.name)}' of {base_ty.display()} is read-only", field.name_span
                 )
             return self._error(
                 "PE3015",
-                f"{base_ty.display()} has no property '{field.name}'",
+                f"{base_ty.display()} has no property '{surface(field.name)}'",
                 field.name_span,
             )
         if isinstance(base_ty, T.ModelDeclType):
             return self._error(
                 "PE3012",
-                f"model declaration members are only callable, e.g. {base_ty.name}.init(seed: 0)",
+                f"model declaration members are only callable, e.g. {base_ty.name}.प्रारम्भ(बीज: 0)",
                 field.span,
             )
         if isinstance(base_ty, T.TrainingDeclType):
             return self._error(
                 "PE3012",
-                f"training declaration members are only callable, e.g. {base_ty.name}.run(model, data)",
+                f"training declaration members are only callable, e.g. {base_ty.name}.चलाय(प्रतिमानमूल्य, दत्त)",
                 field.span,
             )
         if base_ty == T.NamespaceType:
@@ -1350,7 +1355,7 @@ class SemanticAnalyzer:
             )
         return self._error(
             "PE3015",
-            f"{base_ty.display()} has no fields in 0.1",
+            f"{base_ty.display()} has no fields in 0.2",
             field.span,
         )
 
@@ -1358,7 +1363,7 @@ class SemanticAnalyzer:
         if any(name is not None for name in call.arg_names):
             self._error(
                 "PE3004",
-                "named arguments are not supported for methods in 0.1",
+                "named arguments are not supported for methods in 0.2",
                 call.span,
                 hint="pass method arguments positionally",
             )
@@ -1374,9 +1379,9 @@ class SemanticAnalyzer:
             available = sorted(name for (cat, name) in B.METHODS if cat == category)
             return self._error(
                 "PE3015",
-                f"{base_ty.display()} has no method '{field.name}'",
+                f"{base_ty.display()} has no method '{surface(field.name)}'",
                 field.name_span,
-                hint=f"available: {', '.join(available)}",
+                hint=f"available: {', '.join(surface(n) for n in available)}",
             )
         param_types, ret, capability = spec
         # Substitute element/tensor placeholders.
@@ -1406,21 +1411,21 @@ class SemanticAnalyzer:
             if not T.is_assignable(got, want):
                 self._error(
                     "PE3003",
-                    f"argument {i} of method '{field.name}' expects {want.display()}, found {got.display()}",
+                    f"argument {i} of method '{surface(field.name)}' expects {want.display()}, found {got.display()}",
                     call.args[i - 1].span,
                 )
         call.call_kind = "method"
         call.target = (category, field.name)
         if field.name == "join" and elem is not None and elem != T.StringType:
             return self._error(
-                "PE3003", "join() requires List<String>", call.span
+                "PE3003", "संयोजय() requires सूची<अक्षरमाला>", call.span
             )
         if field.name == "sort" and elem is not None and elem not in (T.IntType, T.FloatType):
             return self._error(
-                "PE3003", "sort() requires a List of Int or Float", call.span
+                "PE3003", "क्रमय() requires a सूची of पूर्णाङ्क or दशमलव", call.span
             )
         if capability is not None:
-            self._require_capability(capability, call.span, f"method '{field.name}'")
+            self._require_capability(capability, call.span, f"method '{surface(field.name)}'")
         if ret == B.ELEM:
             return elem if elem is not None else T.ErrorType
         if ret == B.TENSOR_PLACEHOLDER:
@@ -1436,14 +1441,14 @@ class SemanticAnalyzer:
                         if base_ty.dtype != arg_ty.dtype:
                             self._error(
                                 "PE3003",
-                                f"matmul requires equal dtypes, found {base_ty.dtype} and {arg_ty.dtype}",
+                                f"matmul requires equal dtypes, found {surface_type(base_ty.dtype)} and {surface_type(arg_ty.dtype)}",
                                 call.span,
                             )
                         if base_ty.shape is not None and arg_ty.shape is not None:
                             if len(base_ty.shape) != 2 or len(arg_ty.shape) != 2:
                                 self._error(
                                     "PE3003",
-                                    "matmul in 0.1 is defined for 2-D tensors only",
+                                    "matmul in 0.2 is defined for 2-D tensors only",
                                     call.span,
                                 )
                             elif base_ty.shape[1] != arg_ty.shape[0]:
@@ -1489,9 +1494,9 @@ class SemanticAnalyzer:
                     if emit:
                         self._error(
                             "PE3004",
-                            f"{callee} has no parameter named '{name}'",
+                            f"{callee} has no parameter named '{surface(name)}'",
                             args[i].span if i < len(args) else span,
-                            hint=f"parameters: {', '.join(param_names)}",
+                            hint=f"parameters: {', '.join(surface(n) for n in param_names)}",
                         )
                     return None
                 target = param_names.index(name)
@@ -1499,7 +1504,7 @@ class SemanticAnalyzer:
                     if emit:
                         self._error(
                             "PE3004",
-                            f"parameter '{name}' of {callee} is supplied twice",
+                            f"parameter '{surface(name)}' of {callee} is supplied twice",
                             args[i].span if i < len(args) else span,
                         )
                     return None
@@ -1603,9 +1608,9 @@ class SemanticAnalyzer:
         if any(name is not None for name in call.arg_names):
             self._error(
                 "PE3004",
-                "named arguments are not supported for struct constructors in 0.1",
+                "named arguments are not supported for struct constructors in 0.2",
                 call.span,
-                hint=f"pass fields in declaration order: {', '.join(struct.field_names)}",
+                hint=f"pass fields in declaration order: {', '.join(surface(n) for n in struct.field_names)}",
             )
             for arg in call.args:
                 self._check_expr(arg)
@@ -1615,7 +1620,7 @@ class SemanticAnalyzer:
                 "PE3004",
                 f"struct '{struct.name}' expects {len(struct.field_names)} field value(s), found {len(call.args)}",
                 call.span,
-                hint=f"fields: {', '.join(struct.field_names)}",
+                hint=f"fields: {', '.join(surface(n) for n in struct.field_names)}",
             )
         arg_types = [
             self._check_expr(arg, struct.field_types[i] if i < len(struct.field_types) else None)
@@ -1656,7 +1661,7 @@ class SemanticAnalyzer:
                     "PE3003",
                     f"len() is not defined for {ty.display()}",
                     call.args[0].span,
-                    hint="tensor.size and .shape are also available",
+                    hint="tensor.मान and .आकृति are also available",
                 )
             call.call_kind = "native"
             call.native_name = name
@@ -1684,7 +1689,7 @@ class SemanticAnalyzer:
                 call.arg_names,
                 call.args,
                 call.span,
-                f"'{name}'",
+                f"'{surface(name)}'",
                 emit=False,
             )
             if slots is not None:
@@ -1698,7 +1703,7 @@ class SemanticAnalyzer:
                     call.arg_names,
                     call.args,
                     call.span,
-                    f"'{name}'",
+                    f"'{surface(name)}'",
                 )
             else:
                 self._error(
@@ -1747,7 +1752,7 @@ class SemanticAnalyzer:
                 types = ", ".join(t.display() for t in arg_types)
                 self._error(
                     "PE3003",
-                    f"no overload of '{name}' accepts argument types ({types})",
+                    f"no overload of '{surface(name)}' accepts argument types ({types})",
                     call.span,
                     hint="overloads: "
                     + "; ".join(
@@ -1769,11 +1774,11 @@ class SemanticAnalyzer:
             if not T.is_assignable(got, want):
                 self._error(
                     "PE3003",
-                    f"argument '{sig.params[pi].name}' of '{name}' expects {want.display()}, found {got.display()}",
+                    f"argument '{surface(sig.params[pi].name)}' of '{surface(name)}' expects {want.display()}, found {got.display()}",
                     call.args[si].span,
                 )
         if sig.capability is not None:
-            self._require_capability(sig.capability, call.span, f"'{name}'")
+            self._require_capability(sig.capability, call.span, f"'{surface(name)}'")
         call.call_kind = "native"
         call.native_name = name
         call.target = sig
@@ -1851,7 +1856,7 @@ class SemanticAnalyzer:
                         "PE3003",
                         "tensor literals must not mix Int and Float elements",
                         expr.span,
-                        hint="write every element as a Float, e.g. 1.0",
+                        hint="write every element as a दशमलव, e.g. 1.0",
                     )
                     return None
                 if shape != first_shape:
@@ -1879,7 +1884,7 @@ class SemanticAnalyzer:
                         "PE3006",
                         f"module '{namespace}' is used but not imported",
                         base.span,
-                        hint=f"add 'use {namespace};'",
+                        hint=f"add 'उपयोग {surface(namespace)};'",
                     )
                 full_name = f"{namespace}.{field.name}"
                 if full_name not in B.NATIVES:
@@ -1888,7 +1893,7 @@ class SemanticAnalyzer:
                         "PE3006",
                         f"module '{namespace}' has no function '{field.name}'",
                         field.name_span,
-                        hint=f"available: {', '.join(available)}",
+                        hint=f"available: {', '.join(surface(n) for n in available)}",
                     )
                 field.field_kind = "namespace_member"
                 return self._check_native_call(call, full_name, B.NATIVES[full_name])
@@ -1931,7 +1936,7 @@ class SemanticAnalyzer:
                 "PE3015",
                 f"{what} declaration has no method '{name}'",
                 call.span,
-                hint=f"available: {', '.join(sorted(table))}",
+                hint=f"available: {', '.join(surface(n) for n in sorted(table))}",
             )
         params, returns, capability = table[name]
         slots = self._bind_args(
@@ -1940,7 +1945,7 @@ class SemanticAnalyzer:
             call.arg_names,
             call.args,
             call.span,
-            f"'{name}'",
+            f"'{surface(name)}'",
         )
         if slots is None:
             for arg in call.args:
@@ -1959,11 +1964,11 @@ class SemanticAnalyzer:
             if not T.is_assignable(got, want):
                 self._error(
                     "PE3003",
-                    f"argument '{params[pi].name}' of '{name}' expects {want.display()}, found {got.display()}",
+                    f"argument '{surface(params[pi].name)}' of '{surface(name)}' expects {want.display()}, found {got.display()}",
                     call.args[si].span,
                 )
         if capability is not None:
-            self._require_capability(capability, call.span, f"'{name}'")
+            self._require_capability(capability, call.span, f"'{surface(name)}'")
         call.call_kind = f"{what}_method"
         call.target = symbol
         call.method_name = name
@@ -1977,16 +1982,16 @@ class SemanticAnalyzer:
         if fn is None:
             self._error(
                 "PE3005",
-                f"{what} requires the '{capability}' capability but is not inside a function",
+                f"{what} requires the '{surface(capability)}' capability but is not inside a function",
                 span,
             )
             return
         if capability not in fn.capabilities:
             self._error(
                 "PE3005",
-                f"{what} requires capability '{capability}', which '{fn.name}' does not declare",
+                f"{what} requires capability '{surface(capability)}', which '{surface(fn.name)}' does not declare",
                 span,
-                hint=f"add 'capability {capability};' directly inside function '{fn.name}' (the host must also grant it)",
+                hint=f"add 'अधिकार {surface(capability)};' directly inside function '{surface(fn.name)}' (the host must also grant it)",
             )
 
 

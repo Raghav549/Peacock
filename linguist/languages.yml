@@ -5,7 +5,7 @@ Peacock:
   type: programming
   color: "#0E7C86"
   extensions:
-    - ".pac"
+    - ".सूत्र"
   tm_scope: source.peacock
   ace_mode: text
   # language_id is assigned by Linguist when a new language is accepted.

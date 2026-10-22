@@ -37,6 +37,7 @@ from peacock.intelligence import tensor as TI
 from peacock.intelligence.datasets import Dataset
 from peacock.intelligence.layers import Model, build_model
 from peacock.intelligence.training import evaluate_accuracy, train_model
+from peacock.sanskrit import surface
 
 from .artifact import ArtifactFormatError
 from .errors import VMFault, add_trace
@@ -49,7 +50,7 @@ from .native import (
     method_capability,
     native_capability,
 )
-from .values import UNIT, RangeValue, StructInstance, format_value, is_int
+from .values import UNIT, RangeValue, StructInstance, format_value, is_int, type_name
 
 INT_MIN = -(2**63)
 INT_MAX = 2**63 - 1
@@ -123,7 +124,7 @@ class VM:
     # -- public API --------------------------------------------------------
     def write_output(self, text: str) -> None:
         if not isinstance(text, str):
-            raise VMFault("output must be a String", "PE4999")
+            raise VMFault("output must be an अक्षरमाला", "PE4999")
         if self.output_chars + len(text) > self.host.max_output_chars:
             raise ResourceLimitError(
                 f"program exceeded the host output limit of {self.host.max_output_chars} characters",
@@ -135,7 +136,7 @@ class VM:
     def run(self, entry: str = "main") -> ExecutionResult:
         if entry not in self.functions:
             raise VMFault(
-                f"program has no '{entry}' function; a runnable PEACOCK program must define main() -> Unit",
+                f"program has no '{surface(entry)}' function; a runnable PEACOCK program must define मुख्य() -> एकक",
                 "PE4002",
             )
         fn = self.functions[entry]
@@ -251,25 +252,25 @@ class VM:
             name = instr[1]
             cap = native_capability(name)
             if cap is not None:
-                self._require_capability(frame, cap, f"native function '{name}'")
+                self._require_capability(frame, cap, f"native function '{surface(name)}'")
             args = self._pop_args(stack, instr[2])
             stack.append(call_native(self._ctx, name, args))
         elif op == "METHOD":
             name = instr[1]
             cap = method_capability(name)
             if cap is not None:
-                self._require_capability(frame, cap, f"method '{name}'")
+                self._require_capability(frame, cap, f"method '{surface(name)}'")
             args = self._pop_args(stack, instr[2])
             if not args:
                 raise VMFault("method call has no receiver", "PE4999")
             receiver = args[0]
             stack.append(call_method(self._ctx, receiver, name, args[1:]))
         elif op == "MODEL_INIT":
-            self._require_capability(frame, "compute", f"model initialisation '{instr[1]}'")
+            self._require_capability(frame, "compute", f"model initialisation '{surface(instr[1])}'")
             args = self._pop_args(stack, instr[2])
             stack.append(self._model_init(instr[1], args))
         elif op == "TRAINING_METHOD":
-            self._require_capability(frame, "compute", f"training method '{instr[2]}'")
+            self._require_capability(frame, "compute", f"training method '{surface(instr[2])}'")
             args = self._pop_args(stack, instr[3])
             stack.append(self._training_method(instr[1], instr[2], args))
         elif op == "STRUCT_NEW":
@@ -290,7 +291,7 @@ class VM:
                 stack.append(get_property(self._ctx, base, name))
             else:
                 if not isinstance(base, StructInstance):
-                    raise VMFault(f"cannot read field '{name}' of {type(base).__name__}", "PE4002")
+                    raise VMFault(f"cannot read field '{name}' of {type_name(base)}", "PE4002")
                 try:
                     stack.append(base.get(name))
                 except KeyError:
@@ -301,7 +302,7 @@ class VM:
             value = stack.pop()
             base = stack.pop()
             if not isinstance(base, StructInstance):
-                raise VMFault(f"cannot set field '{instr[1]}' of {type(base).__name__}", "PE4002")
+                raise VMFault(f"cannot set field '{instr[1]}' of {type_name(base)}", "PE4002")
             try:
                 base.set(instr[1], value)
             except KeyError:
@@ -312,16 +313,16 @@ class VM:
             index = stack.pop()
             base = stack.pop()
             if not is_int(index):
-                raise VMFault("index must be an Int", "PE4002")
+                raise VMFault("index must be a पूर्णाङ्क", "PE4002")
             if isinstance(base, (list, str)):
                 if not (0 <= index < len(base)):
                     raise VMFault(
-                        f"index {index} out of bounds for {type(base).__name__} of length {len(base)}",
+                        f"index {index} out of bounds for {type_name(base)} of length {len(base)}",
                         "PE4002",
                     )
                 stack.append(base[index])
             else:
-                raise VMFault(f"cannot index {type(base).__name__}", "PE4002")
+                raise VMFault(f"cannot index {type_name(base)}", "PE4002")
         elif op == "INDEX_SET":
             if len(stack) < 3:
                 raise VMFault("stack underflow in INDEX_SET", "PE4999")
@@ -329,9 +330,9 @@ class VM:
             index = stack.pop()
             base = stack.pop()
             if not is_int(index):
-                raise VMFault("index must be an Int", "PE4002")
+                raise VMFault("index must be a पूर्णाङ्क", "PE4002")
             if not isinstance(base, list):
-                raise VMFault(f"cannot assign through an index of {type(base).__name__}", "PE4002")
+                raise VMFault(f"cannot assign through an index of {type_name(base)}", "PE4002")
             if not (0 <= index < len(base)):
                 raise VMFault(
                     f"index {index} out of bounds for List of length {len(base)}", "PE4002"
@@ -346,7 +347,7 @@ class VM:
             end = stack.pop()
             start = stack.pop()
             if not is_int(start) or not is_int(end):
-                raise VMFault("range bounds must be Int", "PE4002")
+                raise VMFault("range bounds must be पूर्णाङ्क", "PE4002")
             stack.append(RangeValue(start, end))
         elif op == "LEN":
             if not stack:
@@ -361,7 +362,7 @@ class VM:
             elif isinstance(value, Dataset):
                 stack.append(len(value))
             else:
-                raise VMFault(f"len() is not defined for {type(value).__name__}", "PE4002")
+                raise VMFault(f"दैर्घ्य() is not defined for {type_name(value)}", "PE4002")
         elif op == "ASSERT":
             if len(stack) < 2:
                 raise VMFault("stack underflow in ASSERT", "PE4999")
@@ -375,7 +376,7 @@ class VM:
                 raise VMFault("stack underflow in THROW", "PE4999")
             message = stack.pop()
             if not isinstance(message, str):
-                raise VMFault("throw requires a String message", "PE4002")
+                raise VMFault("क्षिप requires an अक्षरमाला message", "PE4002")
             raise VMFault(message, "PE4020")
         elif op == "JUMP":
             target = instr[1]
@@ -386,7 +387,7 @@ class VM:
                 raise VMFault("stack underflow in JUMP_IF_FALSE", "PE4999")
             condition = stack.pop()
             if not isinstance(condition, bool):
-                raise VMFault("branch condition must be Bool", "PE4002")
+                raise VMFault("branch condition must be सत्यता", "PE4002")
             if not condition:
                 target = instr[1]
                 self._prune_handlers(frame, target)
@@ -443,12 +444,12 @@ class VM:
     def _require_capability(self, frame: Frame, capability: str, what: str) -> None:
         if capability not in frame.caps:
             raise CapabilityError(
-                f"{what} requires capability '{capability}', but function '{frame.name}' does not declare it",
+                f"{what} requires capability '{surface(capability)}', but function '{surface(frame.name)}' does not declare it",
                 "PE4001",
             )
         if capability not in self.host.grants:
             raise CapabilityError(
-                f"host has not granted capability '{capability}' required by {what}",
+                f"host has not granted capability '{surface(capability)}' required by {what}",
                 "PE4001",
             )
 
@@ -458,7 +459,7 @@ class VM:
         if spec is None:
             raise VMFault(f"unknown model '{name}'", "PE4999")
         if len(args) != 1 or not is_int(args[0]):
-            raise VMFault("model.init expects an Int seed", "PE4002")
+            raise VMFault("प्रतिमान.प्रारम्भ expects a पूर्णाङ्क बीज", "PE4002")
         try:
             model = build_model(
                 spec["input_shape"],
@@ -479,12 +480,12 @@ class VM:
         if config is None:
             raise VMFault(f"unknown training declaration '{name}'", "PE4999")
         if len(args) != 2:
-            raise VMFault(f"training.{method} expects (model, dataset)", "PE4002")
+            raise VMFault(f"अभ्यास.{surface(method)} expects (प्रतिमानमूल्य, दत्तसमूह)", "PE4002")
         model, dataset = args
         if not isinstance(model, Model):
-            raise VMFault("training method expects a Model", "PE4002")
+            raise VMFault("training method expects a प्रतिमानप्रकार", "PE4002")
         if not isinstance(dataset, Dataset):
-            raise VMFault("training method expects a Dataset", "PE4002")
+            raise VMFault("training method expects a दत्तसमूह", "PE4002")
         if len(dataset) > self.host.max_dataset_samples:
             raise ResourceLimitError("dataset exceeds the host sample limit", "PE4003")
         epochs = int(config.get("epochs", 10))
@@ -513,13 +514,13 @@ class VM:
             if isinstance(exc, PeacockError):
                 raise
             raise VMFault(str(exc), "PE6001") from exc
-        raise VMFault(f"unknown training method '{method}'", "PE4999")
+        raise VMFault(f"unknown training method '{surface(method)}'", "PE4999")
 
     # -- arithmetic & comparison ------------------------------------------
     def _eval_unary(self, op: str, a):
         if op == "not":
             if not isinstance(a, bool):
-                raise VMFault("'not' requires Bool", "PE4006")
+                raise VMFault("'न' requires सत्यता", "PE4006")
             return not a
         if op == "-":
             if is_int(a):
@@ -528,7 +529,7 @@ class VM:
                 return -a
             if isinstance(a, TI.Tensor):
                 return TI.negative(a)
-        raise VMFault(f"unary '{op}' is not defined for {type(a).__name__}", "PE4006")
+        raise VMFault(f"unary '{surface(op)}' is not defined for {type_name(a)}", "PE4006")
 
     def _tensor_binary(self, op: str, a, b):
         try:
@@ -556,20 +557,20 @@ class VM:
             return self._tensor_binary(op, a, b)
         if op in ("and", "or"):
             if not isinstance(a, bool) or not isinstance(b, bool):
-                raise VMFault(f"'{op}' requires Bool operands", "PE4006")
+                raise VMFault(f"'{surface(op)}' requires सत्यता operands", "PE4006")
             return (a and b) if op == "and" else (a or b)
         if op in ("==", "!="):
             if type(a) is not type(b):
                 raise VMFault(
-                    f"cannot compare {type(a).__name__} with {type(b).__name__}", "PE4006"
+                    f"cannot compare {type_name(a)} with {type_name(b)}", "PE4006"
                 )
             if not isinstance(a, (bool, int, float, str)):
-                raise VMFault(f"equality is not defined for {type(a).__name__}", "PE4006")
+                raise VMFault(f"equality is not defined for {type_name(a)}", "PE4006")
             return (a == b) if op == "==" else (a != b)
         if op in ("<", "<=", ">", ">="):
             if type(a) is not type(b) or not isinstance(a, (int, float, str)):
                 raise VMFault(
-                    f"ordering comparison '{op}' requires two Ints, two Floats or two Strings",
+                    f"ordering comparison '{surface(op)}' requires two पूर्णाङ्क, two दशमलव or two अक्षरमाला values",
                     "PE4006",
                 )
             if op == "<":
@@ -626,8 +627,8 @@ class VM:
                     raise VMFault(f"float exponentiation: {exc}", "PE4004") from exc
                 return result
         if isinstance(a, str) and isinstance(b, str):
-            raise VMFault(f"operator '{op}' is not defined for two Strings", "PE4006")
+            raise VMFault(f"operator '{op}' is not defined for two अक्षरमाला values", "PE4006")
         raise VMFault(
-            f"operator '{op}' is not defined for {type(a).__name__} and {type(b).__name__}",
+            f"operator '{op}' is not defined for {type_name(a)} and {type_name(b)}",
             "PE4006",
         )

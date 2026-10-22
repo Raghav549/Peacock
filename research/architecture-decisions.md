@@ -16,7 +16,7 @@ available (no LLVM, no clang/rustc in the build environment) and a zero budget.
 
 **Decision.** Implement the first lexer, parser, analyser, IR, emitter and VM in
 Python 3.11 using only the standard library. Confine Python to the language
-implementation and host services; never translate `.pac` to Python; define
+implementation and host services; never translate `.सूत्र` to Python; define
 language semantics independently (e.g., integer division is specified, not
 inherited). Document the staged replacement of each compiler stage in
 `docs/compiler/bootstrap.md`.
@@ -35,21 +35,21 @@ produce identical images and pass the suite). Then Python leaves the build path.
 
 ---
 
-## ADR-0002 — `.pac` is the only canonical source extension
+## ADR-0002 — `.सूत्र` is the only canonical source extension
 
 **Status:** Accepted.
 
 **Context.** Early drafts considered `.pk` and `.peacock`. The user requires a
 single canonical extension and explicit rejection of the others.
 
-**Decision.** `.pac` is canonical. `.pkb` is compiled bytecode; `.pkm` is a
+**Decision.** `.सूत्र` is canonical. `.बीज` is compiled bytecode; `.ज्ञान` is a
 serialised model. The CLI rejects `.pk` and `.peacock` with exit 2 and a message
-naming `.pac`. Linguist metadata maps only `.pac`.
+naming `.सूत्र`. Linguist metadata maps only `.सूत्र`.
 
 **Alternatives.** Accept aliases for convenience — rejected: ambiguous language
 detection and dishonest file-extension claims.
 
-**Consequences.** One extension to document; `.pac` collides with unrelated
+**Consequences.** One extension to document; `.सूत्र` collides with unrelated
 formats/tools (proxy auto-config, other languages), which is noted in the
 Linguist submission risks.
 
@@ -66,7 +66,7 @@ tests, docs and Linguist metadata together.
 PEACOCK later. Optimisation ambitions are modest.
 
 **Decision.** Use a linear, typed IR with numbered slots and temporaries.
-Emit a stack-machine bytecode. Store the image as canonical JSON inside a `.pkb`
+Emit a stack-machine bytecode. Store the image as canonical JSON inside a `.बीज`
 container with a format version and SHA-256 digest. Verify the image structurally
 before execution, independently of the emitter.
 
@@ -331,7 +331,7 @@ mobile); embed a browser (forbidden / impractical); ignore presentation (fails
 the deliverable).
 
 **Consequences.** Tested adapters and an honest limitation; no live interactive
-demo from `.pac`; frame loop is roadmap phase 7.
+demo from `.सूत्र`; frame loop is roadmap phase 7.
 
 **Reversal trigger.** A stable frame/present ABI designed with at least two hosts
 (desktop + web), after which a native can be added.
@@ -376,7 +376,7 @@ recognition is **not** granted.
 **Alternatives.** Submit immediately (premature, likely rejected); skip Linguist
 (loses tooling support).
 
-**Consequences.** Editor highlighting locally; no GitHub language bar. `.pac`
+**Consequences.** Editor highlighting locally; no GitHub language bar. `.सूत्र`
 ambiguity remains.
 
 **Reversal trigger.** Upstream PR merged; then update claims and verify
@@ -384,7 +384,7 @@ highlighting on a real repository.
 
 ---
 
-## ADR-0017 — Versioned `.pkm` model format; quantisation is analysis-only
+## ADR-0017 — Versioned `.ज्ञान` model format; quantisation is analysis-only
 
 **Status:** Accepted.
 
@@ -484,7 +484,7 @@ process-based parallelism exposed as a host capability with no shared state.
 **Context.** ADR-0014 deliberately deferred a presentation native until the frame
 contract was stable and at least two hosts existed. The headless, static-web and
 HTTP backends now share a `Frame`/`Backend` contract, and a language-level
-presentation path is needed so `.pac` programs can display output without
+presentation path is needed so `.सूत्र` programs can display output without
 importing host code. Input, frame clocks and windowing remain unimplemented, so
 the ABI must not presuppose them.
 
@@ -519,3 +519,64 @@ change to this native.
 **Reversal trigger.** A richer host protocol (events, resize, multiple windows)
 that cannot be expressed by an attached backend, or evidence that `ui` should be
 split into finer capabilities.
+
+---
+
+## ADR-0022 — One canonical Sanskrit source surface over stable internal IDs
+
+**Status:** Accepted; supersedes the English source spellings shown in earlier
+ADRs, but not their bytecode, host-policy, or capability-security decisions.
+
+**Context.** Renaming only the source extension would leave an English language
+with Sanskrit filenames. Conversely, renaming every serialized key and opcode
+would break verified artifacts and entangle a source-language decision with the
+VM/container ABI. Accepting both English and Sanskrit reserved words would create
+two dialects, ambiguous documentation, and permanent compatibility pressure.
+Unicode Sanskrit also requires combining-mark-aware identifiers and a deliberate
+numeric-literal policy.
+
+**Decision.**
+
+1. `peacock/sanskrit.py` is the single auditable inventory for reserved source
+   words, native types/functions, capabilities, model/training options, and
+   algorithm enumeration values. Sanskrit source is canonicalised once in the
+   lexer to stable internal identifiers.
+2. Source identifiers use NFC and Unicode letters, decimal digits, and combining
+   marks. Decimal literals accept Unicode decimal digits, including Devanagari;
+   punctuation and radix prefixes stay explicit and deterministic.
+3. Withdrawn English reserved words are rejected with PE1007 and a native
+   replacement hint. Arbitrary non-reserved user identifiers are not translated.
+4. Native source displays, semantic/runtime diagnostics, stack traces, human
+   audit, and disassembly render through the reverse vocabulary. Bytecode
+   opcodes, artifact keys, model parameter keys, host checks, and explicitly
+   documented tooling JSON may retain stable internal IDs.
+5. `.सूत्र`, `.बीज`, and `.ज्ञान` are the canonical source, bytecode, and model
+   extensions. Their container formats remain version 1; newly produced metadata
+   identifies language 0.2. The package/toolchain version is 0.2.0.
+6. Editor/Linguist grammars are generated from compiler vocabulary and checked
+   for freshness. The normative EBNF, native literature document, examples,
+   self-host sources, website, and tests migrate together.
+7. Pāṇinian sources inspire exact vocabulary, scoped rules, ordered
+   correspondence, and explicit conflict resolution. They do not add natural-
+   language sandhi, probabilistic tokenisation, morphology, or an AGI capability.
+
+**Alternatives.** (a) A superficial extension rename — rejected as incomplete.
+(b) Rewrite all internal names and artifact keys — unnecessary ABI breakage.
+(c) Accept English aliases indefinitely — rejected as a second source dialect.
+(d) Translate prose or identifiers with an AI model — non-deterministic and
+unnecessary. (e) Add Sanskrit NLP to the lexer — conflicts with reproducible,
+offline compilation and evidence that sandhi splitting can be non-unique.
+
+**Consequences.** Existing English source requires a real migration, while the
+compiler IR, VM, verifier, and storage formats remain substantially stable.
+Every reserved-word change now has one review point and must update generated
+grammars and documentation. Programmers see one native vocabulary across source,
+errors, and native values. The repository has stronger Unicode and documentation
+regressions. Local Linguist metadata still cannot guarantee upstream GitHub
+recognition, and the native AI engine remains a small tested substrate rather
+than AGI.
+
+**Reversal trigger.** A versioned language proposal demonstrating a concrete
+need for multilingual reserved aliases or a different canonical lexical policy,
+with corresponding artifact, editor, diagnostic, and compatibility tests. No
+alias should be introduced ad hoc.

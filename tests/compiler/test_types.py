@@ -23,7 +23,7 @@ class TypeModelTests(unittest.TestCase):
         self.assertIs(IntType, IntType)
         self.assertIsNot(IntType, FloatType)
         self.assertEqual(IntType.name, "Int")
-        self.assertEqual(ListType(IntType).display(), "List<Int>")
+        self.assertEqual(ListType(IntType).display(), "सूची<पूर्णाङ्क>")
 
     def test_is_assignable(self):
         self.assertTrue(is_assignable(IntType, IntType))
@@ -88,37 +88,37 @@ class TypeModelTests(unittest.TestCase):
 
     def test_string_list_types(self):
         self.assertNotEqual(ListType(StringType), ListType(IntType))
-        self.assertEqual(TensorType("Float32", (2, 3)).display(), "Tensor<Float32, [2, 3]>")
-        self.assertEqual(TensorType("Float32").display(), "Tensor<Float32>")
+        self.assertEqual(TensorType("Float32", (2, 3)).display(), "आयाम<दशमलव३२, [2, 3]>")
+        self.assertEqual(TensorType("Float32").display(), "आयाम<दशमलव३२>")
         self.assertEqual(BoolType.name, "Bool")
 
 
 class TypeDiagnosticSurfaceTests(unittest.TestCase):
     def test_annotated_assignment_mismatch(self):
         expect_diagnostic(
-            'fn main() -> Unit { let x: Int = "text"; }', "PE3003", "cannot initialise"
+            'कार्य मुख्य() -> एकक { स्थापय क्ष: पूर्णाङ्क = "पाठ्य"; }', "PE3003", "cannot initialise"
         )
 
     def test_list_annotation_mismatch(self):
         expect_diagnostic(
-            "fn main() -> Unit { let xs: List<String> = [1, 2]; }", "PE3003"
+            'कार्य मुख्य() -> एकक { स्थापय xs: सूची<अक्षरमाला> = [1, 2]; }', "PE3003"
         )
 
     def test_tensor_annotation(self):
         expect_diagnostic(
-            "fn main() -> Unit { let t: Tensor<Float32, [2]> = tensor([[1.0, 2.0]]); }",
+            'कार्य मुख्य() -> एकक { स्थापय त: आयाम<दशमलव३२, [2]> = आयामीकरण([[1.0, 2.0]]); }',
             "PE3003",
-            "Tensor<Float32, [1, 2]>",
+            "आयाम<दशमलव३२, [1, 2]>",
         )
 
     def test_unit_in_list_rejected(self):
-        expect_diagnostic("fn main() -> Unit { let xs: List<Unit> = []; }", "PE3003")
+        expect_diagnostic('कार्य मुख्य() -> एकक { स्थापय xs: सूची<एकक> = []; }', "PE3003")
 
     def test_bool_ordering(self):
-        expect_diagnostic("fn main() -> Unit { let x = true < false; }", "PE3003")
+        expect_diagnostic('कार्य मुख्य() -> एकक { स्थापय क्ष = सत्य < असत्य; }', "PE3003")
 
     def test_equality_across_types(self):
-        expect_diagnostic('fn main() -> Unit { let x = 1 == "1"; }', "PE3003")
+        expect_diagnostic('कार्य मुख्य() -> एकक { स्थापय क्ष = 1 == "1"; }', "PE3003")
 
 
 if __name__ == "__main__":

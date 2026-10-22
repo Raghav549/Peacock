@@ -1,0 +1,6 @@
+// The smallest PEACOCK program.
+प्रकरण hello
+
+कार्य मुख्य() -> एकक {
+    मुद्रय("Hello from PEACOCK");
+}

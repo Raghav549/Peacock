@@ -1,6 +1,13 @@
-"""Human-readable disassembly of PEACOCK bytecode images."""
+"""Human-readable disassembly of PEACOCK bytecode images.
+
+Opcode names are the stable bytecode instruction set. Source-level identifiers,
+types, capabilities, layer activations, and training options are rendered in the
+canonical Sanskrit surface vocabulary.
+"""
 
 from __future__ import annotations
+
+from peacock.sanskrit import surface, surface_enum, surface_type
 
 
 def _label_targets(image: dict) -> dict[tuple[str, int], str]:
@@ -15,18 +22,34 @@ def _label_targets(image: dict) -> dict[tuple[str, int], str]:
     return labels
 
 
+def _source_argument(opcode: str, index: int, arg):
+    """Translate only operands known to be source identifiers, never user text."""
+
+    if index == 1 and opcode in {
+        "CALL", "CALL_NATIVE", "METHOD", "MODEL_INIT", "STRUCT_NEW",
+        "FIELD_GET", "FIELD_SET", "TRAINING_METHOD",
+    }:
+        return surface(arg)
+    if index == 2 and opcode == "TRAINING_METHOD":
+        return surface(arg)
+    return arg
+
+
 def disassemble(image: dict) -> str:
     labels = _label_targets(image)
     lines: list[str] = []
-    lines.append(f"; PEACOCK bytecode {image.get('language_version')} module={image.get('module')!r}")
+    lines.append(f"; PEACOCK bytecode {image.get('language_version')} module={surface(image.get('module', ''))!r}")
     lines.append(f"; source={image.get('source_path')} sha256={image.get('source_sha256', '')[:16]}...")
     order = sorted(image["functions"], key=lambda n: (n != "main", n))
     for name in order:
         fn = image["functions"][name]
-        params = ", ".join(fn.get("params", []))
-        caps = ", ".join(fn["caps"]) or "none"
+        params = ", ".join(surface(param) for param in fn.get("params", []))
+        caps = ", ".join(surface(capability) for capability in fn["caps"]) or "none"
         lines.append("")
-        lines.append(f"function {name}({params}) -> {fn.get('return_type', 'Unit')}")
+        lines.append(
+            f"function {surface(name)}({params}) -> "
+            f"{surface_type(fn.get('return_type', 'Unit'))}"
+        )
         lines.append(f"  slots={fn['slots']} capabilities={caps}")
         for ip, instr in enumerate(fn["code"]):
             if (name, ip) in labels:
@@ -39,7 +62,7 @@ def disassemble(image: dict) -> str:
                 elif instr[0] == "TRY_BEGIN" and index == 1:
                     args.append(labels.get((name, arg), str(arg)))
                 else:
-                    args.append(repr(arg))
+                    args.append(repr(_source_argument(instr[0], index, arg)))
             rendered = instr[0]
             if args:
                 rendered += " " + ", ".join(args)
@@ -49,17 +72,23 @@ def disassemble(image: dict) -> str:
     if models:
         lines.append("models:")
         for name, spec in sorted(models.items()):
-            layers = " -> ".join(f"Dense({u},{a})" for u, a in spec["layers"])
+            layers = " -> ".join(
+                f"{surface('Dense')}({units},{surface_enum(activation)})"
+                for units, activation in spec["layers"]
+            )
             lines.append(
-                f"  {name}: [{spec['input_dtype']}{spec['input_shape']}] -> "
-                f"[{spec['output_dtype']}{spec['output_shape']}] {layers}"
+                f"  {surface(name)}: [{surface_type(spec['input_dtype'])}{spec['input_shape']}] -> "
+                f"[{surface_type(spec['output_dtype'])}{spec['output_shape']}] {layers}"
             )
     trainings = image.get("trainings", {})
     if trainings:
         lines.append("training declarations:")
         for name, config in sorted(trainings.items()):
-            options = ", ".join(f"{k}={v!r}" for k, v in sorted(config.items()))
-            lines.append(f"  {name}: {options}")
+            options = ", ".join(
+                f"{surface(key)}={surface_enum(value) if isinstance(value, str) else value!r}"
+                for key, value in sorted(config.items())
+            )
+            lines.append(f"  {surface(name)}: {options}")
     if image.get("uses"):
-        lines.append(f"uses: {', '.join(image['uses'])}")
+        lines.append(f"uses: {', '.join(surface(use) for use in image['uses'])}")
     return "\n".join(lines)

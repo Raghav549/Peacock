@@ -14,7 +14,7 @@
   mini-batches, cross-entropy/MSE, finite-loss checks, deterministic seeding,
   per-epoch losses/accuracies and a report with dataset provenance.
 * **Evaluation:** accuracy, confusion matrix, per-class precision/recall/F1.
-* **Serialisation:** `.pkm` v1 with a versioned header, parameter table, float32
+* **Serialisation:** `.ज्ञान` v1 with a versioned header, parameter table, float32
   payload, metadata and SHA-256; `quantize_tensor`/`quantization_report` provide
   int8 size/error analysis. Quantised models are not an executable artifact
   format yet.
@@ -24,4 +24,4 @@ for matmul/softmax/MSE and a small MLP, with tolerances appropriate to Float32.
 That is numerical evidence, not a proof.
 
 Limits: one input/output per declared model, Dense layers only, small datasets,
-no convolution/attention/GPU. Trainable tensors require the `compute` capability.
+no convolution/attention/GPU. Trainable tensors require the `गणना` capability.

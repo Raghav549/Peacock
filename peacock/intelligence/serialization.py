@@ -1,4 +1,4 @@
-"""PEACOCK model file format (``.pkm``) and int8 quantisation utilities.
+"""PEACOCK model file format (``.ज्ञान``) and int8 quantisation utilities.
 
 Format v1 (little-endian):
 
@@ -19,6 +19,8 @@ import hashlib
 import json
 import struct
 from dataclasses import dataclass
+
+from peacock import LANGUAGE_VERSION
 
 from .layers import Model, build_model
 from .tensor import Tensor, TensorError
@@ -74,7 +76,7 @@ def model_to_bytes(model: Model, metadata: dict | None = None) -> bytes:
     header = {
         "format": "peacock-model",
         "format_version": MODEL_VERSION,
-        "language_version": "0.1",
+        "language_version": LANGUAGE_VERSION,
         "architecture": model.architecture(),
         "parameters": entries,
         "payload_bytes": len(payload),

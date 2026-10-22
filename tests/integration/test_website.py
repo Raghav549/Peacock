@@ -92,9 +92,9 @@ class PeacockWebsiteTests(unittest.TestCase):
         cls.output_dir = REPO_ROOT / relative_temp / "site"
         result = run_cli(
             "run",
-            "website/site.pac",
+            "website/site.सूत्र",
             "--grant",
-            "fs",
+            "सञ्चय",
             "--root",
             str(REPO_ROOT),
             "--max-steps",
@@ -112,11 +112,11 @@ class PeacockWebsiteTests(unittest.TestCase):
     def tearDownClass(cls):
         cls._temp.cleanup()
 
-    def test_site_source_is_genuine_pac_and_builds_twelve_routes(self):
-        source = (REPO_ROOT / "website/site.pac").read_text(encoding="utf-8")
-        self.assertIn("fn render_page(", source)
-        self.assertIn("fn site_pages(", source)
-        self.assertIn("fn stylesheet(", source)
+    def test_site_source_is_genuine_sutra_and_builds_twelve_routes(self):
+        source = (REPO_ROOT / "website/site.सूत्र").read_text(encoding="utf-8")
+        self.assertIn("कार्य render_page(", source)
+        self.assertIn("कार्य site_pages(", source)
+        self.assertIn("कार्य stylesheet(", source)
         self.assertIn("renderer_self_test();", source)
         pages = {path.name for path in self.output_dir.glob("*.html")}
         self.assertEqual(pages, ROUTES)
@@ -154,13 +154,13 @@ class PeacockWebsiteTests(unittest.TestCase):
                         target_parser.feed(target.read_text(encoding="utf-8"))
                         self.assertIn(fragment, target_parser.ids, f"{route}: broken fragment {href}")
 
-    def test_real_pac_examples_are_embedded_as_selectable_text(self):
-        source = (REPO_ROOT / "examples/hello.pac").read_text(encoding="utf-8")
+    def test_real_sutra_examples_are_embedded_as_selectable_text(self):
+        source = (REPO_ROOT / "examples/hello.सूत्र").read_text(encoding="utf-8")
         parser = PageAudit()
         parser.feed((self.output_dir / "language.html").read_text(encoding="utf-8"))
         rendered_code = "".join(parser.code_parts)
-        self.assertIn("print(\"Hello from PEACOCK\")", rendered_code)
-        self.assertIn("fn main()", rendered_code)
+        self.assertIn("मुद्रय(\"Hello from PEACOCK\")", rendered_code)
+        self.assertIn("कार्य मुख्य()", rendered_code)
         self.assertIn("Selectable source", (self.output_dir / "language.html").read_text())
         self.assertIn("Hello from PEACOCK", source)
 

@@ -64,15 +64,15 @@ class BenchReport:
         }
 
 
-LOOP_SOURCE = """module vm_loop
-fn main() -> Unit {
-    let mut i = 0;
-    let mut acc = 0;
-    while i < 20000 {
+LOOP_SOURCE = """प्रकरण vm_loop
+कार्य मुख्य() -> एकक {
+    स्थापय परिवर्तनीय i = ०;
+    स्थापय परिवर्तनीय acc = ०;
+    यावत् i < २०००० {
         acc += i;
-        i += 1;
+        i += १;
     }
-    print(str(acc));
+    मुद्रय(पाठ्यीकरण(acc));
 }
 """
 
@@ -97,12 +97,12 @@ def _median_true(repeats: int, fn) -> float:
 
 
 def _synthetic_source(functions: int) -> str:
-    lines = ["module synthetic", ""]
+    lines = ["प्रकरण synthetic", ""]
     for i in range(functions):
-        lines.append(f"fn f{i}(x: Int) -> Int {{ return x * {i + 1} + {i}; }}")
+        lines.append(f"कार्य f{i}(क्ष: पूर्णाङ्क) -> पूर्णाङ्क {{ प्रत्यानय क्ष * {i + 1} + {i}; }}")
     lines.append("")
-    lines.append("fn main() -> Unit {")
-    lines.append(f"    print(str(f0({functions})));")
+    lines.append("कार्य मुख्य() -> एकक {")
+    lines.append(f"    मुद्रय(पाठ्यीकरण(f0({functions})));")
     lines.append("}")
     return "\n".join(lines) + "\n"
 
@@ -172,9 +172,9 @@ def run_benchmarks(quick: bool = False) -> BenchReport:
     # -- compilation -------------------------------------------------------
     sources = {}
     for name, path in (
-        ("hello", REPO_ROOT / "examples" / "hello.pac"),
-        ("tour", REPO_ROOT / "examples" / "tour.pac"),
-        ("selfhost-tokenizer", REPO_ROOT / "selfhost" / "tokenizer.pac"),
+        ("hello", REPO_ROOT / "examples" / "hello.सूत्र"),
+        ("tour", REPO_ROOT / "examples" / "tour.सूत्र"),
+        ("selfhost-tokenizer", REPO_ROOT / "selfhost" / "tokenizer.सूत्र"),
     ):
         sources[name] = path.read_text(encoding="utf-8")
 
@@ -182,7 +182,7 @@ def run_benchmarks(quick: bool = False) -> BenchReport:
         result_box = {}
 
         def compile_once():
-            result_box["r"] = compile_source(source, f"{name}.pac")
+            result_box["r"] = compile_source(source, f"{name}.सूत्र")
 
         ms = _time_call(compile_once, repeats) * 1000.0
         compiled = result_box["r"]
@@ -201,7 +201,7 @@ def run_benchmarks(quick: bool = False) -> BenchReport:
         )
 
     synthetic = _synthetic_source(200)
-    ms = _time_call(lambda: compile_source(synthetic, "synthetic.pac"), repeats) * 1000.0
+    ms = _time_call(lambda: compile_source(synthetic, "synthetic.सूत्र"), repeats) * 1000.0
     report.results.append(
         Result(
             "compiler",
@@ -216,7 +216,7 @@ def run_benchmarks(quick: bool = False) -> BenchReport:
     # Parse throughput (lexing included).
     parse_sample = _synthetic_source(400)
     tokens_count = len(parse_sample.split())
-    ms = _time_call(lambda: compile_source(parse_sample, "synthetic2.pac"), repeats) * 1000.0
+    ms = _time_call(lambda: compile_source(parse_sample, "synthetic2.सूत्र"), repeats) * 1000.0
     report.results.append(
         Result(
             "compiler",
@@ -230,7 +230,7 @@ def run_benchmarks(quick: bool = False) -> BenchReport:
 
     # Peak memory for compilation (tracemalloc, separate from timing).
     tracemalloc.start()
-    compile_source(sources["selfhost-tokenizer"], "tokenizer.pac")
+    compile_source(sources["selfhost-tokenizer"], "tokenizer.सूत्र")
     _current, peak = tracemalloc.get_traced_memory()
     tracemalloc.stop()
     report.results.append(
@@ -244,7 +244,7 @@ def run_benchmarks(quick: bool = False) -> BenchReport:
     )
 
     # -- VM ---------------------------------------------------------------
-    loop_result = compile_source(LOOP_SOURCE, "loop.pac")
+    loop_result = compile_source(LOOP_SOURCE, "loop.सूत्र")
     if loop_result.ok:
         steps, seconds = _run_image(loop_result.image)
         report.results.append(
@@ -253,7 +253,7 @@ def run_benchmarks(quick: bool = False) -> BenchReport:
         report.results.append(
             Result("runtime", "vm_steps_per_second", steps / seconds, "steps/s", "tight integer loop", 1)
         )
-    hello_image = compile_source(sources["hello"], "hello.pac").image
+    hello_image = compile_source(sources["hello"], "hello.सूत्र").image
 
     def start_vm():
         _run_image(hello_image)

@@ -1,0 +1,24 @@
+// Types, structs, lists, loops and error handling.
+प्रकरण type_sample
+
+संघटन Point {
+    क्ष: पूर्णाङ्क
+    य: पूर्णाङ्क
+}
+
+कार्य distance_squared(अ: Point, ब: Point) -> पूर्णाङ्क {
+    स्थापय dx = अ.क्ष - ब.क्ष;
+    स्थापय dy = अ.य - ब.य;
+    प्रत्यानय dx * dx + dy * dy;
+}
+
+कार्य मुख्य() -> एकक {
+    स्थापय परिवर्तनीय squares: सूची<पूर्णाङ्क> = [];
+    प्रति i मध्ये १..६ {
+        squares.योजय(i * i);
+    }
+    स्थापय origin = Point(०, ०);
+    स्थापय corner = Point(३, ४);
+    मुद्रय("distance squared: " + पाठ्यीकरण(distance_squared(origin, corner)));
+    मुद्रय("squares: " + पाठ्यीकरण(squares));
+}

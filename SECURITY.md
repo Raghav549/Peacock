@@ -1,11 +1,11 @@
 # Security policy and threat model
 
-PEACOCK executes untrusted `.pac` programs under a capability-based policy. This
+PEACOCK executes untrusted `.सूत्र` programs under a capability-based policy. This
 document states what is enforced, what is not, and how to report a problem.
 
 ## Supported version
 
-Security fixes target the current `0.1.x` reference implementation. There is no
+Security fixes target the current `0.2.x` reference implementation. There is no
 long-term-support branch yet.
 
 ## Reporting a vulnerability
@@ -15,7 +15,7 @@ Advisories → Report a vulnerability). Do not open a public issue for an unfixe
 vulnerability. Include:
 
 * the affected commit/version;
-* a minimal `.pac` program or artifact;
+* a minimal `.सूत्र` program or artifact;
 * the command and host policy used;
 * the observed behaviour and why it violates the model below.
 
@@ -26,21 +26,21 @@ coordinate disclosure.
 
 ### Capabilities
 
-Three capabilities exist in v0.1:
+Three capabilities exist in v0.2:
 
 | Capability | Authority |
 |---|---|
-| `compute` | create trainable tensors, autodiff, model init/train/predict, save/load |
-| `fs` | read/write files and create directories inside the host sandbox root |
-| `ui` | hand rendered frames to a host-attached presentation backend |
+| `गणना` | create trainable tensors, autodiff, model init/train/predict, save/load |
+| `सञ्चय` | read/write files and create directories inside the host sandbox root |
+| `दृश्य` | hand rendered frames to a host-attached presentation backend |
 
 A program must **declare** a capability in each function that performs a
 protected operation. The host must **independently grant** it. Declaration is not
 authority. The VM checks both before dispatch; `peacock audit` reports static
 usage but is not an enforcement mechanism.
 
-`ui` is presentation-only: it grants no input, window-management, clipboard or
-display-query authority. A host may grant `ui` without attaching a backend; the
+`दृश्य` is presentation-only: it grants no input, window-management, clipboard or
+display-query authority. A host may grant `दृश्य` without attaching a backend; the
 call then fails with `PE4006` before any data leaves the VM.
 
 Capability denials raise `PE4001`. They may be caught by PEACOCK code, but a
@@ -54,10 +54,10 @@ caught denial grants no authority and the operation does not occur. Panics
 * resolves relative paths against a root that must exist and be a directory;
 * rejects absolute paths outside the root, `..` escapes, and NUL bytes;
 * resolves symlinks and requires the final path to remain under the root;
-* creates parent directories for writes and permits explicit `fs.create_dir`,
+* creates parent directories for writes and permits explicit `सञ्चय.निधिरचना`,
   inside the root;
 * enforces `max_file_bytes` on reads and writes;
-* requires the `fs` grant for every operation.
+* requires the `सञ्चय` grant for every operation.
 
 This is **best-effort process-level confinement**, not a kernel sandbox. There is
 a time-of-check/time-of-use window between resolution and open; an attacker who
@@ -86,7 +86,7 @@ limits.
 
 ### Artifacts and models
 
-`.pkb` files are verified structurally, then hashed with SHA-256; `.pkm` model
+`.बीज` files are verified structurally, then hashed with SHA-256; `.ज्ञान` model
 files have their own versioned header, parameter table, payload size bound and
 digest. Loading a malformed or tampered file raises a structured error and does
 not execute partial bytecode. `verify_image` checks opcodes, operands, slots,
@@ -101,7 +101,7 @@ not a formally verified parser.
 
 Integer arithmetic is checked; overflow is a fault, not wraparound. Division and
 remainder by zero are faults. Bounds are checked. Uninitialised locals are
-faults. There is **no language-level garbage collector** in 0.1; the Python host
+faults. There is **no language-level garbage collector** in 0.2; the Python host
 owns memory and cycles are not collected. A program can still consume host
 memory within the tensor/canvas limits; step and element budgets are the primary
 mitigations.
@@ -140,7 +140,7 @@ mitigations.
 
 `tests/security/test_capabilities.py` covers: missing declarations, runtime
 denials, caught denials, sandboxed nested directory creation and attempted
-`fs.create_dir` escapes, traversal/nested traversal/absolute/Windows-style
+`सञ्चय.निधिरचना` escapes, traversal/nested traversal/absolute/Windows-style
 paths, NUL bytes, symlink escapes, file-size limits, step/depth/output/tensor/
 dataset/epoch limits, unknown grants, panic non-catchability, unknown natives,
 unknown capabilities in tampered images, and artifact digest tampering. The
