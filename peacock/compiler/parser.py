@@ -1,4 +1,4 @@
-"""Recursive-descent parser for PEACOCK 0.1.
+"""Recursive-descent parser for PEACOCK 0.2.
 
 The grammar implemented here is exactly the grammar in ``SPECIFICATION.md`` §4.
 Features that are reserved for later phases produce targeted diagnostics rather
@@ -56,16 +56,16 @@ from .diagnostics import DiagnosticBag, ParseError, Span
 from .tokens import RESERVED_FUTURE, Token, TokenKind
 
 _FUTURE_MESSAGES = {
-    TokenKind.ENUM: "enum declarations are reserved for a future version; 0.1 supports structs only",
-    TokenKind.MATCH: "match expressions are reserved for a future version",
-    TokenKind.IMPL: "impl blocks are reserved for a future version",
-    TokenKind.PUB: "visibility modifiers are reserved for a future version; all 0.1 declarations are module-local",
-    TokenKind.CONST: "const declarations are reserved for a future version; use 'let'",
-    TokenKind.IMPORT: "import statements are reserved; 0.1 has no file imports",
-    TokenKind.ASYNC: "async functions are reserved; 0.1 is single-threaded",
-    TokenKind.AWAIT: "await is reserved; 0.1 is single-threaded",
-    TokenKind.SPAWN: "spawn is reserved; concurrency is not implemented in 0.1",
-    TokenKind.YIELD: "yield is reserved; generators are not implemented in 0.1",
+    TokenKind.ENUM: "सूचीभेद declarations are reserved for a future version; 0.2 supports संघटन only",
+    TokenKind.MATCH: "मिलान expressions are reserved for a future version",
+    TokenKind.IMPL: "कार्यान्वयन blocks are reserved for a future version",
+    TokenKind.PUB: "सार्वजनिक visibility modifiers are reserved; all 0.2 declarations are module-local",
+    TokenKind.CONST: "स्थिर declarations are reserved for a future version; use 'स्थापय'",
+    TokenKind.IMPORT: "आयात statements are reserved; 0.2 has no file imports",
+    TokenKind.ASYNC: "असामकालिक functions are reserved; 0.2 is single-threaded",
+    TokenKind.AWAIT: "प्रतीक्षा is reserved; 0.2 is single-threaded",
+    TokenKind.SPAWN: "जनय is reserved; concurrency is not implemented in 0.2",
+    TokenKind.YIELD: "उत्पादय is reserved; generators are not implemented in 0.2",
 }
 
 _ITEM_STARTERS = {
@@ -156,7 +156,7 @@ class Parser:
         while not self.at(TokenKind.EOF):
             fut = _FUTURE_MESSAGES.get(self.current.kind)
             if fut is not None:
-                self.diag.error("PE2001", fut, self.current.span, hint="see SPECIFICATION.md §4 for the 0.1 subset")
+                self.diag.error("PE2001", fut, self.current.span, hint="see SPECIFICATION.md §4 for the 0.2 subset")
                 self._advance_any()
                 continue
             try:
@@ -235,9 +235,9 @@ class Parser:
         if self.at(TokenKind.AS):
             self.error(
                 "PE2005",
-                "module aliases ('as') are not implemented in 0.1",
+                "module aliases ('रूपेण') are not implemented in 0.2",
                 self.current.span,
-                hint="use the canonical namespace name, e.g. 'use nn;'",
+                hint="use the canonical namespace name, e.g. 'उपयोग तन्त्रजाल;'",
             )
         # The semicolon is optional for use declarations, matching module style.
         self.match(TokenKind.SEMICOLON)
@@ -291,14 +291,14 @@ class Parser:
         while not self.at(TokenKind.RBRACE) and not self.at(TokenKind.EOF):
             # 'input', 'output' and 'stack' are contextual keywords: they remain
             # usable as ordinary identifiers elsewhere.
-            if self.at(TokenKind.IDENT) and self.current.text in ("input", "output"):
-                section = self.advance().text
+            if self.at(TokenKind.IDENT) and self.current.value in ("input", "output"):
+                section = str(self.advance().value)
                 f_name = self.expect(TokenKind.IDENT, f"as {section} name")
                 self.expect(TokenKind.COLON, f"after {section} name")
                 f_type = self.parse_type()
                 target = inputs if section == "input" else outputs
                 target.append(StructField(str(f_name.value), f_type, f_name.span.merge(f_type.span)))
-            elif self.at(TokenKind.IDENT) and self.current.text == "stack":
+            elif self.at(TokenKind.IDENT) and self.current.value == "stack":
                 self.advance()
                 self.expect(TokenKind.LBRACE, "to open stack block")
                 while not self.at(TokenKind.RBRACE) and not self.at(TokenKind.EOF):
@@ -309,7 +309,7 @@ class Parser:
                     "PE2010",
                     "expected 'input', 'output' or 'stack' in model body",
                     self.current.span,
-                    hint="model bodies contain only input, output and stack sections in 0.1",
+                    hint="model bodies contain only निवेश, निर्गम and क्रम sections in 0.2",
                 )
         self.expect(TokenKind.RBRACE, "to close model body")
         if not inputs or not outputs:
@@ -615,7 +615,7 @@ class Parser:
                     "PE2031",
                     "chained comparisons are not supported",
                     self.current.span,
-                    hint="combine comparisons with 'and', e.g. 0 <= x and x < 10",
+                    hint="combine comparisons with 'तथा', e.g. 0 <= x तथा x < 10",
                 )
             return Binary(left.span.merge(right.span), op, left, right)
         return left

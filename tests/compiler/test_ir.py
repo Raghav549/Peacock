@@ -9,14 +9,14 @@ from tests.support import compile_ok
 
 def raw_ir(source):
     result = compile_ok(source)
-    return build_ir(result.typed, source, "test.pac")
+    return build_ir(result.typed, source, "test.सूत्र")
 
 
 class IRBuilderTests(unittest.TestCase):
     def test_ir_contains_expected_operations(self):
         ir = raw_ir(
-            "fn add(a: Int, b: Int) -> Int { return a + b; }\n"
-            "fn main() -> Unit { let x = add(1, 2); print(str(x)); }"
+            'कार्य add(अ: पूर्णाङ्क, ब: पूर्णाङ्क) -> पूर्णाङ्क { प्रत्यानय अ + ब; }\n'
+            'कार्य मुख्य() -> एकक { स्थापय क्ष = add(1, 2); मुद्रय(पाठ्यीकरण(क्ष)); }'
         )
         verify_ir(ir)
         ops = [instr.op for instr in ir.functions["add"].instrs]
@@ -28,27 +28,27 @@ class IRBuilderTests(unittest.TestCase):
 
     def test_slot_allocation_is_per_function(self):
         ir = raw_ir(
-            "fn f(a: Int) -> Int { let b = a + 1; return b; }\n"
-            "fn main() -> Unit { let x = f(1); }"
+            'कार्य f(अ: पूर्णाङ्क) -> पूर्णाङ्क { स्थापय ब = अ + 1; प्रत्यानय ब; }\n'
+            'कार्य मुख्य() -> एकक { स्थापय क्ष = f(1); }'
         )
         self.assertGreaterEqual(ir.functions["f"].slot_count, 2)
         self.assertGreaterEqual(ir.functions["main"].slot_count, 1)
 
     def test_unreachable_statements_are_not_emitted(self):
-        ir = raw_ir('fn main() -> Unit { return; print("never"); }')
+        ir = raw_ir('कार्य मुख्य() -> एकक { प्रत्यानय; मुद्रय("never"); }')
         constants = [instr.args[0] for instr in ir.functions["main"].instrs if instr.op == "const"]
         self.assertNotIn("never", constants)
 
     def test_try_scope_is_balanced(self):
         ir = raw_ir(
-            'fn main() -> Unit { try { throw "x"; } catch (e) { print(e); } }'
+            'कार्य मुख्य() -> एकक { यत्न { क्षिप "x"; } गृह्ण (घाताधार) { मुद्रय(घाताधार); } }'
         )
         ops = [instr.op for instr in ir.functions["main"].instrs]
         self.assertEqual(ops.count("try_begin"), ops.count("try_end"))
         verify_ir(ir)
 
     def test_ir_uses_only_declared_capabilities(self):
-        ir = raw_ir("fn main() -> Unit { capability fs; let x = 1; }")
+        ir = raw_ir('कार्य मुख्य() -> एकक { अधिकार सञ्चय; स्थापय क्ष = 1; }')
         self.assertEqual(ir.functions["main"].capabilities, frozenset({"fs"}))
 
 
@@ -60,14 +60,14 @@ class OptimizerTests(unittest.TestCase):
         return ir, stats
 
     def test_constant_folding(self):
-        ir, stats = self.optimized("fn main() -> Unit { let x = 1 + 2 * 3; print(str(x)); }")
+        ir, stats = self.optimized('कार्य मुख्य() -> एकक { स्थापय क्ष = 1 + 2 * 3; मुद्रय(पाठ्यीकरण(क्ष)); }')
         constants = [instr.args[0] for instr in ir.functions["main"].instrs if instr.op == "const"]
         self.assertIn(7, constants)
         self.assertGreaterEqual(stats["constants_folded"], 2)
 
     def test_constant_branch_folding(self):
         ir, stats = self.optimized(
-            'fn main() -> Unit { if true { print("a"); } else { print("b"); } }'
+            'कार्य मुख्य() -> एकक { यदि सत्य { मुद्रय("a"); } अन्यथा { मुद्रय("b"); } }'
         )
         ops = [instr.op for instr in ir.functions["main"].instrs]
         self.assertNotIn("branch", ops)
@@ -77,14 +77,14 @@ class OptimizerTests(unittest.TestCase):
         self.assertGreaterEqual(stats["branches_folded"], 1)
 
     def test_dead_temporary_elimination(self):
-        ir, stats = self.optimized("fn main() -> Unit { 1 + 2; }")
+        ir, stats = self.optimized('कार्य मुख्य() -> एकक { 1 + 2; }')
         self.assertGreaterEqual(stats["dead_temps_removed"], 1)
         self.assertFalse(
             any(instr.op == "binop" for instr in ir.functions["main"].instrs)
         )
 
     def test_optimizer_is_idempotent(self):
-        source = "fn main() -> Unit { let x = 1 + 2; if false { print(str(x)); } }"
+        source = 'कार्य मुख्य() -> एकक { स्थापय क्ष = 1 + 2; यदि असत्य { मुद्रय(पाठ्यीकरण(क्ष)); } }'
         ir1, _ = self.optimized(source)
         first = [(i.op, i.dest, i.args) for i in ir1.functions["main"].instrs]
         ir2, _ = optimize(ir1)
@@ -92,7 +92,7 @@ class OptimizerTests(unittest.TestCase):
         self.assertEqual(first, second)
 
     def test_all_examples_optimize_cleanly(self):
-        for name in ("hello.pac", "tour.pac", "tensors.pac", "xor.pac", "aurora.pac"):
+        for name in ("hello.सूत्र", "tour.सूत्र", "tensors.सूत्र", "xor.सूत्र", "aurora.सूत्र"):
             source = (__import__("pathlib").Path(__file__).resolve().parents[2] / "examples" / name).read_text()
             result = compile_source(source, name)
             self.assertTrue(result.ok, name)
@@ -101,7 +101,7 @@ class OptimizerTests(unittest.TestCase):
 
 class VerifierTests(unittest.TestCase):
     def setUp(self):
-        self.ir = raw_ir("fn main() -> Unit { let x = 1; print(str(x)); }")
+        self.ir = raw_ir('कार्य मुख्य() -> एकक { स्थापय क्ष = 1; मुद्रय(पाठ्यीकरण(क्ष)); }')
 
     def test_rejects_bad_register(self):
         bad = copy.deepcopy(self.ir)

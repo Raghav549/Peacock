@@ -1,0 +1,63 @@
+// PEACOCK language tour: functions, structs, lists, loops, errors, assertions.
+प्रकरण tour
+
+संघटन Point {
+    क्ष: पूर्णाङ्क
+    य: पूर्णाङ्क
+}
+
+कार्य distance_squared(अ: Point, ब: Point) -> पूर्णाङ्क {
+    स्थापय dx = अ.क्ष - ब.क्ष;
+    स्थापय dy = अ.य - ब.य;
+    प्रत्यानय dx * dx + dy * dy;
+}
+
+कार्य योग(values: सूची<पूर्णाङ्क>) -> पूर्णाङ्क {
+    स्थापय परिवर्तनीय total = ०;
+    प्रति मूल्य मध्ये values {
+        total += मूल्य;
+    }
+    प्रत्यानय total;
+}
+
+कार्य doubled(n: पूर्णाङ्क) -> पूर्णाङ्क {
+    यदि n < ० {
+        क्षिप "doubled() does not accept negative numbers";
+    }
+    प्रत्यानय n * २;
+}
+
+कार्य मुख्य() -> एकक {
+    स्थापय परिवर्तनीय squares: सूची<पूर्णाङ्क> = [];
+    प्रति i मध्ये १..६ {
+        squares.योजय(i * i);
+    }
+    मुद्रय("squares: " + पाठ्यीकरण(squares));
+    मुद्रय("sum: " + पाठ्यीकरण(योग(squares)));
+
+    स्थापय origin = Point(०, ०);
+    स्थापय corner = Point(३, ४);
+    मुद्रय("distance squared: " + पाठ्यीकरण(distance_squared(origin, corner)));
+
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < ३ {
+        मुद्रय("loop " + पाठ्यीकरण(i));
+        i += १;
+    }
+
+    यत्न {
+        मुद्रय("doubled: " + पाठ्यीकरण(doubled(२१)));
+        स्थापय bad = doubled(-१);
+        मुद्रय("not reached " + पाठ्यीकरण(bad));
+    } गृह्ण (सन्देश) {
+        मुद्रय("caught: " + सन्देश);
+    }
+
+    निश्चिनु(योग(squares) == ५५, "sum of squares should be 55");
+
+    स्थापय label = "  PEACOCK  ";
+    मुद्रय("trimmed: [" + label.शोधय() + "]");
+    मुद्रय("characters: " + पाठ्यीकरण(दैर्घ्य(label)));
+    मुद्रय("split: " + पाठ्यीकरण("a,b,c".विभाजय(",")));
+    मुद्रय("types: " + प्रकारनाम(label) + ", " + प्रकारनाम(३.५) + ", " + प्रकारनाम(squares));
+}

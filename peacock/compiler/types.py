@@ -1,4 +1,4 @@
-"""PEACOCK's static type model (v0.1).
+"""PEACOCK's static type model (v0.2).
 
 The model is deliberately small and explicit. There is no implicit numeric
 conversion between ``Int`` and ``Float``; tensor dtypes follow the promotion
@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Sequence
+
+from peacock.sanskrit import surface_type
 
 
 class Type:
@@ -24,7 +26,7 @@ class PrimitiveType(Type):
     name: str
 
     def display(self) -> str:
-        return self.name
+        return surface_type(self.name)
 
 
 IntType = PrimitiveType("Int")
@@ -44,9 +46,9 @@ class TensorType(Type):
 
     def display(self) -> str:
         if self.shape is None:
-            return f"Tensor<{self.dtype}>"
+            return surface_type(f"Tensor<{self.dtype}>")
         dims = ", ".join(str(d) for d in self.shape)
-        return f"Tensor<{self.dtype}, [{dims}]>"
+        return surface_type(f"Tensor<{self.dtype}, [{dims}]>")
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,7 +56,7 @@ class ListType(Type):
     element: Type
 
     def display(self) -> str:
-        return f"List<{self.element.display()}>"
+        return surface_type(f"List<{self.element.display()}>")
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,7 +88,7 @@ class OpaqueType(Type):
     name: str
 
     def display(self) -> str:
-        return self.name
+        return surface_type(self.name)
 
 
 ColorType = OpaqueType("Color")

@@ -17,8 +17,8 @@
 * truncation (missing IEND) rejection;
 * HDR tone mapping (`clip` or `aces`) at encode time.
 
-`graphics.present(canvas)` hands the framebuffer to the host's attached
-presentation backend (capability `ui`). The canvas is not consumed or mutated, so
+`चित्र.प्रदर्शय(चित्रपट्ट)` hands the framebuffer to the host's attached
+presentation backend (capability `दृश्य`). The canvas is not consumed or mutated, so
 a program can present the same surface repeatedly after drawing each frame.
 
 Limits: no palette/grayscale/interlaced PNG variants, no gamma chunks, no text

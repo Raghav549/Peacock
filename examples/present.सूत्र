@@ -1,0 +1,31 @@
+// Present animated frames to the host's presentation backend.
+//
+// Run with:  ./bin/peacock run examples/present.सूत्र --grant दृश्य --present out/preview
+//
+// The host attaches a backend (the CLI attaches a static-web backend) and each
+// चित्र.प्रदर्शय call hands it the current canvas. The program does not know
+// or care whether the backend writes PNGs, serves HTTP or draws a window.
+प्रकरण present_demo
+
+उपयोग रङ्ग
+उपयोग चित्र
+
+कार्य मुख्य() -> एकक {
+    अधिकार दृश्य;
+
+    स्थापय चित्रपट्ट = चित्र.चित्रपट्ट(३२०, १८०);
+    स्थापय backdrop = [
+        रङ्ग.ओकएलसीएच(०.२०, ०.०६, २५०.०),
+        रङ्ग.ओकएलसीएच(०.३४, ०.१०, २९०.०)
+    ];
+    स्थापय परिवर्तनीय frame = ०;
+    यावत् frame < ४ {
+        स्थापय त = दशमलवीकरण(frame) / ३.०;
+        चित्र.वर्णक्रम(चित्रपट्ट, backdrop, ३०.० + ४०.० * त);
+        चित्र.वृत्त(चित्रपट्ट, ८०.० + ६०.० * त, ९०.०, २६.०, रङ्ग.ओकएलसीएच(०.७८, ०.१६, ६०.०));
+        चित्र.वृत्त(चित्रपट्ट, २४०.० - ४०.० * त, ७०.०, १४.०, रङ्ग.ओकएलसीएच(०.७२, ०.१४, २००.०));
+        चित्र.प्रदर्शय(चित्रपट्ट);
+        frame += १;
+    }
+    मुद्रय("presented " + पाठ्यीकरण(frame) + " frames");
+}

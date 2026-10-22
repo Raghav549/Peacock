@@ -1,6 +1,6 @@
 # PEACOCK Architecture
 
-Status: describes the v0.1 bootstrap implementation. The language definition is
+Status: describes the v0.2 bootstrap implementation. The language definition is
 independent of this implementation; the Python toolchain is a temporary host
 (ADR-0001). Components marked **planned** do not exist yet.
 
@@ -14,14 +14,14 @@ PEACOCK is being built as an AI-native language and computing ecosystem:
   security and enforced resource budgets;
 * an ecosystem that can eventually host its own compiler and tools.
 
-Non-goals for v0.1: being a general-purpose replacement for Python, shipping a
+Non-goals for v0.2: being a general-purpose replacement for Python, shipping a
 production UI toolkit, matching GPU performance, or claiming AGI. The reference
 implementation is deliberately small enough to audit and test.
 
 ## 2. System map
 
 ```
- .pac source
+ .सूत्र source
      │  lexer (compiler/lexer.py)
      ▼
  tokens ──► parser (compiler/parser.py) ──► AST (compiler/ast_nodes.py)
@@ -36,7 +36,7 @@ implementation is deliberately small enough to audit and test.
                                          verified PIR
                                               │  bytecode compiler (compiler/bytecode.py)
                                               ▼
-                                         .pkb image (JSON + SHA-256)
+                                         .बीज image (JSON + SHA-256)
                                               │  VM loader + verifier (runtime/vm.py)
                                               ▼
                                          stack VM execution
@@ -61,6 +61,14 @@ line/column tracking. It never uses regular expressions. Tokens carry `kind`,
 Numbers are validated for radix, underscores and 64-bit range. Errors recover and
 continue so one run can report several lexical problems.
 
+`peacock/sanskrit.py` is the single source-vocabulary boundary. The lexer applies
+Unicode NFC to identifiers, accepts combining marks and Unicode decimal digits,
+and canonicalises Sanskrit reserved words to stable internal IDs before parsing.
+It rejects withdrawn English reserved spellings with PE1007 rather than building
+a second source dialect. Source-facing type, capability, native, disassembly, and
+diagnostic displays use the same lexicon in reverse. Serialized artifact keys,
+opcodes, and host-policy IDs remain stable implementation representations.
+
 ### 3.2 Parsing
 
 `compiler/parser.py` is recursive descent with one-token lookahead. It produces
@@ -78,7 +86,7 @@ invalid assignment targets have targeted diagnostics.
 2. type resolution (primitive, list, tensor, struct, opaque);
 3. function-body checking with lexical scopes;
 4. model and training validation;
-5. entry-point checks (`main` takes no parameters, returns Unit);
+5. entry-point checks (`मुख्य` takes no parameters, returns एकक);
 6. capability checking for protected natives and declaration methods.
 
 Each local receives a **slot**; temporaries are assigned in the IR stage. The
@@ -87,11 +95,11 @@ types, but it does track definite returns and unreachable statements. Diagnostic
 are collected in one `DiagnosticBag`; `ErrorType` suppresses cascades.
 
 An explicitly opt-in `--semantic-shadow` path runs **after** this Python
-analysis. `selfhost/type_model.pac` represents types, computes relations and
+analysis. `selfhost/type_model.सूत्र` represents types, computes relations and
 expression result rules, and maintains a lexical binding stack for AST-derived
 probes of local declarations, name resolution, assignments, user-function
 signatures/calls, conditions and returns. The adapter serialises selected typed
-AST facts into generated `.pac` source, compiles/runs the kernel, and compares
+AST facts into generated `.सूत्र` source, compiles/runs the kernel, and compares
 probe outcomes with expectations derived from Python's typed AST and selected
 diagnostics; separate regressions check diagnostic equality on representative
 invalid inputs. The Python analyser still decides compilation and emits diagnostics;
@@ -144,7 +152,7 @@ calls it again on load, so a tampered artifact cannot reach dispatch.
 
 ### 3.6 Artifacts
 
-`runtime/artifact.py` writes `.pkb`:
+`runtime/artifact.py` writes `.बीज`:
 
 ```
 magic b"PEACOCK\x1a" | <H format_version> | <I language minor> |
@@ -152,7 +160,7 @@ magic b"PEACOCK\x1a" | <H format_version> | <I language minor> |
 ```
 
 The loader verifies magic, versions, length bounds, JSON shape and the digest
-before verification. Models use a separate `.pkm` format with magic
+before verification. Models use a separate `.ज्ञान` format with magic
 `PEACOCKM`, a versioned header, a parameter table, a float32 payload, and a
 SHA-256 digest (`intelligence/serialization.py`).
 
@@ -205,12 +213,12 @@ Three enforcement layers:
 3. **Host:** `HostPolicy` grants capabilities, enforces step/depth/output/tensor/
    dataset/epoch/file budgets, resolves filesystem paths inside a sandbox root
    (rejecting `..` traversal, absolute paths outside the root, symlink escapes,
-   NUL bytes and oversized files), permits `fs.create_dir` only within that root,
+   NUL bytes and oversized files), permits `सञ्चय.निधिरचना` only within that root,
    and forwards
-   `graphics.present` frames to an attached backend, failing
+   `चित्र.प्रदर्शय` frames to an attached backend, failing
    with PE4006 when none is attached.
 
-The capabilities are `compute`, `fs` and `ui`. `ui` is presentation-only: it
+The source capabilities are `गणना`, `सञ्चय` and `दृश्य`. `दृश्य` is presentation-only: it
 grants no input, window management or display query.
 
 This is best-effort process-level isolation, **not** a kernel sandbox. See
@@ -229,7 +237,7 @@ This is best-effort process-level isolation, **not** a kernel sandbox. See
   guards, training reports.
 * `evaluation.py`: accuracy, confusion matrix, per-class report.
 * `optim.py`: original SGD (optional momentum) and Adam.
-* `serialization.py`: `.pkm` v1 with per-parameter dtype/shape, float payload,
+* `serialization.py`: `.ज्ञान` v1 with per-parameter dtype/shape, float payload,
   metadata, SHA-256, and int8 quantisation helpers.
 
 Gradient correctness is checked against finite differences in tests
@@ -267,7 +275,7 @@ implementations:
 * `ServerBackend` — a stdlib HTTP host serving the latest frame, manifest,
   viewer and health check.
 
-They are driven by the `graphics.present(canvas)` native (capability `ui`): the
+They are driven by the `चित्र.प्रदर्शय(चित्रपट्ट)` native (capability `दृश्य`): the
 host attaches a backend through `HostPolicy(presenter=...)`, and the CLI exposes
 this as `--present DIR` with a `WebBackend` or `--serve PORT` with a
 `ServerBackend`. The VM never imports `peacock/platforms`; it calls the host
@@ -277,11 +285,11 @@ and mobile shells are roadmap work; Android and iOS require platform toolchains
 and signing, and are documented as **not implemented**, not stubbed as if they
 worked.
 
-Separately, `website/site.pac` is a verified PEACOCK-authored static-site
-exporter, not an extension of the frame `WebBackend`. Its single `.pac`
+Separately, `website/site.सूत्र` is a verified PEACOCK-authored static-site
+exporter, not an extension of the frame `WebBackend`. Its single `.सूत्र`
 compilation unit defines reusable component nodes, route/navigation data, twelve
 page functions, HTML escaping/rendering and responsive CSS. The CLI compiles and
-runs it with `fs` granted; it reads repository examples and the SVG logo, then
+runs it with `सञ्चय` granted; it reads repository examples and the SVG logo, then
 writes browser-readable HTML, CSS and SVG. It emits no JavaScript or UI framework.
 Twelve routes are covered by an integration test, but there is no browser-based
 visual regression, general client-side UI/event runtime, or app-module system.
@@ -294,7 +302,7 @@ See [website/README.md](website/README.md).
 | CPython 3.11+ | runs bootstrap compiler/VM | temporary host; language definition does not depend on it |
 | `zlib` | DEFLATE in PNG | documented platform compression library; PNG framing/CRC are ours |
 | `hashlib` | SHA-256 digests | standard library primitive |
-| OS filesystem | `fs` capability | documented interop boundary behind the sandbox |
+| OS filesystem | `सञ्चय` capability | documented interop boundary behind the sandbox |
 | Browser | static web preview | presentation only; no JS framework or language runtime |
 | HTTP stdlib | server host | transport boundary, not language semantics |
 
@@ -340,10 +348,10 @@ loader with deterministic mutated inputs; they are not proof of security.
 
 The Python implementation is split into (a) the language definition and
 compiler stages, and (b) host services. The self-hosting plan reimplements (a)
-in `.pac` while keeping OS access behind natives:
+in `.सूत्र` while keeping OS access behind natives:
 
-1. tokenizer — **done** (`selfhost/tokenizer.pac`, parity-tested);
-2. parser and AST — **partial** (`selfhost/parser.pac`): full 0.1 syntax,
+1. tokenizer — **done** (`selfhost/tokenizer.सूत्र`, parity-tested);
+2. parser and AST — **partial** (`selfhost/parser.सूत्र`): full 0.1 syntax,
    including model/training declarations, with canonical AST-digest parity on the
    14-file corpus and self-parse; strict first-error reporting, no recovery or
    `PE2xxx` diagnostic parity yet, and no typed AST nodes;

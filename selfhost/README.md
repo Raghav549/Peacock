@@ -9,43 +9,43 @@ self-hosting.
 
 | Program | Lines | What it does | Evidence |
 |---|---:|---|---|
-| `tokenizer.pac` | 235 | lexes a `.pac` file into labelled tokens (keywords, identifiers, numbers, strings, operators, comments) | token count and non-string token-label parity with the bootstrap lexer on `examples/tour.pac` (367 tokens) |
-| `parser.pac` | 1,085 | lexes and parses the full 0.1 grammar — module/use/struct/fn, statements, expressions, model and training declarations — and prints a canonical AST digest | byte-identical digest with the bootstrap AST on the 14-file core corpus, plus parsing its own source and `tokenizer.pac` |
-| `type_model.pac` | — | executable PEACOCK kernel for recursive type relations, unary/binary/list/index inference, lexical bindings, declaration/assignment, user-function signatures/calls, conditions, returns and iterable rules | VM-run assertions plus opt-in typed-AST shadow probes against Python; experimental, incomplete and not a production semantic analyser |
-| `fixtures/core_syntax.pac` | 57 | covers else-if, nested blocks, indexing, power associativity, `not/and/or`, `%`, ranges, break/continue, `assert` and generics | included in the parity corpus and executable |
-| `fixtures/invalid/*.pac` | — | malformed programs for the negative suite | assert a non-zero exit, a `PE4020` diagnostic, line/column and no stdout AST |
+| `tokenizer.सूत्र` | 235 | lexes a `.सूत्र` file into labelled tokens (keywords, identifiers, numbers, strings, operators, comments) | token count and non-string token-label parity with the bootstrap lexer on `examples/tour.सूत्र` (367 tokens) |
+| `parser.सूत्र` | 1,131 | lexes and parses the full 0.2 grammar — प्रकरण/उपयोग/संघटन/कार्य, statements, expressions, प्रतिमान and अभ्यास declarations — and prints a canonical AST digest | byte-identical digest with the bootstrap AST on the 14-file core corpus, plus parsing its own source and `tokenizer.सूत्र` |
+| `type_model.सूत्र` | — | executable PEACOCK kernel for recursive type relations, unary/binary/list/index inference, lexical bindings, declaration/assignment, user-function signatures/calls, conditions, returns and iterable rules | VM-run assertions plus opt-in typed-AST shadow probes against Python; experimental, incomplete and not a production semantic analyser |
+| `fixtures/core_syntax.सूत्र` | 57 | covers else-if, nested blocks, indexing, power associativity, `न/तथा/वा`, `%`, ranges, विच्छिन्दु/अनुवर्तय, `निश्चिनु` and generics | included in the parity corpus and executable |
+| `fixtures/invalid/*.सूत्र` | — | malformed programs for the negative suite | assert a non-zero exit, a `PE4020` diagnostic, line/column and no stdout AST |
 
 ## Running the parser
 
-The parser needs the `fs` capability and a program argument:
+The parser needs the `सञ्चय` capability and a program argument:
 
 ```bash
-./bin/peacock run selfhost/parser.pac \
-  --grant fs --root . --max-steps 100000000 \
-  -- examples/tour.pac
+./bin/peacock run selfhost/parser.सूत्र \
+  --grant सञ्चय --root . --max-steps 300000000 \
+  -- examples/tour.सूत्र
 ```
 
 `--max-steps` is raised because the parser runs on the Python reference VM and
-self-parsing (1,085 lines) takes about 5.5 s and tens of millions of VM steps.
+self-parsing (1,131 lines) takes tens of millions of VM steps.
 The default 2,000,000-step budget is intentionally too small.
 
 The output is one S-expression per declaration in the format implemented by
 `tests/integration/ast_digest.py`; the bootstrap AST is the oracle:
 
 ```
-(module hello)
-(fn main (params) (ret (t Unit)) (block (expr (call (name print) (arg _ (str))))))
+(प्रकरण hello)
+(कार्य मुख्य (प्राचलावली) (प्रत्यागत (प्रकार एकक)) (खण्ड (अभिव्यक्ति (आह्वान (नाम मुद्रय) (तर्क _ (पाठ्यीकरण))))))
 ```
 
 ## Parity corpus
 
 `tests/integration/test_selfhost_parser.py` compares the two parsers on:
 
-* all seven `examples/` programs, including `xor.pac` and `spiral.pac` with model
+* seven core `examples/` programs (`present.सूत्र` is covered by the presentation integration tests), including `xor.सूत्र` and `spiral.सूत्र` with model
   and training declarations;
 * the six `linguist/samples/` programs;
-* `selfhost/fixtures/core_syntax.pac`;
-* `selfhost/tokenizer.pac` and `selfhost/parser.pac` (self-parse).
+* `selfhost/fixtures/core_syntax.सूत्र`;
+* `selfhost/tokenizer.सूत्र` and `selfhost/parser.सूत्र` (self-parse).
 
 Run it directly:
 
@@ -71,9 +71,9 @@ python3 -m unittest tests.integration.test_selfhost_parser -v
 
 | Stage | Status |
 |---|---|
-| 1. lexer/tokenizer | done (`tokenizer.pac`, plus the lexer inside `parser.pac`) |
+| 1. lexer/tokenizer | done (`tokenizer.सूत्र`, plus the lexer inside `parser.सूत्र`) |
 | 2. parser and AST | **partial** — full-grammar syntax parity and self-parse; diagnostics/recovery and typed AST pending |
-| 3. semantic analyser/type checker | **shadow prototype** (`type_model.pac` executes supported typed-AST expression/scope/name/assignment/call/return/condition/iterable probes; Python remains authoritative and kernel-generated diagnostics are not implemented) |
+| 3. semantic analyser/type checker | **shadow prototype** (`type_model.सूत्र` executes supported typed-AST expression/scope/name/assignment/call/return/condition/iterable probes; Python remains authoritative and kernel-generated diagnostics are not implemented) |
 | 4. IR/optimiser/bytecode emitter | planned |
 | 5. VM in PEACOCK | planned |
 | 6. fixed point | planned |

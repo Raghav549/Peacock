@@ -8,9 +8,9 @@ exist locally.
 
 | File | Purpose |
 |---|---|
-| `languages.yml` | proposed entry (`Peacock`, `.pac`, `source.peacock`) |
+| `languages.yml` | proposed entry (`Peacock`, `.सूत्र`, `source.peacock`) |
 | `peacock.tmLanguage.json` | TextMate grammar with keywords, types, numbers, strings, capabilities, comments |
-| `samples/*.pac` | representative programs (hello, types, tensors, colour, motion, capabilities) |
+| `samples/*.सूत्र` | representative programs (hello, types, tensors, colour, motion, capabilities) |
 | `../assets/peacock.svg`, `../assets/peacock-256.png` | logo usable for editor/tooling metadata |
 | `../editors/vscode/` | minimal VS Code extension using the grammar |
 
@@ -31,7 +31,7 @@ forks, with reasonable distribution across distinct user/repository pairs.
 
 This project does **not** currently meet that usage-evidence requirement on the
 evidence available in this checkout. The samples here are authored for PEACOCK
-and compile, but do not demonstrate independent public usage. `.pac` conflicts
+and compile, but do not demonstrate independent public usage. `.सूत्र` conflicts
 with other ecosystem file types are not yet comprehensively checked against the
 upstream language database; check before proposing it. Thus a PR would be
 premature even though draft metadata/grammar files are prepared. No upstream
@@ -41,7 +41,7 @@ submission or acceptance is claimed.
 
 1. Gather GitHub code-search evidence meeting the live usage thresholds above,
    excluding forks and the project's own concentrated results; establish that
-   `.pac` assignment will not misclassify existing formats.
+   `.सूत्र` assignment will not misclassify existing formats.
 2. Confirm the upstream contribution guide and grammar licensing/tooling again
    at submission time.
 3. Provide licensed, representative, non-tutorial PEACOCK samples showing
@@ -60,7 +60,7 @@ submission or acceptance is claimed.
 
 * Grammars for languages with few public repositories are often rejected as
   insufficiently used.
-* `.pac` is also used by unrelated formats/tools; the entry must not claim or
+* `.सूत्र` is also used by unrelated formats/tools; the entry must not claim or
   break those. GitHub resolves ambiguous extensions by statistics, so PEACOCK
   will not always win.
 * Renaming or re-scoping after submission is costly; stabilise keywords first.

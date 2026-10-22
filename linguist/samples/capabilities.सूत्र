@@ -1,0 +1,12 @@
+// Capabilities must be declared by the calling function and granted by the host.
+प्रकरण capability_sample
+
+उपयोग सञ्चय
+उपयोग प्रक्रिया
+
+कार्य मुख्य() -> एकक {
+    अधिकार सञ्चय;
+    स्थापय पथ = प्रक्रिया.तर्कावली().प्राप्नु(०);
+    स्थापय पाठ्य = सञ्चय.पाठ्यपठन(पथ);
+    मुद्रय("characters: " + पाठ्यीकरण(दैर्घ्य(पाठ्य)));
+}

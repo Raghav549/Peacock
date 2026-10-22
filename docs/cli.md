@@ -10,13 +10,13 @@ peacock <command> [options]
 | Command | Purpose |
 |---|---|
 | `version` | versions, extension, implementation status |
-| `check <file.pac>` | full pipeline; `--json`, `--no-opt`, `--quiet`, experimental `--semantic-shadow` |
-| `run <file.pac\|file.pkb>` | compile if needed, execute; `--grant`, `--root`, `--json`, `--report`, `--max-steps`, `--present DIR`, `--serve PORT` |
-| `build <file.pac> [-o file.pkb]` | verified image + SHA-256; optional experimental `--semantic-shadow` |
+| `check <file.सूत्र>` | full pipeline; `--json`, `--no-opt`, `--quiet`, experimental `--semantic-shadow` |
+| `run <file.सूत्र\|file.बीज>` | compile if needed, execute; `--grant`, `--root`, `--json`, `--report`, `--max-steps`, `--present DIR`, `--serve PORT` |
+| `build <file.सूत्र> [-o file.बीज]` | verified image + SHA-256; optional experimental `--semantic-shadow` |
 | `disasm <file>` | human-readable instructions, models, training declarations |
-| `audit <file.pac>` | static capability report; `--json` |
-| `tokens <file.pac>` | token dump (debug) |
-| `ast <file.pac>` | AST dump (debug) |
+| `audit <file.सूत्र>` | static capability report; `--json` |
+| `tokens <file.सूत्र>` | token dump (debug) |
+| `ast <file.सूत्र>` | AST dump (debug) |
 | `bench` | reproducible benchmark suite; `--json PATH`, `--quick` |
 | `fuzz` | deterministic fuzzers; `--iterations`, `--seed`, `--json` |
 | `test` | run the unittest suite; `-p PATTERN`, `--quiet` |
@@ -24,14 +24,14 @@ peacock <command> [options]
 ## Semantic shadow checks (experimental)
 
 `check --semantic-shadow` keeps the Python analyser authoritative and then runs
-AST-derived checks through `selfhost/type_model.pac` in the PEACOCK VM. It
+AST-derived checks through `selfhost/type_model.सूत्र` in the PEACOCK VM. It
 covers the currently migrated type relations, expression result rules, local
 scope/name probes, declarations/assignments, user-function signatures/calls,
 conditions and returns. The JSON stats include `selfhost_type_cases`,
 `selfhost_semantic_cases`, `selfhost_builtin_cases` and shadow time. A disagreement
 is an internal compiler error; the flag does not change ordinary compilation
 acceptance or diagnostics. `build` also accepts the flag to require the same
-shadow pass before emitting `.pkb`.
+shadow pass before emitting `.बीज`.
 
 This remains experimental: field/method semantics, native overloads,
 model/training checks, diagnostics, IR, bytecode and VM are not migrated.
@@ -41,10 +41,10 @@ model/training checks, diagnostics, IR, bytecode and VM are not migrated.
 Nothing is granted by default.
 
 ```bash
-./bin/peacock run app.pac --grant fs
-./bin/peacock run app.pac --grant compute --root ./sandbox
-./bin/peacock run app.pac --grant fs,compute
-./bin/peacock run app.pac --grant ui --present out/preview
+./bin/peacock run app.सूत्र --grant सञ्चय
+./bin/peacock run app.सूत्र --grant गणना --root ./sandbox
+./bin/peacock run app.सूत्र --grant सञ्चय,compute
+./bin/peacock run app.सूत्र --grant दृश्य --present out/preview
 ```
 
 `--root` defaults to the current directory. Paths in a program are resolved under
@@ -52,12 +52,12 @@ that root; escapes are rejected. The program itself must also declare the
 capability in the function that uses it.
 
 `--present DIR` attaches the static-web presentation backend: every
-`graphics.present(canvas)` writes `frames/frame_NNNN.png`, updates `latest.png`
+`चित्र.प्रदर्शय(चित्रपट्ट)` writes `frames/frame_NNNN.png`, updates `latest.png`
 and `index.html`, and the run ends with `manifest.json`. The backend is a host
-object; the VM only sees a native call. `ui` grants presentation, not input.
+object; the VM only sees a native call. `दृश्य` grants presentation, not input.
 
 ```bash
-./bin/peacock run examples/present.pac --grant ui --present out/preview
+./bin/peacock run examples/present.सूत्र --grant दृश्य --present out/preview
 # stdout: presented 4 frames
 # out/preview/manifest.json lists four 320x180 frames
 ```
@@ -68,7 +68,7 @@ available afterwards (`-1` serves until interrupted). `--serve-host` defaults to
 `127.0.0.1`; use `0.0.0.0` only for a deliberate container preview.
 
 ```bash
-./bin/peacock run examples/present.pac --grant ui --serve 8099 --linger 30
+./bin/peacock run examples/present.सूत्र --grant दृश्य --serve 8099 --linger 30
 # stderr: serving at http://127.0.0.1:8099/
 # routes: /  /frame.png  /manifest.json  /healthz
 ```
@@ -78,10 +78,10 @@ bound is a usage error. The HTTP host has no authentication or TLS.
 
 ## Arguments
 
-Arguments after `--` are passed to `process.args()`:
+Arguments after `--` are passed to `प्रक्रिया.तर्कावली()`:
 
 ```bash
-./bin/peacock run selfhost/tokenizer.pac --grant fs -- examples/tour.pac --dump
+./bin/peacock run selfhost/tokenizer.सूत्र --grant सञ्चय -- examples/tour.सूत्र --dump
 ```
 
 ## Exit codes
@@ -100,9 +100,11 @@ Arguments after `--` are passed to `process.args()`:
 
 `check --json`, `run --json`, `audit --json` and `bench --json` print stable JSON.
 `run --report FILE` writes the last `TrainingReport` plus environment metadata.
+For tooling compatibility, audit JSON retains stable internal capability/native IDs;
+the human-readable audit and disassembly render their Sanskrit source spellings.
 
 ## Notes
 
-* `.pkb` programs run without source; the image is re-verified.
-* `check` on a `.pk`/`.peacock` file fails with a usage error: rename to `.pac`.
+* `.बीज` programs run without source; the image is re-verified.
+* `check` on a `.pk`/`.peacock` file fails with a usage error: rename to `.सूत्र`.
 * The CLI never downloads anything and never reads credentials.

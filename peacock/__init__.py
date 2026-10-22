@@ -12,8 +12,9 @@ Public components:
     peacock.frontend  — colour science, software rasteriser, layout, motion
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __codename__ = "Fledgling"
 
 #: Language version accepted by this toolchain. Independent of the toolchain version.
-LANGUAGE_VERSION = "0.1"
+#: 0.2 establishes the Sanskrit-native source surface and Unicode literals.
+LANGUAGE_VERSION = "0.2"

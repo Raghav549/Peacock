@@ -4,7 +4,8 @@
 |---|---|
 | [compiler/bootstrap.md](compiler/bootstrap.md) | Python bootstrap boundary and staged self-hosting plan |
 | [compiler/bytecode.md](compiler/bytecode.md) | PIR, instruction set, image format, verification |
-| [language/idioms.md](language/idioms.md) | valid v0.1 patterns and common mistakes |
+| [language/sanskrit.md](language/sanskrit.md) | Sanskrit vocabulary, Pāṇinian foundations, Unicode rules, and research boundaries |
+| [language/idioms.md](language/idioms.md) | valid v0.2 patterns and common mistakes |
 | [runtime/execution.md](runtime/execution.md) | frames, values, errors, limits |
 | [security/capabilities.md](security/capabilities.md) | threat model, capability enforcement, sandbox |
 | [ai-engine/tensors.md](ai-engine/tensors.md) | tensor engine, autodiff, training, serialisation |

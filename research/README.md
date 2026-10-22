@@ -27,16 +27,17 @@ honest substrate for these questions.
 
 | File | Contents |
 |---|---|
-| [references.bib](references.bib) | 162 bibliographic entries (papers, books, standards, RFCs) covering the areas PEACOCK draws on |
+| [references.bib](references.bib) | 178 bibliographic entries (papers, books, standards, RFCs) covering the areas PEACOCK draws on |
 | [literature-review.md](literature-review.md) | What the literature establishes, what PEACOCK adopts or rejects, and where the implementation is thinner than the state of the art |
 | [open-questions.md](open-questions.md) | 18 numbered research questions with hypotheses, experiment designs, metrics, decision rules and current status |
-| [architecture-decisions.md](architecture-decisions.md) | ADR-0001 … ADR-0021: context, decision, alternatives, consequences, and what would reverse each decision |
+| [architecture-decisions.md](architecture-decisions.md) | ADR-0001 … ADR-0022: context, decision, alternatives, consequences, and what would reverse each decision |
 | [benchmark-methodology.md](benchmark-methodology.md) | How measurements are taken, what they do and do not mean, and the anti-comparison policy |
 
 ## What research actually influenced what
 
 | Area | Sources used as background | Artifact in this repository | Depth |
 |---|---|---|---|
+| Sanskrit grammar and native technical vocabulary | [panini1x1x1], [panini1x3x2], [panini3x1x1], [krishna2015derivative], [dave2020sandhi], [jayanti2026indic] | `sanskrit.py`, Unicode lexer, generated editor grammars, `docs/language/sanskrit.md` | deterministic formal grammar; no natural-language morphology |
 | Recursive-descent parsing, diagnostics | [aho2006compilers], [cooper2011engineering] | `lexer.py`, `parser.py`, `diagnostics.py` | textbook subset |
 | Static typing, scopes | [pierce2002types], [milner1978theory], [wright1994syntactic] | `types.py`, `semantic.py` (monomorphic, no inference) | small subset |
 | IR and optimisation | [click1995simple], [muchnick1997advanced], [cytron1991ssa] | linear PIR, folding/DCE, verifier | no SSA, no register allocation |
@@ -55,13 +56,15 @@ honest substrate for these questions.
 
 ## Citation status (honest)
 
-The bibliography was compiled from the published literature during this build.
-The build environment has **no outbound access** to publisher or arXiv hosts, so
-identifiers and URLs could not be fetched or machine-verified here. Entries
-contain only standard bibliographic fields; questionable identifiers were
-omitted rather than guessed. Before citing this file externally, verify each
-entry against the publisher/DOI resolver. If an error is found, correct it in a
-pull request — do not add an entry you cannot verify.
+The historical bibliography was compiled from published literature and is not
+all machine-verified. For the Sanskrit-native migration, the primary Pāṇinian
+sūtra pages, the catalogue record for the *Mahābhāṣya* edition, the digital
+*Vākyapadīya* contents, and all eight added arXiv abstracts/metadata were fetched
+and checked on **2026-10-22**. Those new entries carry explicit verification
+notes. This does not retroactively verify every older identifier. Before citing
+the file externally, verify each entry against its publisher/DOI resolver. If an
+error is found, correct it in a pull request — do not add an entry you cannot
+verify.
 
 This is why the review below says "the literature establishes X" only for
 well-established results and labels contested or implementation-specific claims
@@ -72,7 +75,7 @@ as such.
 * It is **not** a claim that PEACOCK has produced research results. Apart from
   measurements of this implementation, there are none.
 * It is **not** a claim of AGI capability. The "AGI research tooling" deliverable
-  is a planned phase (see [../ROADMAP.md](../ROADMAP.md)); v0.1 provides
+  is a planned phase (see [../ROADMAP.md](../ROADMAP.md)); v0.2 provides
   deterministic training/evaluation primitives, seeds, reports and provenance,
   not an AGI system or a novel learning algorithm.
 * It is **not** a literature-complete survey. It covers the mechanisms this

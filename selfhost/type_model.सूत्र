@@ -1,0 +1,563 @@
+// PEACOCK-native semantic kernel (migration stage 3).
+//
+// This file is executed by PEACOCK itself. It contains a recursive type
+// descriptor, type relations, expression result rules, a lexical symbol table,
+// declaration/assignment checks and user-function signature checks. The Python
+// bootstrap remains authoritative; `compile_source(..., semantic_mode="shadow")`
+// translates real parsed/typed AST nodes into probes executed by this kernel.
+//
+// Scope is intentionally explicit: this is not yet a complete semantic
+// analyser and it does not emit PEACOCK diagnostics or IR.
+
+प्रकरण selfhost_type_model
+
+संघटन TypeDesc {
+    tag: अक्षरमाला,
+    नाम: अक्षरमाला,
+    shape_known: सत्यता,
+    dims: सूची<पूर्णाङ्क>,
+    elements: सूची<TypeDesc>
+}
+
+संघटन Binding {
+    नाम: अक्षरमाला,
+    ty: TypeDesc,
+    mutable: सत्यता,
+    scope: पूर्णाङ्क
+}
+
+संघटन FunctionSignature {
+    नाम: अक्षरमाला,
+    parameter_names: सूची<अक्षरमाला>,
+    parameter_types: सूची<TypeDesc>,
+    result: TypeDesc
+}
+
+कार्य primitive(नाम: अक्षरमाला) -> TypeDesc {
+    प्रत्यानय TypeDesc("primitive", नाम, असत्य, [], []);
+}
+
+कार्य error_type() -> TypeDesc {
+    प्रत्यानय primitive("<error>");
+}
+
+कार्य tensor_type(दत्तप्रकार: अक्षरमाला, known: सत्यता, dims: सूची<पूर्णाङ्क>) -> TypeDesc {
+    प्रत्यानय TypeDesc("आयामीकरण", दत्तप्रकार, known, dims, []);
+}
+
+कार्य list_type(element: TypeDesc) -> TypeDesc {
+    प्रत्यानय TypeDesc("list", "", असत्य, [], [element]);
+}
+
+कार्य nominal_type(प्रकारनाम: अक्षरमाला) -> TypeDesc {
+    प्रत्यानय TypeDesc("nominal", प्रकारनाम, असत्य, [], []);
+}
+
+कार्य opaque_type(प्रकारनाम: अक्षरमाला) -> TypeDesc {
+    प्रत्यानय TypeDesc("opaque", प्रकारनाम, असत्य, [], []);
+}
+
+कार्य range_type() -> TypeDesc {
+    प्रत्यानय opaque_type("सीमा");
+}
+
+कार्य is_error(ty: TypeDesc) -> सत्यता {
+    प्रत्यानय ty.नाम == "<error>";
+}
+
+कार्य is_numeric(ty: TypeDesc) -> सत्यता {
+    प्रत्यानय ty.tag == "primitive" तथा (ty.नाम == "पूर्णाङ्क" वा ty.नाम == "दशमलव");
+}
+
+कार्य type_equal(left: TypeDesc, right: TypeDesc) -> सत्यता {
+    यदि left.tag != right.tag वा left.नाम != right.नाम {
+        प्रत्यानय असत्य;
+    }
+    यदि left.shape_known != right.shape_known {
+        प्रत्यानय असत्य;
+    }
+    यदि left.shape_known {
+        यदि दैर्घ्य(left.dims) != दैर्घ्य(right.dims) {
+            प्रत्यानय असत्य;
+        }
+        स्थापय परिवर्तनीय i = ०;
+        यावत् i < दैर्घ्य(left.dims) {
+            यदि left.dims.प्राप्नु(i) != right.dims.प्राप्नु(i) {
+                प्रत्यानय असत्य;
+            }
+            i += १;
+        }
+    }
+    यदि दैर्घ्य(left.elements) != दैर्घ्य(right.elements) {
+        प्रत्यानय असत्य;
+    }
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < दैर्घ्य(left.elements) {
+        यदि न type_equal(left.elements.प्राप्नु(i), right.elements.प्राप्नु(i)) {
+            प्रत्यानय असत्य;
+        }
+        i += १;
+    }
+    प्रत्यानय सत्य;
+}
+
+कार्य type_key(ty: TypeDesc) -> अक्षरमाला {
+    यदि ty.tag == "list" {
+        यदि दैर्घ्य(ty.elements) != १ {
+            प्रत्यानय "list<?>";
+        }
+        प्रत्यानय "list<" + type_key(ty.elements.प्राप्नु(०)) + ">";
+    }
+    यदि ty.tag == "आयामीकरण" {
+        स्थापय परिवर्तनीय key = "tensor<" + ty.नाम + ",";
+        यदि न ty.shape_known {
+            प्रत्यानय key + "?>";
+        }
+        key = key + "[";
+        स्थापय परिवर्तनीय i = ०;
+        यावत् i < दैर्घ्य(ty.dims) {
+            यदि i > ० {
+                key = key + ",";
+            }
+            key = key + पाठ्यीकरण(ty.dims.प्राप्नु(i));
+            i += १;
+        }
+        प्रत्यानय key + "]>";
+    }
+    प्रत्यानय ty.tag + ":" + ty.नाम;
+}
+
+// `source` may flow to `target` under the v0.2 assignment rules.
+कार्य is_assignable(source: TypeDesc, लक्ष्य: TypeDesc) -> सत्यता {
+    यदि is_error(source) वा is_error(लक्ष्य) {
+        प्रत्यानय सत्य;
+    }
+    यदि source.tag == "primitive" तथा source.नाम == "अभाव" {
+        प्रत्यानय सत्य;
+    }
+    यदि source.tag == "आयामीकरण" तथा लक्ष्य.tag == "आयामीकरण" {
+        यदि source.नाम != लक्ष्य.नाम {
+            प्रत्यानय असत्य;
+        }
+        यदि न लक्ष्य.shape_known {
+            प्रत्यानय सत्य;
+        }
+        प्रत्यानय source.shape_known तथा type_equal(source, लक्ष्य);
+    }
+    प्रत्यानय type_equal(source, लक्ष्य);
+}
+
+कार्य same_shape(left: TypeDesc, right: TypeDesc) -> सत्यता {
+    यदि left.tag != "आयामीकरण" वा right.tag != "आयामीकरण" {
+        प्रत्यानय असत्य;
+    }
+    यदि left.shape_known != right.shape_known {
+        प्रत्यानय असत्य;
+    }
+    यदि न left.shape_known {
+        प्रत्यानय सत्य;
+    }
+    यदि दैर्घ्य(left.dims) != दैर्घ्य(right.dims) {
+        प्रत्यानय असत्य;
+    }
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < दैर्घ्य(left.dims) {
+        यदि left.dims.प्राप्नु(i) != right.dims.प्राप्नु(i) {
+            प्रत्यानय असत्य;
+        }
+        i += १;
+    }
+    प्रत्यानय सत्य;
+}
+
+// NumPy-style, right-aligned shape compatibility. Unknown shapes are
+// conservatively compatible, matching the bootstrap type rules.
+कार्य broadcastable(left: TypeDesc, right: TypeDesc) -> सत्यता {
+    यदि left.tag != "आयामीकरण" वा right.tag != "आयामीकरण" {
+        प्रत्यानय असत्य;
+    }
+    यदि न left.shape_known वा न right.shape_known {
+        प्रत्यानय सत्य;
+    }
+    स्थापय परिवर्तनीय कोटि = दैर्घ्य(left.dims);
+    यदि दैर्घ्य(right.dims) > कोटि {
+        कोटि = दैर्घ्य(right.dims);
+    }
+    स्थापय परिवर्तनीय i = १;
+    यावत् i <= कोटि {
+        स्थापय परिवर्तनीय अ = १;
+        स्थापय परिवर्तनीय ब = १;
+        यदि i <= दैर्घ्य(left.dims) {
+            अ = left.dims.प्राप्नु(दैर्घ्य(left.dims) - i);
+        }
+        यदि i <= दैर्घ्य(right.dims) {
+            ब = right.dims.प्राप्नु(दैर्घ्य(right.dims) - i);
+        }
+        यदि अ != ब तथा अ != १ तथा ब != १ {
+            प्रत्यानय असत्य;
+        }
+        i += १;
+    }
+    प्रत्यानय सत्य;
+}
+
+कार्य tensor_binary_type(op: अक्षरमाला, left: TypeDesc, right: TypeDesc) -> TypeDesc {
+    यदि op != "+" तथा op != "-" तथा op != "*" तथा op != "/" तथा op != "**" {
+        प्रत्यानय error_type();
+    }
+    यदि left.tag == "आयामीकरण" तथा right.tag == "आयामीकरण" {
+        यदि left.नाम != right.नाम वा न broadcastable(left, right) {
+            प्रत्यानय error_type();
+        }
+        यदि न left.shape_known वा न right.shape_known {
+            प्रत्यानय tensor_type(left.नाम, असत्य, []);
+        }
+        स्थापय परिवर्तनीय कोटि = दैर्घ्य(left.dims);
+        यदि दैर्घ्य(right.dims) > कोटि {
+            कोटि = दैर्घ्य(right.dims);
+        }
+        स्थापय dims: सूची<पूर्णाङ्क> = [];
+        स्थापय परिवर्तनीय offset = ०;
+        यावत् offset < कोटि {
+            स्थापय परिवर्तनीय अ = १;
+            स्थापय परिवर्तनीय ब = १;
+            यदि offset < दैर्घ्य(left.dims) {
+                अ = left.dims.प्राप्नु(दैर्घ्य(left.dims) - १ - offset);
+            }
+            यदि offset < दैर्घ्य(right.dims) {
+                ब = right.dims.प्राप्नु(दैर्घ्य(right.dims) - १ - offset);
+            }
+            यदि अ == १ {
+                dims.योजय(ब);
+            } अन्यथा {
+                dims.योजय(अ);
+            }
+            offset += १;
+        }
+        dims.विपर्यय();
+        प्रत्यानय tensor_type(left.नाम, सत्य, dims);
+    }
+    स्थापय परिवर्तनीय आयामीकरण = left;
+    स्थापय परिवर्तनीय scalar = right;
+    यदि right.tag == "आयामीकरण" {
+        आयामीकरण = right;
+        scalar = left;
+    }
+    यदि आयामीकरण.tag != "आयामीकरण" वा न is_numeric(scalar) {
+        प्रत्यानय error_type();
+    }
+    यदि op == "**" तथा scalar.नाम != "पूर्णाङ्क" {
+        प्रत्यानय error_type();
+    }
+    प्रत्यानय आयामीकरण;
+}
+
+कार्य infer_binary(op: अक्षरमाला, left: TypeDesc, right: TypeDesc) -> TypeDesc {
+    यदि is_error(left) वा is_error(right) {
+        प्रत्यानय error_type();
+    }
+    यदि op == "तथा" वा op == "वा" {
+        यदि left.tag == "primitive" तथा right.tag == "primitive" तथा left.नाम == "सत्यता" तथा right.नाम == "सत्यता" {
+            प्रत्यानय primitive("सत्यता");
+        }
+        प्रत्यानय error_type();
+    }
+    यदि op == "==" वा op == "!=" {
+        यदि type_equal(left, right) तथा left.tag == "primitive" तथा
+            (left.नाम == "पूर्णाङ्क" वा left.नाम == "दशमलव" वा left.नाम == "सत्यता" वा left.नाम == "अक्षरमाला") {
+            प्रत्यानय primitive("सत्यता");
+        }
+        प्रत्यानय error_type();
+    }
+    यदि op == "<" वा op == "<=" वा op == ">" वा op == ">=" {
+        यदि type_equal(left, right) तथा left.tag == "primitive" तथा
+            (left.नाम == "पूर्णाङ्क" वा left.नाम == "दशमलव" वा left.नाम == "अक्षरमाला") {
+            प्रत्यानय primitive("सत्यता");
+        }
+        प्रत्यानय error_type();
+    }
+    यदि left.tag == "आयामीकरण" वा right.tag == "आयामीकरण" {
+        प्रत्यानय tensor_binary_type(op, left, right);
+    }
+    यदि op == "+" तथा type_equal(left, right) तथा left.tag == "primitive" तथा
+        (left.नाम == "पूर्णाङ्क" वा left.नाम == "दशमलव" वा left.नाम == "अक्षरमाला") {
+        प्रत्यानय left;
+    }
+    यदि (op == "-" वा op == "*" वा op == "/") तथा type_equal(left, right) तथा
+        left.tag == "primitive" तथा (left.नाम == "पूर्णाङ्क" वा left.नाम == "दशमलव") {
+        प्रत्यानय left;
+    }
+    यदि op == "%" तथा type_equal(left, right) तथा left.tag == "primitive" तथा left.नाम == "पूर्णाङ्क" {
+        प्रत्यानय left;
+    }
+    यदि op == "**" तथा type_equal(left, right) तथा left.tag == "primitive" तथा
+        (left.नाम == "पूर्णाङ्क" वा left.नाम == "दशमलव") {
+        प्रत्यानय left;
+    }
+    प्रत्यानय error_type();
+}
+
+कार्य infer_unary(op: अक्षरमाला, operand: TypeDesc) -> TypeDesc {
+    यदि is_error(operand) {
+        प्रत्यानय error_type();
+    }
+    यदि op == "-" तथा (is_numeric(operand) वा operand.tag == "आयामीकरण") {
+        प्रत्यानय operand;
+    }
+    यदि op == "न" तथा operand.tag == "primitive" तथा operand.नाम == "सत्यता" {
+        प्रत्यानय primitive("सत्यता");
+    }
+    प्रत्यानय error_type();
+}
+
+कार्य valid_range_bounds(आरम्भ: TypeDesc, अन्त: TypeDesc) -> सत्यता {
+    प्रत्यानय आरम्भ.tag == "primitive" तथा आरम्भ.नाम == "पूर्णाङ्क" तथा
+        अन्त.tag == "primitive" तथा अन्त.नाम == "पूर्णाङ्क";
+}
+
+कार्य infer_list(elements: सूची<TypeDesc>, has_expected: सत्यता, expected_element: TypeDesc) -> TypeDesc {
+    यदि दैर्घ्य(elements) == ० {
+        यदि has_expected {
+            प्रत्यानय list_type(expected_element);
+        }
+        प्रत्यानय error_type();
+    }
+    स्थापय first = elements.प्राप्नु(०);
+    यदि is_error(first) {
+        प्रत्यानय error_type();
+    }
+    स्थापय परिवर्तनीय i = १;
+    यावत् i < दैर्घ्य(elements) {
+        यदि न type_equal(first, elements.प्राप्नु(i)) {
+            प्रत्यानय error_type();
+        }
+        i += १;
+    }
+    प्रत्यानय list_type(first);
+}
+
+कार्य infer_index(आधार: TypeDesc, सूचक: TypeDesc) -> TypeDesc {
+    यदि is_error(आधार) वा is_error(सूचक) {
+        प्रत्यानय error_type();
+    }
+    यदि सूचक.tag != "primitive" वा सूचक.नाम != "पूर्णाङ्क" {
+        प्रत्यानय error_type();
+    }
+    यदि आधार.tag == "list" तथा दैर्घ्य(आधार.elements) == १ {
+        प्रत्यानय आधार.elements.प्राप्नु(०);
+    }
+    यदि आधार.tag == "primitive" तथा आधार.नाम == "अक्षरमाला" {
+        प्रत्यानय primitive("अक्षरमाला");
+    }
+    प्रत्यानय error_type();
+}
+
+कार्य lookup_index(bindings: सूची<Binding>, scope_stack: सूची<पूर्णाङ्क>, नाम: अक्षरमाला) -> पूर्णाङ्क {
+    स्थापय परिवर्तनीय scope_index = scope_stack.दैर्घ्य() - १;
+    यावत् scope_index >= ० {
+        स्थापय current_scope = scope_stack.प्राप्नु(scope_index);
+        स्थापय परिवर्तनीय binding_index = bindings.दैर्घ्य() - १;
+        यावत् binding_index >= ० {
+            स्थापय binding = bindings.प्राप्नु(binding_index);
+            यदि binding.scope == current_scope तथा binding.नाम == नाम {
+                प्रत्यानय binding_index;
+            }
+            binding_index -= १;
+        }
+        scope_index -= १;
+    }
+    प्रत्यानय -१;
+}
+
+कार्य declare(bindings: सूची<Binding>, scope_stack: सूची<पूर्णाङ्क>, नाम: अक्षरमाला, ty: TypeDesc, mutable: सत्यता) -> सत्यता {
+    स्थापय current_scope = scope_stack.प्राप्नु(scope_stack.दैर्घ्य() - १);
+    स्थापय duplicate = lookup_index(bindings, scope_stack, नाम) >= ० तथा
+        bindings.प्राप्नु(lookup_index(bindings, scope_stack, नाम)).scope == current_scope;
+    यदि नाम != "_" {
+        // Keep the latest duplicate just as the bootstrap's recovery path does;
+        // the false result still exposes the duplicate to differential checks.
+        bindings.योजय(Binding(नाम, ty, mutable, current_scope));
+    }
+    प्रत्यानय न duplicate;
+}
+
+कार्य resolved_type(bindings: सूची<Binding>, scope_stack: सूची<पूर्णाङ्क>, नाम: अक्षरमाला) -> TypeDesc {
+    स्थापय सूचक = lookup_index(bindings, scope_stack, नाम);
+    यदि सूचक < ० {
+        प्रत्यानय error_type();
+    }
+    प्रत्यानय bindings.प्राप्नु(सूचक).ty;
+}
+
+कार्य assignment_status(bindings: सूची<Binding>, scope_stack: सूची<पूर्णाङ्क>, नाम: अक्षरमाला, मूल्य: TypeDesc, op: अक्षरमाला) -> अक्षरमाला {
+    स्थापय सूचक = lookup_index(bindings, scope_stack, नाम);
+    यदि सूचक < ० {
+        प्रत्यानय "unknown";
+    }
+    स्थापय binding = bindings.प्राप्नु(सूचक);
+    यदि न binding.mutable {
+        प्रत्यानय "immutable";
+    }
+    यदि op == "=" {
+        यदि is_assignable(मूल्य, binding.ty) {
+            प्रत्यानय "ok";
+        }
+        प्रत्यानय "type";
+    }
+    स्थापय result = infer_binary(op, binding.ty, मूल्य);
+    यदि is_error(result) वा न is_assignable(result, binding.ty) {
+        प्रत्यानय "type";
+    }
+    प्रत्यानय "ok";
+}
+
+कार्य signature_index(signatures: सूची<FunctionSignature>, नाम: अक्षरमाला) -> पूर्णाङ्क {
+    स्थापय परिवर्तनीय i = signatures.दैर्घ्य() - १;
+    यावत् i >= ० {
+        यदि signatures.प्राप्नु(i).नाम == नाम {
+            प्रत्यानय i;
+        }
+        i -= १;
+    }
+    प्रत्यानय -१;
+}
+
+कार्य check_call(signatures: सूची<FunctionSignature>, नाम: अक्षरमाला, arguments: सूची<TypeDesc>) -> TypeDesc {
+    स्थापय सूचक = signature_index(signatures, नाम);
+    यदि सूचक < ० {
+        प्रत्यानय error_type();
+    }
+    स्थापय signature = signatures.प्राप्नु(सूचक);
+    यदि दैर्घ्य(arguments) != दैर्घ्य(signature.parameter_types) {
+        प्रत्यानय error_type();
+    }
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < दैर्घ्य(arguments) {
+        यदि न is_assignable(arguments.प्राप्नु(i), signature.parameter_types.प्राप्नु(i)) {
+            प्रत्यानय error_type();
+        }
+        i += १;
+    }
+    प्रत्यानय signature.result;
+}
+
+कार्य return_compatible(actual: TypeDesc, expected: TypeDesc, has_value: सत्यता) -> सत्यता {
+    यदि expected.tag == "primitive" तथा expected.नाम == "एकक" {
+        प्रत्यानय न has_value;
+    }
+    यदि न has_value {
+        प्रत्यानय असत्य;
+    }
+    प्रत्यानय is_assignable(actual, expected);
+}
+
+कार्य variable_initializer_compatible(actual: TypeDesc, expected: TypeDesc) -> सत्यता {
+    यदि expected.tag == "primitive" तथा expected.नाम == "एकक" {
+        प्रत्यानय असत्य;
+    }
+    प्रत्यानय is_assignable(actual, expected);
+}
+
+कार्य condition_compatible(actual: TypeDesc) -> सत्यता {
+    प्रत्यानय is_assignable(actual, primitive("सत्यता"));
+}
+
+कार्य iterable_supported(actual: TypeDesc) -> सत्यता {
+    // Match the analyser's ErrorType recovery: an upstream error owns the
+    // diagnostic and must not produce a second, misleading iterable error.
+    प्रत्यानय is_error(actual) वा actual.tag == "list" वा (actual.tag == "opaque" तथा actual.नाम == "सीमा");
+}
+
+कार्य run_builtin_checks() -> पूर्णाङ्क {
+    स्थापय int_ty = primitive("पूर्णाङ्क");
+    स्थापय float_ty = primitive("दशमलव");
+    स्थापय bool_ty = primitive("सत्यता");
+    स्थापय string_ty = primitive("अक्षरमाला");
+    स्थापय never_ty = primitive("अभाव");
+    स्थापय err_ty = error_type();
+    स्थापय परिवर्तनीय cases = ०;
+
+    निश्चिनु(is_assignable(int_ty, int_ty));
+    निश्चिनु(न is_assignable(int_ty, float_ty));
+    निश्चिनु(is_assignable(never_ty, primitive("एकक")));
+    निश्चिनु(is_assignable(err_ty, string_ty));
+    निश्चिनु(type_equal(list_type(list_type(int_ty)), list_type(list_type(primitive("पूर्णाङ्क")))));
+    निश्चिनु(न is_assignable(list_type(int_ty), list_type(float_ty)));
+    निश्चिनु(is_assignable(nominal_type("Point"), nominal_type("Point")));
+    निश्चिनु(न is_assignable(nominal_type("Point"), nominal_type("Other")));
+    निश्चिनु(is_assignable(opaque_type("वर्ण"), opaque_type("वर्ण")));
+    cases += ९;
+
+    स्थापय concrete = tensor_type("दशमलव३२", सत्य, [२, ३]);
+    स्थापय dynamic = tensor_type("दशमलव३२", असत्य, []);
+    निश्चिनु(is_assignable(concrete, dynamic));
+    निश्चिनु(न is_assignable(dynamic, concrete));
+    निश्चिनु(न is_assignable(concrete, tensor_type("दशमलव६४", असत्य, [])));
+    निश्चिनु(is_assignable(concrete, tensor_type("दशमलव३२", सत्य, [२, ३])));
+    निश्चिनु(न is_assignable(concrete, tensor_type("दशमलव३२", सत्य, [३, २])));
+    निश्चिनु(broadcastable(tensor_type("दशमलव३२", सत्य, [२, १]), tensor_type("दशमलव३२", सत्य, [१, ३])));
+    निश्चिनु(broadcastable(tensor_type("दशमलव३२", सत्य, [३]), tensor_type("दशमलव३२", सत्य, [२, ३])));
+    निश्चिनु(न broadcastable(tensor_type("दशमलव३२", सत्य, [२]), tensor_type("दशमलव३२", सत्य, [३])));
+    निश्चिनु(न broadcastable(int_ty, concrete));
+    cases += ९;
+
+    निश्चिनु(type_equal(infer_binary("+", int_ty, int_ty), int_ty));
+    निश्चिनु(type_equal(infer_binary("+", string_ty, string_ty), string_ty));
+    निश्चिनु(type_equal(infer_binary("तथा", bool_ty, bool_ty), bool_ty));
+    निश्चिनु(type_equal(infer_binary("<", int_ty, int_ty), bool_ty));
+    निश्चिनु(is_error(infer_binary("+", int_ty, float_ty)));
+    निश्चिनु(type_equal(infer_unary("-", concrete), concrete));
+    निश्चिनु(type_equal(infer_unary("न", bool_ty), bool_ty));
+    निश्चिनु(is_error(infer_index(list_type(int_ty), float_ty)));
+    निश्चिनु(type_equal(infer_index(list_type(int_ty), int_ty), int_ty));
+    निश्चिनु(type_equal(infer_list([int_ty, int_ty], असत्य, err_ty), list_type(int_ty)));
+    निश्चिनु(is_error(infer_list([int_ty, float_ty], असत्य, err_ty)));
+    निश्चिनु(is_error(infer_list([], असत्य, err_ty)));
+    निश्चिनु(type_equal(infer_list([], सत्य, int_ty), list_type(int_ty)));
+    cases += १३;
+
+    स्थापय परिवर्तनीय bindings: सूची<Binding> = [];
+    स्थापय परिवर्तनीय active_scopes: सूची<पूर्णाङ्क> = [०];
+    निश्चिनु(declare(bindings, active_scopes, "मूल्य", int_ty, सत्य));
+    निश्चिनु(resolved_type(bindings, active_scopes, "मूल्य").नाम == "पूर्णाङ्क");
+    निश्चिनु(assignment_status(bindings, active_scopes, "मूल्य", float_ty, "=") == "type");
+    निश्चिनु(assignment_status(bindings, active_scopes, "मूल्य", int_ty, "=") == "ok");
+    निश्चिनु(न declare(bindings, active_scopes, "मूल्य", float_ty, असत्य));
+    निश्चिनु(resolved_type(bindings, active_scopes, "मूल्य").नाम == "दशमलव");
+    निश्चिनु(assignment_status(bindings, active_scopes, "मूल्य", float_ty, "=") == "immutable");
+    active_scopes.योजय(१);
+    निश्चिनु(declare(bindings, active_scopes, "मूल्य", string_ty, असत्य));
+    निश्चिनु(resolved_type(bindings, active_scopes, "मूल्य").नाम == "अक्षरमाला");
+    active_scopes.निष्कासय();
+    निश्चिनु(resolved_type(bindings, active_scopes, "मूल्य").नाम == "दशमलव");
+    निश्चिनु(lookup_index(bindings, active_scopes, "missing") == -१);
+    cases += १२;
+
+    स्थापय परिवर्तनीय signatures: सूची<FunctionSignature> = [];
+    signatures.योजय(FunctionSignature("योग", ["left", "right"], [int_ty, int_ty], int_ty));
+    निश्चिनु(type_equal(check_call(signatures, "योग", [int_ty, int_ty]), int_ty));
+    निश्चिनु(is_error(check_call(signatures, "योग", [int_ty])));
+    निश्चिनु(is_error(check_call(signatures, "योग", [int_ty, float_ty])));
+    निश्चिनु(is_error(check_call(signatures, "absent", [])));
+    निश्चिनु(return_compatible(int_ty, int_ty, सत्य));
+    निश्चिनु(न return_compatible(int_ty, float_ty, सत्य));
+    निश्चिनु(न return_compatible(int_ty, int_ty, असत्य));
+    निश्चिनु(return_compatible(primitive("एकक"), primitive("एकक"), असत्य));
+    निश्चिनु(न return_compatible(primitive("एकक"), primitive("एकक"), सत्य));
+    निश्चिनु(variable_initializer_compatible(int_ty, int_ty));
+    निश्चिनु(न variable_initializer_compatible(int_ty, primitive("एकक")));
+    निश्चिनु(condition_compatible(bool_ty));
+    निश्चिनु(न condition_compatible(int_ty));
+    निश्चिनु(iterable_supported(range_type()));
+    निश्चिनु(iterable_supported(list_type(int_ty)));
+    निश्चिनु(न iterable_supported(int_ty));
+    निश्चिनु(iterable_supported(err_ty));
+    cases += १३;
+
+    प्रत्यानय cases;
+}
+
+कार्य मुख्य() -> एकक {
+    स्थापय checks = run_builtin_checks();
+    मुद्रय("PEACOCK type-model checks passed (" + पाठ्यीकरण(checks) + " assertions)");
+}

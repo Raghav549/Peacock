@@ -1,5 +1,5 @@
-# Canonical PEACOCK source files. The linguist-language attribute keeps
-# .pac rendered as Peacock before (and independently of) upstream Linguist support.
-*.pac text eol=lf linguist-language=Peacock linguist-detectable=true
-linguist/samples/*.pac linguist-documentation=false
-*.pkb binary
+# Canonical PEACOCK source files. These attributes request Peacock classification
+# once Linguist knows the language; they do not register it upstream by themselves.
+*.सूत्र text eol=lf linguist-language=Peacock linguist-detectable=true
+linguist/samples/*.सूत्र linguist-documentation=false
+*.बीज binary

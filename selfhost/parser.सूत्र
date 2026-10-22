@@ -1,0 +1,1131 @@
+// Self-hosted PEACOCK parser (stage 2a).
+//
+// This program is written in PEACOCK and executed by the real PEACOCK VM. It
+// lexes and parses the core language (प्रकरण/उपयोग/संघटन/कार्य declarations,
+// statements, expressions) and prints a canonical S-expression AST digest.
+// tests/integration/test_selfhost_parser.py compares the digest with one
+// produced from the bootstrap AST on the core corpus.
+//
+// Scope and honesty:
+//   * the parser covers the full 0.2 grammar, including प्रतिमान and अभ्यास
+//     declarations; the bootstrap parser remains the diagnostics/recovery oracle;
+//   * the parser is strict: it stops at the first syntax error instead of
+//     recovering like the bootstrap parser;
+//   * it parses a file passed as the first program argument and requires the
+//     `सञ्चय` capability.
+//
+// This is a genuine self-hosted component, not the full compiler, and it does
+// not make the toolchain self-hosting.
+
+प्रकरण selfhost_parser
+
+उपयोग पाठ्य
+उपयोग सञ्चय
+उपयोग प्रक्रिया
+
+संघटन Tok {
+    kind: अक्षरमाला
+    पाठ्य: अक्षरमाला
+    आरम्भ: पूर्णाङ्क
+}
+
+संघटन Parser {
+    toks: सूची<Tok>
+    pos: पूर्णाङ्क
+    source: अक्षरमाला
+}
+
+// ---------------------------------------------------------------------------
+// Lexer
+// ---------------------------------------------------------------------------
+
+कार्य is_ident_start(ch: अक्षरमाला) -> सत्यता {
+    यदि दैर्घ्य(ch) == ० {
+        प्रत्यानय असत्य;
+    }
+    प्रत्यानय पाठ्य.वर्णः(ch) वा ch == "_";
+}
+
+कार्य is_ident_continue(ch: अक्षरमाला) -> सत्यता {
+    यदि दैर्घ्य(ch) == ० {
+        प्रत्यानय असत्य;
+    }
+    प्रत्यानय पाठ्य.वर्णाङ्कः(ch) वा पाठ्य.चिह्नमात्रा(ch) वा ch == "_";
+}
+
+कार्य is_float_literal(s: अक्षरमाला) -> सत्यता {
+    यदि दैर्घ्य(s) >= २ {
+        स्थापय first = पाठ्य.अक्षरम्(s, ०);
+        स्थापय second = पाठ्य.अक्षरम्(s, १);
+        यदि first == "0" तथा (second == "x" वा second == "X" वा second == "b" वा second == "B" वा second == "o" वा second == "O") {
+            प्रत्यानय असत्य;
+        }
+    }
+    प्रत्यानय s.अन्तर्भूत(".") वा s.अन्तर्भूत("e") वा s.अन्तर्भूत("E");
+}
+
+कार्य scan_number(source: अक्षरमाला, आरम्भ: पूर्णाङ्क) -> पूर्णाङ्क {
+    स्थापय n = दैर्घ्य(source);
+    स्थापय परिवर्तनीय i = आरम्भ;
+    स्थापय ch = पाठ्य.अक्षरम्(source, i);
+    यदि ch == "0" तथा i + १ < n {
+        स्थापय next = पाठ्य.अक्षरम्(source, i + १);
+        यदि next == "x" वा next == "X" वा next == "b" वा next == "B" वा next == "o" वा next == "O" {
+            i += २;
+            यावत् i < n {
+                स्थापय च = पाठ्य.अक्षरम्(source, i);
+                यदि पाठ्य.वर्णाङ्कः(च) वा च == "_" {
+                    i += १;
+                } अन्यथा {
+                    विच्छिन्दु;
+                }
+            }
+            प्रत्यानय i;
+        }
+    }
+    यावत् i < n {
+        स्थापय च = पाठ्य.अक्षरम्(source, i);
+        यदि पाठ्य.अङ्कः(च) वा च == "_" {
+            i += १;
+        } अन्यथा {
+            विच्छिन्दु;
+        }
+    }
+    यदि i + १ < n {
+        स्थापय dot = पाठ्य.अक्षरम्(source, i);
+        स्थापय after = पाठ्य.अक्षरम्(source, i + १);
+        यदि dot == "." तथा पाठ्य.अङ्कः(after) {
+            i += १;
+            यावत् i < n {
+                स्थापय च = पाठ्य.अक्षरम्(source, i);
+                यदि पाठ्य.अङ्कः(च) वा च == "_" {
+                    i += १;
+                } अन्यथा {
+                    विच्छिन्दु;
+                }
+            }
+        }
+    }
+    यदि i < n {
+        स्थापय घाताधार = पाठ्य.अक्षरम्(source, i);
+        यदि घाताधार == "e" वा घाताधार == "E" {
+            स्थापय परिवर्तनीय j = i + १;
+            यदि j < n {
+                स्थापय sign = पाठ्य.अक्षरम्(source, j);
+                यदि sign == "+" वा sign == "-" {
+                    j += १;
+                }
+            }
+            यदि j < n {
+                यदि पाठ्य.अङ्कः(पाठ्य.अक्षरम्(source, j)) {
+                    i = j;
+                    यावत् i < n {
+                        यदि पाठ्य.अङ्कः(पाठ्य.अक्षरम्(source, i)) {
+                            i += १;
+                        } अन्यथा {
+                            विच्छिन्दु;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    प्रत्यानय i;
+}
+
+कार्य lex_error(source: अक्षरमाला, सूचक: पूर्णाङ्क, सन्देश: अक्षरमाला) -> एकक {
+    स्थापय परिवर्तनीय रेखा = १;
+    स्थापय परिवर्तनीय col = १;
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < सूचक तथा i < दैर्घ्य(source) {
+        यदि पाठ्य.अक्षरम्(source, i) == "\n" {
+            रेखा += १;
+            col = १;
+        } अन्यथा {
+            col += १;
+        }
+        i += १;
+    }
+    क्षिप "lex error at line " + पाठ्यीकरण(रेखा) + ", column " + पाठ्यीकरण(col) + ": " + सन्देश;
+}
+
+कार्य lex(source: अक्षरमाला) -> सूची<Tok> {
+    स्थापय keywords = [
+        "प्रकरण", "उपयोग", "रूपेण", "कार्य", "स्थापय", "परिवर्तनीय", "यदि", "अन्यथा", "यावत्", "प्रति",
+        "मध्ये", "प्रत्यानय", "विच्छिन्दु", "अनुवर्तय", "संघटन", "प्रतिमान", "अभ्यास",
+        "अधिकार", "यत्न", "गृह्ण", "क्षिप", "निश्चिनु", "सत्य", "असत्य",
+        "तथा", "वा", "न"
+    ];
+    स्थापय two_char_ops = [
+        "**", "==", "!=", "<=", ">=", "->", "+=", "-=", "*=", "/=", "%=", ".."
+    ];
+    स्थापय single_char_ops = [
+        "+", "-", "*", "/", "%", "<", ">", "=", ".", ",", ":", ";", "(", ")",
+        "{", "}", "[", "]", "?"
+    ];
+
+    स्थापय tokens: सूची<Tok> = [];
+    स्थापय n = दैर्घ्य(source);
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < n {
+        स्थापय ch = पाठ्य.अक्षरम्(source, i);
+        यदि पाठ्य.रिक्तिः(ch) {
+            i += १;
+            अनुवर्तय;
+        }
+        यदि ch == "/" तथा i + १ < n {
+            स्थापय nxt = पाठ्य.अक्षरम्(source, i + १);
+            यदि nxt == "/" {
+                i += २;
+                यावत् i < n {
+                    यदि पाठ्य.अक्षरम्(source, i) == "\n" {
+                        विच्छिन्दु;
+                    }
+                    i += १;
+                }
+                अनुवर्तय;
+            }
+            यदि nxt == "*" {
+                स्थापय आरम्भ = i;
+                स्थापय परिवर्तनीय depth = १;
+                i += २;
+                यावत् i < n तथा depth > ० {
+                    यदि i + १ < n {
+                        स्थापय अ = पाठ्य.अक्षरम्(source, i);
+                        स्थापय ब = पाठ्य.अक्षरम्(source, i + १);
+                        यदि अ == "/" तथा ब == "*" {
+                            depth += १;
+                            i += २;
+                            अनुवर्तय;
+                        }
+                        यदि अ == "*" तथा ब == "/" {
+                            depth -= १;
+                            i += २;
+                            अनुवर्तय;
+                        }
+                    }
+                    i += १;
+                }
+                यदि depth > ० {
+                    lex_error(source, आरम्भ, "unterminated block comment");
+                }
+                अनुवर्तय;
+            }
+        }
+        यदि ch == "\"" {
+            स्थापय आरम्भ = i;
+            i += १;
+            स्थापय परिवर्तनीय closed = असत्य;
+            यावत् i < n {
+                स्थापय च = पाठ्य.अक्षरम्(source, i);
+                यदि च == "\\" {
+                    i += २;
+                    अनुवर्तय;
+                }
+                यदि च == "\"" {
+                    i += १;
+                    closed = सत्य;
+                    विच्छिन्दु;
+                }
+                i += १;
+            }
+            यदि न closed {
+                lex_error(source, आरम्भ, "unterminated string literal");
+            }
+            tokens.योजय(Tok("पाठ्यीकरण", source.उपपाठ्य(आरम्भ, i), आरम्भ));
+            अनुवर्तय;
+        }
+        यदि पाठ्य.अङ्कः(ch) {
+            स्थापय अन्त = scan_number(source, i);
+            स्थापय raw = source.उपपाठ्य(i, अन्त);
+            यदि is_float_literal(raw) {
+                tokens.योजय(Tok("दशमलवीकरण", raw, i));
+            } अन्यथा {
+                tokens.योजय(Tok("पूर्णीकरण", raw, i));
+            }
+            i = अन्त;
+            अनुवर्तय;
+        }
+        यदि is_ident_start(ch) {
+            स्थापय आरम्भ = i;
+            i += १;
+            यावत् i < n {
+                यदि is_ident_continue(पाठ्य.अक्षरम्(source, i)) {
+                    i += १;
+                } अन्यथा {
+                    विच्छिन्दु;
+                }
+            }
+            स्थापय word = source.उपपाठ्य(आरम्भ, i);
+            यदि keywords.अन्तर्भूत(word) {
+                tokens.योजय(Tok("kw", word, आरम्भ));
+            } अन्यथा {
+                tokens.योजय(Tok("id", word, आरम्भ));
+            }
+            अनुवर्तय;
+        }
+        यदि i + १ < n {
+            स्थापय pair = source.उपपाठ्य(i, i + २);
+            यदि two_char_ops.अन्तर्भूत(pair) {
+                tokens.योजय(Tok("op", pair, i));
+                i += २;
+                अनुवर्तय;
+            }
+        }
+        यदि single_char_ops.अन्तर्भूत(ch) {
+            tokens.योजय(Tok("op", ch, i));
+            i += १;
+            अनुवर्तय;
+        }
+        lex_error(source, i, "invalid character '" + ch + "'");
+        i += १;
+    }
+    tokens.योजय(Tok("eof", "", n));
+    प्रत्यानय tokens;
+}
+
+// ---------------------------------------------------------------------------
+// Parser state helpers
+// ---------------------------------------------------------------------------
+
+कार्य वृक्षनाम(नाम: अक्षरमाला) -> अक्षरमाला {
+    यदि नाम == "ann" { प्रत्यानय "प्रकाराङ्कन"; }
+    यदि नाम == "arg" { प्रत्यानय "तर्क"; }
+    यदि नाम == "assign" { प्रत्यानय "नियोजन"; }
+    यदि नाम == "b" { प्रत्यानय "द्वि"; }
+    यदि नाम == "block" { प्रत्यानय "खण्ड"; }
+    यदि नाम == "call" { प्रत्यानय "आह्वान"; }
+    यदि नाम == "cap" { प्रत्यानय "अधिकार"; }
+    यदि नाम == "error" { प्रत्यानय "दोष"; }
+    यदि नाम == "expr" { प्रत्यानय "अभिव्यक्ति"; }
+    यदि नाम == "field" { प्रत्यानय "क्षेत्र"; }
+    यदि नाम == "layer" { प्रत्यानय "स्तर"; }
+    यदि नाम == "list" { प्रत्यानय "सूची"; }
+    यदि नाम == "opt" { प्रत्यानय "विकल्प"; }
+    यदि नाम == "param" { प्रत्यानय "प्राचल"; }
+    यदि नाम == "params" { प्रत्यानय "प्राचलावली"; }
+    यदि नाम == "ret" { प्रत्यानय "प्रत्यागत"; }
+    यदि नाम == "sym" { प्रत्यानय "प्रतीक"; }
+    यदि नाम == "t" { प्रत्यानय "प्रकार"; }
+    यदि नाम == "tylist" { प्रत्यानय "सूचीप्रकार"; }
+    यदि नाम == "u" { प्रत्यानय "एक"; }
+    प्रत्यानय नाम;
+}
+
+कार्य अंशनाम(नाम: अक्षरमाला) -> अक्षरमाला {
+    यदि नाम == "x" { प्रत्यानय "क्ष"; }
+    यदि नाम == "y" { प्रत्यानय "य"; }
+    यदि नाम == "a" { प्रत्यानय "अ"; }
+    यदि नाम == "b" { प्रत्यानय "ब"; }
+    यदि नाम == "c" { प्रत्यानय "च"; }
+    यदि नाम == "t" { प्रत्यानय "त"; }
+    यदि नाम == "r" { प्रत्यानय "र"; }
+    यदि नाम == "g" { प्रत्यानय "ग"; }
+    यदि नाम == "e" { प्रत्यानय "घाताधार"; }
+    यदि नाम == "x0" { प्रत्यानय "क्ष०"; }
+    यदि नाम == "x1" { प्रत्यानय "क्ष१"; }
+    यदि नाम == "y0" { प्रत्यानय "य०"; }
+    यदि नाम == "y1" { प्रत्यानय "य१"; }
+    प्रत्यानय नाम;
+}
+
+कार्य node(नाम: अक्षरमाला, parts: सूची<अक्षरमाला>) -> अक्षरमाला {
+    स्थापय शीर्षक = वृक्षनाम(नाम);
+    यदि दैर्घ्य(parts) == ० {
+        प्रत्यानय "(" + शीर्षक + ")";
+    }
+    स्थापय परिवर्तनीय प्रदत्त: सूची<अक्षरमाला> = [];
+    प्रति अंश मध्ये parts {
+        प्रदत्त.योजय(अंशनाम(अंश));
+    }
+    प्रत्यानय "(" + शीर्षक + " " + प्रदत्त.संयोजय(" ") + ")";
+}
+
+कार्य peek_at(p: Parser, offset: पूर्णाङ्क) -> Tok {
+    स्थापय सूचक = p.pos + offset;
+    यदि सूचक < ० वा सूचक >= p.toks.दैर्घ्य() {
+        प्रत्यानय Tok("eof", "", p.source.दैर्घ्य());
+    }
+    प्रत्यानय p.toks.प्राप्नु(सूचक);
+}
+
+कार्य peek(p: Parser) -> Tok {
+    प्रत्यानय peek_at(p, ०);
+}
+
+कार्य at_kind(p: Parser, kind: अक्षरमाला) -> सत्यता {
+    प्रत्यानय peek(p).kind == kind;
+}
+
+कार्य at_kw(p: Parser, word: अक्षरमाला) -> सत्यता {
+    स्थापय त = peek(p);
+    प्रत्यानय त.kind == "kw" तथा त.पाठ्य == word;
+}
+
+कार्य at_op(p: Parser, op: अक्षरमाला) -> सत्यता {
+    स्थापय त = peek(p);
+    प्रत्यानय त.kind == "op" तथा त.पाठ्य == op;
+}
+
+कार्य advance(p: Parser) -> Tok {
+    स्थापय त = peek(p);
+    यदि त.kind != "eof" {
+        p.pos += १;
+    }
+    प्रत्यानय त;
+}
+
+कार्य accept_op(p: Parser, op: अक्षरमाला) -> सत्यता {
+    यदि at_op(p, op) {
+        p.pos += १;
+        प्रत्यानय सत्य;
+    }
+    प्रत्यानय असत्य;
+}
+
+कार्य error_at(p: Parser, सूचक: पूर्णाङ्क, सन्देश: अक्षरमाला) -> एकक {
+    स्थापय परिवर्तनीय रेखा = १;
+    स्थापय परिवर्तनीय col = १;
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < सूचक तथा i < दैर्घ्य(p.source) {
+        यदि पाठ्य.अक्षरम्(p.source, i) == "\n" {
+            रेखा += १;
+            col = १;
+        } अन्यथा {
+            col += १;
+        }
+        i += १;
+    }
+    क्षिप "parse error at line " + पाठ्यीकरण(रेखा) + ", column " + पाठ्यीकरण(col) + ": " + सन्देश;
+}
+
+कार्य error_here(p: Parser, सन्देश: अक्षरमाला) -> एकक {
+    error_at(p, peek(p).आरम्भ, सन्देश);
+}
+
+कार्य expect_op(p: Parser, op: अक्षरमाला) -> Tok {
+    यदि न at_op(p, op) {
+        स्थापय त = peek(p);
+        error_here(p, "expected '" + op + "', found " + describe_token(त));
+    }
+    प्रत्यानय advance(p);
+}
+
+कार्य expect_kind(p: Parser, kind: अक्षरमाला, what: अक्षरमाला) -> Tok {
+    यदि न at_kind(p, kind) {
+        स्थापय त = peek(p);
+        error_here(p, "expected " + what + ", found " + describe_token(त));
+    }
+    प्रत्यानय advance(p);
+}
+
+कार्य expect_ident(p: Parser, what: अक्षरमाला) -> Tok {
+    प्रत्यानय expect_kind(p, "id", what);
+}
+
+कार्य describe_token(त: Tok) -> अक्षरमाला {
+    यदि त.kind == "eof" {
+        प्रत्यानय "end of file";
+    }
+    यदि त.kind == "id" {
+        प्रत्यानय "identifier '" + त.पाठ्य + "'";
+    }
+    यदि त.kind == "kw" {
+        प्रत्यानय "keyword '" + त.पाठ्य + "'";
+    }
+    यदि त.kind == "पाठ्यीकरण" {
+        प्रत्यानय "string literal";
+    }
+    प्रत्यानय "'" + त.पाठ्य + "'";
+}
+
+// ---------------------------------------------------------------------------
+// Type expressions
+// ---------------------------------------------------------------------------
+
+कार्य parse_type(p: Parser) -> अक्षरमाला {
+    स्थापय name_tok = expect_ident(p, "a type name");
+    स्थापय नाम = name_tok.पाठ्य;
+    यदि नाम == "आयाम" {
+        expect_op(p, "<");
+        स्थापय दत्तप्रकार = expect_ident(p, "a tensor dtype").पाठ्य;
+        स्थापय parts = [दत्तप्रकार];
+        यदि accept_op(p, ",") {
+            expect_op(p, "[");
+            स्थापय dims: सूची<अक्षरमाला> = [];
+            यदि न at_op(p, "]") {
+                यावत् सत्य {
+                    dims.योजय(expect_kind(p, "पूर्णीकरण", "a tensor dimension").पाठ्य);
+                    यदि न accept_op(p, ",") {
+                        विच्छिन्दु;
+                    }
+                }
+            }
+            expect_op(p, "]");
+            parts.योजय(node("आकृति", dims));
+        }
+        expect_op(p, ">");
+        प्रत्यानय node("आयामीकरण", parts);
+    }
+    यदि नाम == "सूची" {
+        expect_op(p, "<");
+        स्थापय element = parse_type(p);
+        expect_op(p, ">");
+        प्रत्यानय node("tylist", [element]);
+    }
+    यदि at_op(p, "<") {
+        advance(p);
+        स्थापय तर्कावली: सूची<अक्षरमाला> = [];
+        यावत् सत्य {
+            तर्कावली.योजय(parse_type(p));
+            यदि न accept_op(p, ",") {
+                विच्छिन्दु;
+            }
+        }
+        expect_op(p, ">");
+        स्थापय parts = [नाम];
+        प्रति arg मध्ये तर्कावली {
+            parts.योजय(arg);
+        }
+        प्रत्यानय node("t", parts);
+    }
+    प्रत्यानय node("t", [नाम]);
+}
+
+कार्य parse_params(p: Parser) -> अक्षरमाला {
+    expect_op(p, "(");
+    स्थापय params: सूची<अक्षरमाला> = [];
+    यदि न at_op(p, ")") {
+        यावत् सत्य {
+            स्थापय नाम = expect_ident(p, "a parameter name").पाठ्य;
+            expect_op(p, ":");
+            स्थापय ty = parse_type(p);
+            params.योजय(node("param", [नाम, ty]));
+            यदि न accept_op(p, ",") {
+                विच्छिन्दु;
+            }
+            यदि at_op(p, ")") {
+                विच्छिन्दु;
+            }
+        }
+    }
+    expect_op(p, ")");
+    प्रत्यानय node("params", params);
+}
+
+// ---------------------------------------------------------------------------
+// Expressions (mirrors the bootstrap precedence grammar)
+// ---------------------------------------------------------------------------
+
+कार्य parse_expr(p: Parser) -> अक्षरमाला {
+    प्रत्यानय parse_or(p);
+}
+
+कार्य parse_or(p: Parser) -> अक्षरमाला {
+    स्थापय परिवर्तनीय left = parse_and(p);
+    यावत् at_kw(p, "वा") {
+        advance(p);
+        स्थापय right = parse_and(p);
+        left = node("b", ["वा", left, right]);
+    }
+    प्रत्यानय left;
+}
+
+कार्य parse_and(p: Parser) -> अक्षरमाला {
+    स्थापय परिवर्तनीय left = parse_not(p);
+    यावत् at_kw(p, "तथा") {
+        advance(p);
+        स्थापय right = parse_not(p);
+        left = node("b", ["तथा", left, right]);
+    }
+    प्रत्यानय left;
+}
+
+कार्य parse_not(p: Parser) -> अक्षरमाला {
+    यदि at_kw(p, "न") {
+        advance(p);
+        स्थापय operand = parse_not(p);
+        प्रत्यानय node("u", ["न", operand]);
+    }
+    प्रत्यानय parse_comparison(p);
+}
+
+कार्य is_comparison_op(p: Parser) -> सत्यता {
+    यदि at_op(p, "==") वा at_op(p, "!=") वा at_op(p, "<") वा at_op(p, "<=") वा at_op(p, ">") वा at_op(p, ">=") {
+        प्रत्यानय सत्य;
+    }
+    प्रत्यानय असत्य;
+}
+
+कार्य parse_comparison(p: Parser) -> अक्षरमाला {
+    स्थापय left = parse_range(p);
+    यदि is_comparison_op(p) {
+        स्थापय op = advance(p).पाठ्य;
+        स्थापय right = parse_range(p);
+        यदि is_comparison_op(p) {
+            error_here(p, "chained comparisons are not supported; combine comparisons with 'तथा'");
+        }
+        प्रत्यानय node("b", [op, left, right]);
+    }
+    प्रत्यानय left;
+}
+
+कार्य parse_range(p: Parser) -> अक्षरमाला {
+    स्थापय left = parse_additive(p);
+    यदि accept_op(p, "..") {
+        स्थापय right = parse_additive(p);
+        प्रत्यानय node("परिसर", [left, right]);
+    }
+    प्रत्यानय left;
+}
+
+कार्य parse_additive(p: Parser) -> अक्षरमाला {
+    स्थापय परिवर्तनीय left = parse_multiplicative(p);
+    यावत् at_op(p, "+") वा at_op(p, "-") {
+        स्थापय op = advance(p).पाठ्य;
+        स्थापय right = parse_multiplicative(p);
+        left = node("b", [op, left, right]);
+    }
+    प्रत्यानय left;
+}
+
+कार्य parse_multiplicative(p: Parser) -> अक्षरमाला {
+    स्थापय परिवर्तनीय left = parse_unary(p);
+    यावत् at_op(p, "*") वा at_op(p, "/") वा at_op(p, "%") {
+        स्थापय op = advance(p).पाठ्य;
+        स्थापय right = parse_unary(p);
+        left = node("b", [op, left, right]);
+    }
+    प्रत्यानय left;
+}
+
+कार्य parse_unary(p: Parser) -> अक्षरमाला {
+    यदि at_op(p, "-") {
+        advance(p);
+        स्थापय operand = parse_unary(p);
+        प्रत्यानय node("u", ["-", operand]);
+    }
+    यदि at_kw(p, "न") {
+        advance(p);
+        स्थापय operand = parse_unary(p);
+        प्रत्यानय node("u", ["न", operand]);
+    }
+    प्रत्यानय parse_power(p);
+}
+
+कार्य parse_power(p: Parser) -> अक्षरमाला {
+    स्थापय आधार = parse_postfix(p);
+    यदि accept_op(p, "**") {
+        स्थापय घाताङ्कः = parse_unary(p);
+        प्रत्यानय node("b", ["**", आधार, घाताङ्कः]);
+    }
+    प्रत्यानय आधार;
+}
+
+कार्य parse_call_args(p: Parser) -> सूची<अक्षरमाला> {
+    स्थापय तर्कावली: सूची<अक्षरमाला> = [];
+    यदि न at_op(p, ")") {
+        स्थापय परिवर्तनीय saw_named = असत्य;
+        यावत् सत्य {
+            यदि at_kind(p, "id") तथा peek_at(p, १).kind == "op" तथा peek_at(p, १).पाठ्य == ":" {
+                स्थापय नाम = advance(p).पाठ्य;
+                advance(p);
+                स्थापय मूल्य = parse_expr(p);
+                तर्कावली.योजय(node("arg", [नाम, मूल्य]));
+                saw_named = सत्य;
+            } अन्यथा {
+                यदि saw_named {
+                    error_here(p, "positional arguments may not follow named arguments");
+                }
+                स्थापय मूल्य = parse_expr(p);
+                तर्कावली.योजय(node("arg", ["_", मूल्य]));
+            }
+            यदि न accept_op(p, ",") {
+                विच्छिन्दु;
+            }
+            यदि at_op(p, ")") {
+                विच्छिन्दु;
+            }
+        }
+    }
+    expect_op(p, ")");
+    प्रत्यानय तर्कावली;
+}
+
+कार्य parse_postfix(p: Parser) -> अक्षरमाला {
+    स्थापय परिवर्तनीय expr = parse_primary(p);
+    यावत् सत्य {
+        यदि accept_op(p, "(") {
+            स्थापय तर्कावली = parse_call_args(p);
+            स्थापय parts = [expr];
+            प्रति arg मध्ये तर्कावली {
+                parts.योजय(arg);
+            }
+            expr = node("call", parts);
+            अनुवर्तय;
+        }
+        यदि accept_op(p, ".") {
+            स्थापय नाम = expect_ident(p, "a field name after '.'").पाठ्य;
+            expr = node("field", [expr, नाम]);
+            अनुवर्तय;
+        }
+        यदि accept_op(p, "[") {
+            स्थापय सूचक = parse_expr(p);
+            expect_op(p, "]");
+            expr = node("सूचक", [expr, सूचक]);
+            अनुवर्तय;
+        }
+        विच्छिन्दु;
+    }
+    प्रत्यानय expr;
+}
+
+कार्य parse_primary(p: Parser) -> अक्षरमाला {
+    स्थापय त = peek(p);
+    यदि त.kind == "पूर्णीकरण" {
+        advance(p);
+        प्रत्यानय node("पूर्णीकरण", []);
+    }
+    यदि त.kind == "दशमलवीकरण" {
+        advance(p);
+        प्रत्यानय node("दशमलवीकरण", []);
+    }
+    यदि त.kind == "पाठ्यीकरण" {
+        advance(p);
+        प्रत्यानय node("पाठ्यीकरण", []);
+    }
+    यदि at_kw(p, "सत्य") {
+        advance(p);
+        प्रत्यानय node("सत्य", []);
+    }
+    यदि at_kw(p, "असत्य") {
+        advance(p);
+        प्रत्यानय node("असत्य", []);
+    }
+    यदि त.kind == "id" {
+        advance(p);
+        प्रत्यानय node("नाम", [त.पाठ्य]);
+    }
+    यदि accept_op(p, "(") {
+        स्थापय inner = parse_expr(p);
+        expect_op(p, ")");
+        प्रत्यानय inner;
+    }
+    यदि accept_op(p, "[") {
+        स्थापय elements: सूची<अक्षरमाला> = [];
+        यदि न at_op(p, "]") {
+            यावत् सत्य {
+                elements.योजय(parse_expr(p));
+                यदि न accept_op(p, ",") {
+                    विच्छिन्दु;
+                }
+                यदि at_op(p, "]") {
+                    विच्छिन्दु;
+                }
+            }
+        }
+        expect_op(p, "]");
+        प्रत्यानय node("list", elements);
+    }
+    error_here(p, "expected an expression, found " + describe_token(त));
+    प्रत्यानय node("error", []);
+}
+
+// ---------------------------------------------------------------------------
+// Statements
+// ---------------------------------------------------------------------------
+
+कार्य parse_let(p: Parser) -> अक्षरमाला {
+    advance(p);
+    स्थापय parts: सूची<अक्षरमाला> = [];
+    यदि at_kw(p, "परिवर्तनीय") {
+        advance(p);
+        parts.योजय("परिवर्तनीय");
+    }
+    स्थापय नाम = expect_ident(p, "a variable name").पाठ्य;
+    parts.योजय(नाम);
+    यदि accept_op(p, ":") {
+        parts.योजय(node("ann", [parse_type(p)]));
+    }
+    expect_op(p, "=");
+    parts.योजय(parse_expr(p));
+    expect_op(p, ";");
+    प्रत्यानय node("स्थापय", parts);
+}
+
+कार्य parse_if(p: Parser) -> अक्षरमाला {
+    advance(p);
+    स्थापय condition = parse_expr(p);
+    स्थापय then_block = parse_block(p);
+    स्थापय parts = [condition, then_block];
+    यदि at_kw(p, "अन्यथा") {
+        advance(p);
+        यदि at_kw(p, "यदि") {
+            parts.योजय(parse_if(p));
+        } अन्यथा {
+            parts.योजय(parse_block(p));
+        }
+    }
+    प्रत्यानय node("यदि", parts);
+}
+
+कार्य parse_while(p: Parser) -> अक्षरमाला {
+    advance(p);
+    स्थापय condition = parse_expr(p);
+    स्थापय body = parse_block(p);
+    प्रत्यानय node("यावत्", [condition, body]);
+}
+
+कार्य parse_for(p: Parser) -> अक्षरमाला {
+    advance(p);
+    स्थापय नाम = expect_ident(p, "a loop variable").पाठ्य;
+    यदि न at_kw(p, "मध्ये") {
+        error_here(p, "expected 'मध्ये' in प्रति loop");
+    }
+    advance(p);
+    स्थापय iterable = parse_expr(p);
+    स्थापय body = parse_block(p);
+    प्रत्यानय node("प्रति", [नाम, iterable, body]);
+}
+
+कार्य parse_return(p: Parser) -> अक्षरमाला {
+    advance(p);
+    यदि at_op(p, ";") {
+        advance(p);
+        प्रत्यानय node("प्रत्यानय", []);
+    }
+    स्थापय मूल्य = parse_expr(p);
+    expect_op(p, ";");
+    प्रत्यानय node("प्रत्यानय", [मूल्य]);
+}
+
+कार्य parse_capability(p: Parser) -> अक्षरमाला {
+    advance(p);
+    स्थापय names: सूची<अक्षरमाला> = [];
+    यावत् सत्य {
+        names.योजय(expect_ident(p, "a capability name after अधिकार").पाठ्य);
+        यदि न accept_op(p, ",") {
+            विच्छिन्दु;
+        }
+    }
+    expect_op(p, ";");
+    प्रत्यानय node("cap", names);
+}
+
+कार्य parse_try(p: Parser) -> अक्षरमाला {
+    advance(p);
+    स्थापय body = parse_block(p);
+    यदि न at_kw(p, "गृह्ण") {
+        error_here(p, "expected 'गृह्ण' after यत्न block");
+    }
+    advance(p);
+    expect_op(p, "(");
+    स्थापय नाम = expect_ident(p, "a गृह्ण binding").पाठ्य;
+    expect_op(p, ")");
+    स्थापय catch_body = parse_block(p);
+    प्रत्यानय node("यत्न", [body, नाम, catch_body]);
+}
+
+कार्य parse_throw(p: Parser) -> अक्षरमाला {
+    advance(p);
+    स्थापय मूल्य = parse_expr(p);
+    expect_op(p, ";");
+    प्रत्यानय node("क्षिप", [मूल्य]);
+}
+
+कार्य parse_assert(p: Parser) -> अक्षरमाला {
+    advance(p);
+    स्थापय parenthesised = accept_op(p, "(");
+    स्थापय condition = parse_expr(p);
+    स्थापय parts = [condition];
+    यदि accept_op(p, ",") {
+        parts.योजय(parse_expr(p));
+    }
+    यदि parenthesised {
+        expect_op(p, ")");
+    }
+    expect_op(p, ";");
+    प्रत्यानय node("निश्चिनु", parts);
+}
+
+कार्य parse_statement(p: Parser) -> अक्षरमाला {
+    यदि at_kw(p, "स्थापय") {
+        प्रत्यानय parse_let(p);
+    }
+    यदि at_kw(p, "यदि") {
+        प्रत्यानय parse_if(p);
+    }
+    यदि at_kw(p, "यावत्") {
+        प्रत्यानय parse_while(p);
+    }
+    यदि at_kw(p, "प्रति") {
+        प्रत्यानय parse_for(p);
+    }
+    यदि at_kw(p, "प्रत्यानय") {
+        प्रत्यानय parse_return(p);
+    }
+    यदि at_kw(p, "विच्छिन्दु") {
+        advance(p);
+        expect_op(p, ";");
+        प्रत्यानय node("विच्छिन्दु", []);
+    }
+    यदि at_kw(p, "अनुवर्तय") {
+        advance(p);
+        expect_op(p, ";");
+        प्रत्यानय node("अनुवर्तय", []);
+    }
+    यदि at_kw(p, "अधिकार") {
+        प्रत्यानय parse_capability(p);
+    }
+    यदि at_kw(p, "यत्न") {
+        प्रत्यानय parse_try(p);
+    }
+    यदि at_kw(p, "क्षिप") {
+        प्रत्यानय parse_throw(p);
+    }
+    यदि at_kw(p, "निश्चिनु") {
+        प्रत्यानय parse_assert(p);
+    }
+    यदि at_op(p, "{") {
+        प्रत्यानय parse_block(p);
+    }
+
+    स्थापय expr = parse_expr(p);
+    यदि at_op(p, "=") वा at_op(p, "+=") वा at_op(p, "-=") वा at_op(p, "*=") वा at_op(p, "/=") वा at_op(p, "%=") {
+        स्थापय op = advance(p).पाठ्य;
+        स्थापय मूल्य = parse_expr(p);
+        expect_op(p, ";");
+        प्रत्यानय node("assign", [op, expr, मूल्य]);
+    }
+    expect_op(p, ";");
+    प्रत्यानय node("expr", [expr]);
+}
+
+कार्य parse_block(p: Parser) -> अक्षरमाला {
+    expect_op(p, "{");
+    स्थापय statements: सूची<अक्षरमाला> = [];
+    यावत् न at_op(p, "}") तथा न at_kind(p, "eof") {
+        यदि accept_op(p, ";") {
+            अनुवर्तय;
+        }
+        statements.योजय(parse_statement(p));
+    }
+    expect_op(p, "}");
+    प्रत्यानय node("block", statements);
+}
+
+// ---------------------------------------------------------------------------
+// Declarations
+// ---------------------------------------------------------------------------
+
+कार्य parse_use(p: Parser) -> अक्षरमाला {
+    advance(p);
+    स्थापय परिवर्तनीय पथ = expect_ident(p, "a module name after 'उपयोग'").पाठ्य;
+    यावत् accept_op(p, ".") {
+        पथ = पथ + "." + expect_ident(p, "a module path component").पाठ्य;
+    }
+    स्थापय parts = [पथ];
+    यदि at_kw(p, "रूपेण") {
+        error_here(p, "module aliases ('रूपेण') are not implemented in 0.2");
+    }
+    accept_op(p, ";");
+    प्रत्यानय node("उपयोग", parts);
+}
+
+कार्य parse_struct(p: Parser) -> अक्षरमाला {
+    advance(p);
+    स्थापय नाम = expect_ident(p, "a struct name after संघटन").पाठ्य;
+    expect_op(p, "{");
+    स्थापय parts = [नाम];
+    यावत् न at_op(p, "}") तथा न at_kind(p, "eof") {
+        स्थापय field_name = expect_ident(p, "a संघटन field name").पाठ्य;
+        expect_op(p, ":");
+        स्थापय ty = parse_type(p);
+        parts.योजय(node("field", [field_name, ty]));
+        accept_op(p, ",");
+        accept_op(p, ";");
+    }
+    expect_op(p, "}");
+    प्रत्यानय node("संघटन", parts);
+}
+
+कार्य parse_function(p: Parser) -> अक्षरमाला {
+    advance(p);
+    स्थापय नाम = expect_ident(p, "a function name after 'कार्य'").पाठ्य;
+    स्थापय params = parse_params(p);
+    स्थापय परिवर्तनीय ret = node("t", ["एकक"]);
+    यदि accept_op(p, "->") {
+        ret = parse_type(p);
+    }
+    स्थापय body = parse_block(p);
+    प्रत्यानय node("कार्य", [नाम, params, node("ret", [ret]), body]);
+}
+
+कार्य parse_layer(p: Parser) -> अक्षरमाला {
+    स्थापय नाम = expect_ident(p, "a layer name").पाठ्य;
+    expect_op(p, "(");
+    स्थापय तर्कावली: सूची<अक्षरमाला> = [];
+    यदि न at_op(p, ")") {
+        यावत् सत्य {
+            स्थापय arg_name = expect_ident(p, "a layer argument name").पाठ्य;
+            expect_op(p, ":");
+            स्थापय parts = [arg_name];
+            यदि at_kind(p, "id") तथा (peek_at(p, १).kind == "op") तथा (peek_at(p, १).पाठ्य == "," वा peek_at(p, १).पाठ्य == ")") {
+                स्थापय sym = advance(p).पाठ्य;
+                parts.योजय(node("sym", [sym]));
+            } अन्यथा {
+                parts.योजय(parse_expr(p));
+            }
+            तर्कावली.योजय(node("arg", parts));
+            यदि न accept_op(p, ",") {
+                विच्छिन्दु;
+            }
+            यदि at_op(p, ")") {
+                विच्छिन्दु;
+            }
+        }
+    }
+    expect_op(p, ")");
+    स्थापय parts = [नाम];
+    प्रति arg मध्ये तर्कावली {
+        parts.योजय(arg);
+    }
+    प्रत्यानय node("layer", parts);
+}
+
+कार्य parse_model(p: Parser) -> अक्षरमाला {
+    advance(p);
+    स्थापय नाम = expect_ident(p, "a model name after प्रतिमान").पाठ्य;
+    expect_op(p, "{");
+    स्थापय inputs: सूची<अक्षरमाला> = [];
+    स्थापय outputs: सूची<अक्षरमाला> = [];
+    स्थापय layers: सूची<अक्षरमाला> = [];
+    यावत् न at_op(p, "}") तथा न at_kind(p, "eof") {
+        स्थापय section = peek(p);
+        यदि section.kind == "id" तथा (section.पाठ्य == "निवेश" वा section.पाठ्य == "निर्गम") {
+            advance(p);
+            स्थापय field_name = expect_ident(p, "a प्रतिमान field name").पाठ्य;
+            expect_op(p, ":");
+            स्थापय ty = parse_type(p);
+            यदि section.पाठ्य == "निवेश" {
+                inputs.योजय(node("निवेश", [field_name, ty]));
+            } अन्यथा {
+                outputs.योजय(node("निर्गम", [field_name, ty]));
+            }
+            अनुवर्तय;
+        }
+        यदि section.kind == "id" तथा section.पाठ्य == "क्रम" {
+            advance(p);
+            expect_op(p, "{");
+            यावत् न at_op(p, "}") तथा न at_kind(p, "eof") {
+                layers.योजय(parse_layer(p));
+            }
+            expect_op(p, "}");
+            अनुवर्तय;
+        }
+        error_here(p, "expected 'निवेश', 'निर्गम' or 'क्रम' in प्रतिमान body");
+    }
+    expect_op(p, "}");
+    स्थापय parts = [नाम];
+    प्रति field मध्ये inputs {
+        parts.योजय(field);
+    }
+    प्रति field मध्ये outputs {
+        parts.योजय(field);
+    }
+    parts.योजय(node("क्रम", layers));
+    प्रत्यानय node("प्रतिमान", parts);
+}
+
+कार्य parse_training(p: Parser) -> अक्षरमाला {
+    advance(p);
+    स्थापय नाम = expect_ident(p, "a training name after अभ्यास").पाठ्य;
+    expect_op(p, "{");
+    स्थापय options: सूची<अक्षरमाला> = [];
+    यावत् न at_op(p, "}") तथा न at_kind(p, "eof") {
+        स्थापय field_name = expect_ident(p, "a अभ्यास option name").पाठ्य;
+        expect_op(p, ":");
+        स्थापय मूल्य = parse_expr(p);
+        options.योजय(node("opt", [field_name, मूल्य]));
+        accept_op(p, ",");
+        accept_op(p, ";");
+    }
+    expect_op(p, "}");
+    स्थापय parts = [नाम];
+    प्रति option मध्ये options {
+        parts.योजय(option);
+    }
+    प्रत्यानय node("अभ्यास", parts);
+}
+
+कार्य parse_program(p: Parser) -> एकक {
+    स्थापय परिवर्तनीय module_name = "";
+    यदि at_kw(p, "प्रकरण") {
+        advance(p);
+        module_name = expect_ident(p, "a module name after 'प्रकरण'").पाठ्य;
+        accept_op(p, ";");
+    }
+    स्थापय uses: सूची<अक्षरमाला> = [];
+    स्थापय structs: सूची<अक्षरमाला> = [];
+    स्थापय functions: सूची<अक्षरमाला> = [];
+    स्थापय models: सूची<अक्षरमाला> = [];
+    स्थापय trainings: सूची<अक्षरमाला> = [];
+
+    यावत् न at_kind(p, "eof") {
+        यदि at_kw(p, "उपयोग") {
+            uses.योजय(parse_use(p));
+            अनुवर्तय;
+        }
+        यदि at_kw(p, "कार्य") {
+            functions.योजय(parse_function(p));
+            अनुवर्तय;
+        }
+        यदि at_kw(p, "संघटन") {
+            structs.योजय(parse_struct(p));
+            अनुवर्तय;
+        }
+        यदि at_kw(p, "प्रतिमान") {
+            models.योजय(parse_model(p));
+            अनुवर्तय;
+        }
+        यदि at_kw(p, "अभ्यास") {
+            trainings.योजय(parse_training(p));
+            अनुवर्तय;
+        }
+        यदि at_kw(p, "प्रकरण") {
+            error_here(p, "the 'प्रकरण' declaration must appear once, before all items");
+        }
+        error_here(p, "expected a declaration (कार्य, संघटन, उपयोग), found " + describe_token(peek(p)));
+    }
+
+    मुद्रय("(प्रकरण " + module_name + ")");
+    प्रति u मध्ये uses {
+        मुद्रय(u);
+    }
+    प्रति s मध्ये structs {
+        मुद्रय(s);
+    }
+    प्रति f मध्ये functions {
+        मुद्रय(f);
+    }
+    प्रति m मध्ये models {
+        मुद्रय(m);
+    }
+    प्रति tr मध्ये trainings {
+        मुद्रय(tr);
+    }
+}
+
+कार्य मुख्य() -> एकक {
+    अधिकार सञ्चय;
+    स्थापय तर्कावली = प्रक्रिया.तर्कावली();
+    यदि तर्कावली.दैर्घ्य() < १ {
+        मुद्रय("usage: parser.सूत्र <path.सूत्र>");
+        प्रत्यानय;
+    }
+    स्थापय पथ = तर्कावली.प्राप्नु(०);
+    स्थापय source = सञ्चय.पाठ्यपठन(पथ);
+    स्थापय tokens = lex(source);
+    स्थापय p = Parser(tokens, ०, source);
+    parse_program(p);
+}

@@ -18,8 +18,8 @@ The harness (`peacock/benchmarks.py`):
 
 * records the environment: Python version/build, platform, kernel, CPU count,
   total RAM, git commit, compiler version;
-* compiles three checked-in sources (`examples/hello.pac`, `examples/tour.pac`,
-  `selfhost/tokenizer.pac`) and a generated 200-function file;
+* compiles three checked-in sources (`examples/hello.सूत्र`, `examples/tour.सूत्र`,
+  `selfhost/tokenizer.सूत्र`) and a generated 200-function file;
 * runs tensor, training, rendering, motion and VM workloads;
 * reports the **median** of repeated in-process wall-clock samples;
 * uses `time.perf_counter()` (monotonic, high resolution) and `gc.collect()`

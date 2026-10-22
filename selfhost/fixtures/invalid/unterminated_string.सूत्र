@@ -1,0 +1,5 @@
+प्रकरण invalid_unterminated_string
+
+कार्य मुख्य() -> एकक {
+    मुद्रय("unterminated);
+}

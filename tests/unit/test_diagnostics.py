@@ -35,23 +35,23 @@ class SpanTests(unittest.TestCase):
 
 class DiagnosticRenderingTests(unittest.TestCase):
     def test_caret_points_at_span(self):
-        source = "fn main() -> Unit { let x = missing; }"
-        result = compile_source(source, "demo.pac")
+        source = 'कार्य मुख्य() -> एकक { स्थापय क्ष = missing; }'
+        result = compile_source(source, "demo.सूत्र")
         rendered = result.diagnostics.render_all(source)
         self.assertIn("PE3002", rendered)
-        self.assertIn("demo.pac" if "demo.pac" in rendered else "-->", rendered)
+        self.assertIn("demo.सूत्र" if "demo.सूत्र" in rendered else "-->", rendered)
         self.assertIn("^", rendered)
         self.assertIn("missing", rendered)
 
     def test_hint_is_rendered(self):
-        source = "fn main() -> Unit { let x = 1; x = 2; }"
-        result = compile_source(source, "demo.pac")
+        source = 'कार्य मुख्य() -> एकक { स्थापय क्ष = 1; क्ष = 2; }'
+        result = compile_source(source, "demo.सूत्र")
         rendered = result.diagnostics.render_all(source)
-        self.assertIn("let mut", rendered)
+        self.assertIn("स्थापय परिवर्तनीय", rendered)
 
     def test_color_rendering_is_opt_in(self):
-        source = "fn main() -> Unit { let x = missing; }"
-        result = compile_source(source, "demo.pac")
+        source = 'कार्य मुख्य() -> एकक { स्थापय क्ष = missing; }'
+        result = compile_source(source, "demo.सूत्र")
         self.assertNotIn("\x1b[", result.diagnostics.render_all(source))
         self.assertIn("\x1b[", result.diagnostics.render_all(source, color=True))
 

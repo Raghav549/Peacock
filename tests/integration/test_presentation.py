@@ -1,7 +1,7 @@
-"""End-to-end tests for `graphics.present` and the host presentation path.
+"""End-to-end tests for `चित्र.प्रदर्शय` and the host presentation path.
 
 These tests exercise the real VM native, the real capability checks and the real
-static-web backend. They are the evidence that a `.pac` program can hand frames
+static-web backend. They are the evidence that a `.सूत्र` program can hand frames
 to a host without the language runtime knowing what the host is.
 """
 
@@ -44,9 +44,9 @@ class PresentCommandTests(unittest.TestCase):
             out = Path(tmp) / "preview"
             result = run_cli(
                 "run",
-                "examples/present.pac",
+                "examples/present.सूत्र",
                 "--grant",
-                "ui",
+                "दृश्य",
                 "--present",
                 str(out),
             )
@@ -75,7 +75,7 @@ class PresentCommandTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "preview"
             result = run_cli(
-                "run", "examples/present.pac", "--present", str(out)
+                "run", "examples/present.सूत्र", "--present", str(out)
             )
             self.assertEqual(result.returncode, 3)
             self.assertIn("PE4001", result.stderr)
@@ -86,7 +86,7 @@ class PresentCommandTests(unittest.TestCase):
             self.assertFalse((out / "latest.png").exists())
 
     def test_grant_without_backend_is_a_configuration_error(self) -> None:
-        result = run_cli("run", "examples/present.pac", "--grant", "ui")
+        result = run_cli("run", "examples/present.सूत्र", "--grant", "दृश्य")
         self.assertEqual(result.returncode, 3)
         self.assertIn("PE4006", result.stderr)
         self.assertIn("no presentation backend", result.stderr)
@@ -96,9 +96,9 @@ class PresentCommandTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             result = run_cli(
                 "run",
-                "examples/present.pac",
+                "examples/present.सूत्र",
                 "--grant",
-                "ui",
+                "दृश्य",
                 "--present",
                 str(Path(tmp) / "preview"),
                 "--json",
@@ -110,60 +110,60 @@ class PresentCommandTests(unittest.TestCase):
             self.assertEqual(payload["grants"], ["ui"])
 
     def test_unknown_grant_message_lists_ui(self) -> None:
-        result = run_cli("run", "examples/present.pac", "--grant", "network")
+        result = run_cli("run", "examples/present.सूत्र", "--grant", "network")
         self.assertEqual(result.returncode, 2)
-        self.assertIn("known grants: compute, fs, ui", result.stderr)
+        self.assertIn("known Sanskrit grants: गणना, सञ्चय, दृश्य", result.stderr)
 
 
 class StaticCapabilityTests(unittest.TestCase):
     def test_present_requires_a_declaration(self) -> None:
         source = textwrap.dedent(
             """
-            module missing_declaration
+            प्रकरण missing_declaration
 
-            use graphics
+            उपयोग चित्र
 
-            fn main() -> Unit {
-                let canvas = graphics.canvas(8, 8);
-                graphics.present(canvas);
+            कार्य मुख्य() -> एकक {
+                स्थापय चित्रपट्ट = चित्र.चित्रपट्ट(8, 8);
+                चित्र.प्रदर्शय(चित्रपट्ट);
             }
             """
         )
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "missing.pac"
+            path = Path(tmp) / "missing.सूत्र"
             path.write_text(source, encoding="utf-8")
             result = run_cli("check", str(path))
             self.assertEqual(result.returncode, 1)
             self.assertIn("PE3005", result.stderr)
             self.assertIn("ui", result.stderr)
-            self.assertIn("capability ui", result.stderr)
+            self.assertIn("अधिकार दृश्य", result.stderr)
 
     def test_declaration_without_grant_is_catchable_and_presents_nothing(self) -> None:
         source = textwrap.dedent(
             """
-            module caught_denial
+            प्रकरण caught_denial
 
-            use graphics
+            उपयोग चित्र
 
-            fn main() -> Unit {
-                capability ui;
-                let canvas = graphics.canvas(16, 16);
-                try {
-                    graphics.present(canvas);
-                    print("presented");
-                } catch (message) {
-                    print("denied: " + message);
+            कार्य मुख्य() -> एकक {
+                अधिकार दृश्य;
+                स्थापय चित्रपट्ट = चित्र.चित्रपट्ट(16, 16);
+                यत्न {
+                    चित्र.प्रदर्शय(चित्रपट्ट);
+                    मुद्रय("presented");
+                } गृह्ण (सन्देश) {
+                    मुद्रय("denied: " + सन्देश);
                 }
             }
             """
         )
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "caught.pac"
+            path = Path(tmp) / "caught.सूत्र"
             path.write_text(source, encoding="utf-8")
             out = Path(tmp) / "preview"
             result = run_cli("run", str(path), "--present", str(out))
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("denied: host has not granted capability 'ui'", result.stdout)
+            self.assertIn("denied: host has not granted capability 'दृश्य'", result.stdout)
             self.assertNotIn("presented", result.stdout.replace("denied:", ""))
             manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["frames"], [])
@@ -222,9 +222,9 @@ class ServeCommandTests(unittest.TestCase):
                 "-m",
                 "peacock.cli",
                 "run",
-                "examples/present.pac",
+                "examples/present.सूत्र",
                 "--grant",
-                "ui",
+                "दृश्य",
                 "--serve",
                 str(port),
                 "--linger",
@@ -286,9 +286,9 @@ class ServeCommandTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             result = run_cli(
                 "run",
-                "examples/present.pac",
+                "examples/present.सूत्र",
                 "--grant",
-                "ui",
+                "दृश्य",
                 "--present",
                 str(Path(tmp) / "preview"),
                 "--serve",
@@ -306,9 +306,9 @@ class ServeCommandTests(unittest.TestCase):
             port = sock.getsockname()[1]
             result = run_cli(
                 "run",
-                "examples/present.pac",
+                "examples/present.सूत्र",
                 "--grant",
-                "ui",
+                "दृश्य",
                 "--serve",
                 str(port),
             )

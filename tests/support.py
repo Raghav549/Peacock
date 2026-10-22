@@ -13,7 +13,7 @@ from peacock.runtime.vm import VM
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
-def compile_ok(source: str, path: str = "test.pac") -> CompileResult:
+def compile_ok(source: str, path: str = "test.सूत्र") -> CompileResult:
     result = compile_source(source, path)
     if not result.ok:
         raise AssertionError(
@@ -23,7 +23,7 @@ def compile_ok(source: str, path: str = "test.pac") -> CompileResult:
     return result
 
 
-def compile_errors(source: str, path: str = "test.pac") -> list:
+def compile_errors(source: str, path: str = "test.सूत्र") -> list:
     result = compile_source(source, path)
     if result.ok:
         raise AssertionError("expected compilation to fail, but it succeeded")
@@ -89,5 +89,5 @@ def run_example(
 
 
 def all_diagnostics(source: str) -> DiagnosticBag:
-    result = compile_source(source, "test.pac")
+    result = compile_source(source, "test.सूत्र")
     return result.diagnostics

@@ -7,22 +7,22 @@
 
 ## Executive finding
 
-This checkout is substantially more than a proposal: it contains an original, executable PEACOCK language subset, a Python-hosted lexer/parser/type checker/IR/optimiser/bytecode compiler and VM, working CPU tensor/autodiff/training primitives, and a 2D software graphics stack. The `.pac` examples are genuine PEACOCK syntax, not renamed Python. End-to-end execution and a bytecode artifact were verified during this audit. It is nevertheless **not an independently bootstrapped/self-hosting implementation**: the production toolchain and supporting engines remain Python. Native platform backends, 3D/GPU/UI framework and broad language features remain absent. Existing documentation is unusually detailed and mostly candid; this audit adds a point-in-time evidence index rather than replacing that documentation.
+This checkout is substantially more than a proposal: it contains an original, executable PEACOCK language subset, a Python-hosted lexer/parser/type checker/IR/optimiser/bytecode compiler and VM, working CPU tensor/autodiff/training primitives, and a 2D software graphics stack. The `.सूत्र` examples are genuine PEACOCK syntax, not renamed Python. End-to-end execution and a bytecode artifact were verified during this audit. It is nevertheless **not an independently bootstrapped/self-hosting implementation**: the production toolchain and supporting engines remain Python. Native platform backends, 3D/GPU/UI framework and broad language features remain absent. Existing documentation is unusually detailed and mostly candid; this audit adds a point-in-time evidence index rather than replacing that documentation.
 
 ## Scope and method
 
 Inspected tracked tree, manifests, executable wrappers, source and test layout, compiler/runtime package boundaries, examples, research and platform docs, `.gitattributes`, Linguist proposal, VS Code package, logo files, and available Git history. Ran the project test command, standard-library unittest discovery, and CLI smoke tests. At HEAD, history is a single **grafted** merge commit (`374a75b`); the available clone does not expose meaningful earlier project history or other development branches. The current working branch is `arena/3d38bd9d-peacock`; `main` and `origin/main` resolve to that same base commit. No local changes existed at audit start.
 
-A tracked-file extension count is not a byte-weighted GitHub Linguist computation. The checkout has 80 tracked `.py`, 22 `.pac`, 28 `.md`, one `.tex`-extension count absent (zero tracked TeX), plus small config/assets. The user-provided repository overview is approximately 93.6% Python / 6.4% TeX. The Python share is explained by the actual bootstrap/compiler/runtime/test implementation being Python; `.pac` is genuine but presently a minority of source files. The reported TeX cannot be attributed to any tracked `.tex` file in this snapshot: re-check Linguist's current per-file output on GitHub and inspect any untracked/ignored or subsequently changed files. Neither language statistics nor current Linguist classification were queried from GitHub's repository API during this local audit. `.gitattributes` explicitly labels `.pac` as Peacock and detectable; that repository-local hint is not upstream recognition.
+A tracked-file extension count is not a byte-weighted GitHub Linguist computation. The checkout has 80 tracked `.py`, 22 `.सूत्र`, 28 `.md`, one `.tex`-extension count absent (zero tracked TeX), plus small config/assets. The user-provided repository overview is approximately 93.6% Python / 6.4% TeX. The Python share is explained by the actual bootstrap/compiler/runtime/test implementation being Python; `.सूत्र` is genuine but presently a minority of source files. The reported TeX cannot be attributed to any tracked `.tex` file in this snapshot: re-check Linguist's current per-file output on GitHub and inspect any untracked/ignored or subsequently changed files. Neither language statistics nor current Linguist classification were queried from GitHub's repository API during this local audit. `.gitattributes` explicitly labels `.सूत्र` as Peacock and detectable; that repository-local hint is not upstream recognition.
 
 ## Subsystem findings
 
 | Subsystem | Honest status | Evidence / limitation |
 |---|---|---|
-| `.pac` language identity and examples | Working and tested (subset) | `SPECIFICATION.md`; eight `examples/*.pac`; examples compile, several execute. `.pk` and `.peacock` are rejected as source suffixes. |
+| `.सूत्र` language identity and examples | Working and tested (subset) | `SPECIFICATION.md`; eight `examples/*.सूत्र`; examples compile, several execute. `.pk` and `.peacock` are rejected as source suffixes. |
 | Lexer, diagnostics, parser, AST | Working and tested (Python bootstrap) | `peacock/compiler/{lexer,tokens,parser,ast_nodes,diagnostics}.py`; lexical/parser tests; self-host tokenizer and parser parity fixtures. |
 | Name resolution, scopes, types, semantic checks | Working and tested (subset) | `semantic.py`, `types.py`; unknown names, invalid types and capabilities have tests. No general generics, inference, modules/imports or advanced type features. |
-| IR, optimisation, backend | Working and tested (limited) | Typed linear IR, verifier, optimisation passes, custom bytecode compiler and `.pkb` artifact. No native machine-code/WASM/GPU backend. |
+| IR, optimisation, backend | Working and tested (limited) | Typed linear IR, verifier, optimisation passes, custom bytecode compiler and `.बीज` artifact. No native machine-code/WASM/GPU backend. |
 | Runtime | Working and tested (Python VM) | Custom stack VM, checked arithmetic, errors, budgets, host natives; Python process owns memory; no PEACOCK GC. |
 | CLI | Working and tested | `run`, `check`, `build`, `disasm`, `audit`, `tokens`, `ast`, `bench`, `fuzz`, `test`, `version`. Audit found `--version` was not accepted although a conventional flag is expected; added an alias and regression test in this change. |
 | Module system / stdlib | Partial | Single-file programs, built-in namespaces, flat program value namespace. No user-file imports/package manager. |
@@ -30,7 +30,7 @@ A tracked-file extension count is not a byte-weighted GitHub Linguist computatio
 | Frontend / graphics | Partial but real | Colour conversions and 2D software rasterizer/PNG, gradients, motion/layout/AABB physics; examples and tests. No interactive UI toolkit, text shaping/accessibility, 3D, GPU, live input/vsync. |
 | Security | Partial / best-effort | Static declaration + VM checks + host grants/resource budgets and tests. Host path policy has documented TOCTOU limits; not an OS sandbox or formal guarantee. |
 | Targets | Partial | Linux/headless, static web export and HTTP frame presentation adapters have tests. Desktop, Android, iOS and WASM builds absent. iOS requires macOS/Xcode/signing and is not verifiable here. |
-| Self-hosting | Partial, not self-hosted | PEACOCK `.pac` tokenizer and full grammar parser are tested for parity; type analysis, IR, bytecode, VM remain Python. No bootstrap compiler compiles itself. |
+| Self-hosting | Partial, not self-hosted | PEACOCK `.सूत्र` tokenizer and full grammar parser are tested for parity; type analysis, IR, bytecode, VM remain Python. No bootstrap compiler compiles itself. |
 | Tests / CI | Working locally; CI presence unverified | 490 tests passed using both `./bin/peacock test` and `python -m unittest discover -v`. No workflow files occur in the inspected tree. `pytest` is not installed; project tests use `unittest`. |
 | Dependencies | Python 3.11+ stdlib only at runtime | `pyproject.toml`: empty dependencies, setuptools build backend. No NumPy/PyTorch/TensorFlow/LLVM or UI framework. Packaging/build installation itself was not tested. |
 | Research | Present; use with source verification | 162 bibliography entries, literature review, open questions, ADRs and benchmark methodology are documented. Research README itself says bibliography identifiers were not machine-verified and the survey is not comprehensive. |
@@ -45,10 +45,10 @@ Commands run from the repository root:
 - `python -m pytest -q` — **not run**: environment has no `pytest` module (`No module named pytest`).
 - `python -m unittest discover -v` — **PASS, 490 tests** in 39.924 s.
 - `./bin/peacock test` — **PASS, 490 tests** in 40.248 s.
-- `./bin/peacock version` — reports PEACOCK AI 0.1.0, `.pac`, `.pkb`, Python 3.11.2 and explicitly “NOT self-hosting”.
-- `./bin/peacock check examples/hello.pac` — **PASS**, 1 function, 6 instructions.
-- `./bin/peacock run examples/hello.pac` — **PASS**, prints `Hello from PEACOCK`.
-- `./bin/peacock build examples/hello.pac -o <temporary .pkb>` followed by `run` of the artifact — **PASS**, 598-byte image, checksum printed, same expected output.
+- `./bin/peacock version` — reports PEACOCK AI 0.1.0, `.सूत्र`, `.बीज`, Python 3.11.2 and explicitly “NOT self-hosting”.
+- `./bin/peacock check examples/hello.सूत्र` — **PASS**, 1 function, 6 instructions.
+- `./bin/peacock run examples/hello.सूत्र` — **PASS**, prints `Hello from PEACOCK`.
+- `./bin/peacock build examples/hello.सूत्र -o <temporary .बीज>` followed by `run` of the artifact — **PASS**, 598-byte image, checksum printed, same expected output.
 - `./bin/peacock --version` — **FAIL before fix** (`unknown command '--version'`). Fixed in this change and added a regression test; post-fix targeted verification is recorded in the session report.
 
 The test suite includes lexer/parser/semantic/type/IR/VM cases; invalid syntax, unknown identifiers, runtime failures, security checks; examples; tensor gradients and training; graphics/colour/platform and documentation checks. The above is observed output, not a blanket security or production-readiness assertion.
@@ -59,12 +59,12 @@ The available Git object graph is shallow/grafted at `374a75b`, so this audit ca
 
 ## Linguist investigation
 
-The local metadata proposes `Peacock`, `.pac`, `source.peacock`, programming type and an Ace `text` mode, with a TextMate-compatible grammar. The grammar and VS Code copy are JSON and have consistency tests; the samples compile through the real compiler. The current official [`github-linguist/linguist` contribution guide](https://github.com/github-linguist/linguist/blob/main/CONTRIBUTING.md), inspected 2026-10-17, describes language entry metadata, a licensed grammar added using Linguist's tooling, representative non-tutorial samples, and usage evidence. It currently calls for 2,000 indexed files/year for extensions expected to be used multiple times per repo, or 200 for one-per-repo names, excluding forks, plus reasonable distribution across unique user/repo combinations. `.pac` is not demonstrated here to meet that bar. The upstream language database was not cloned to check all current extension conflicts, and the prepared sample files are project-authored examples, not evidence of independent in-the-wild usage. No remote submission was attempted; upstream recognition is not claimed.
+The local metadata proposes `Peacock`, `.सूत्र`, `source.peacock`, programming type and an Ace `text` mode, with a TextMate-compatible grammar. The grammar and VS Code copy are JSON and have consistency tests; the samples compile through the real compiler. The current official [`github-linguist/linguist` contribution guide](https://github.com/github-linguist/linguist/blob/main/CONTRIBUTING.md), inspected 2026-10-17, describes language entry metadata, a licensed grammar added using Linguist's tooling, representative non-tutorial samples, and usage evidence. It currently calls for 2,000 indexed files/year for extensions expected to be used multiple times per repo, or 200 for one-per-repo names, excluding forks, plus reasonable distribution across unique user/repo combinations. `.सूत्र` is not demonstrated here to meet that bar. The upstream language database was not cloned to check all current extension conflicts, and the prepared sample files are project-authored examples, not evidence of independent in-the-wild usage. No remote submission was attempted; upstream recognition is not claimed.
 
 ## Files reviewed
 
 Configuration/build: `pyproject.toml`, `.gitignore`, `.gitattributes`, `bin/peacock`, `bin/peacock.cmd`.
-Language/implementation: all tracked `.pac` examples/selfhost fixtures plus compiler, runtime, AI, frontend, platform and CLI packages.
+Language/implementation: all tracked `.सूत्र` examples/selfhost fixtures plus compiler, runtime, AI, frontend, platform and CLI packages.
 Quality/docs: all test modules; README and specification/architecture/status/roadmap/security; docs tree; research review, questions, ADRs, methods and bibliography.
 Identity/tooling: `assets/`, `editors/vscode/`, `linguist/`.
 
@@ -73,7 +73,7 @@ Identity/tooling: `assets/`, `editors/vscode/`, `linguist/`.
 The type-algebra work is no longer only a standalone demonstration: the compiler
 API supports opt-in `semantic_mode="shadow"`. After parsing actual source
 function/struct declaration annotations, the adapter generates relation checks
-and executes them in the `.pac` kernel. Python computes expected assignability
+and executes them in the `.सूत्र` kernel. Python computes expected assignability
 and tensor broadcast outcomes; Python semantic analysis still decides compilation
 and diagnostics. Tests compare diagnostics and accept/reject for a small corpus.
 This remains experimental relation-level shadow validation, not full semantic
@@ -89,27 +89,37 @@ initial checkout state.
 2. Add a lightweight CI matrix running `unittest`, examples, package install/entry point, syntax metadata and reproducible security/fuzz smoke tests.
 3. Keep unsupported native/web/mobile/3D/GPU capabilities explicitly unclaimed; improve host boundaries and benchmark/visual test coverage before expanding their promises.
 
-## Current follow-on verification (2026-10-17)
+## Current follow-on verification (2026-10-22)
 
-This section supersedes the historical test count, migration summary and priority
-list above for the current working tree. The checkout is on
-`arena/c197f94a-peacock`, based on `afddb2d84c3281aac9100a40a1fd4fd59704cf3b`;
-changes are uncommitted. `./bin/peacock test` passes **506 tests** (40.347 s):
-223 compiler, 81 AI, 74 frontend, 37 security, 65 integration, 20 unit and 6
-benchmark tests.
+This section supersedes the historical test counts and migration summaries above
+for the current working tree. The checkout is on `arena/80ce7062-peacock`, based
+on `92469d1b618ab47ff025ae43bf172969321719f0`; changes are uncommitted.
+`./bin/peacock test` passes **511 tests** (44.960 s): 227 compiler,
+81 AI, 74 frontend, 37 security, 65 integration, 21 unit and 6 benchmark tests.
 
-The semantic shadow now runs through experimental `check`/`build
---semantic-shadow` flags and covers selected type/expression/scope/declaration/
-assignment/call/return/condition/iterable rules. ErrorType iterable recovery is
-regression-tested: an unresolved iterable yields only its primary Python
-`PE3002`, and the PEACOCK kernel agrees. The Python analyser remains authoritative;
-this is not full diagnostic parity or self-hosting.
+The source language is now Sanskrit-native throughout its reserved vocabulary:
+keywords, native functions/types, model/training options, capabilities, Unicode
+identifiers, and Devanagari/Unicode decimal literals. `peacock/sanskrit.py` is
+the canonical lexical boundary; stable internal bytecode and tooling IDs are not
+accepted as an English source dialect. `.सूत्र` is the only source extension.
+Native source displays, semantic diagnostics, runtime traces, human audit, and
+disassembly use Sanskrit names, while documented JSON/host interfaces can retain
+stable internal IDs. Newly generated bytecode and model containers report
+language 0.2 with container format 1.
 
-`website/site.pac` compiles and runs through the actual PEACOCK CLI/compiler/VM
-to generate twelve static HTML routes, responsive CSS and SVG; four integration
-tests validate paths, page structure, embedded `.pac` examples and CSS. The
-static generator is distinct from the frame `WebBackend`, has no JavaScript, and
-has not had browser-based visual testing. `fs.create_dir` is capability-gated,
-sandbox-rooted and covered by security regressions. See `STATUS.md` for current
-evidence, `ROADMAP.md` for dependency-ordered next steps, and
-`website/README.md` for the export boundary.
+The corpus, self-hosted lexer/parser/type kernel, website, examples, editor
+metadata, and generated TextMate grammars use the native vocabulary. A shared
+grammar generator has a freshness test, and all fenced PEACOCK documentation
+examples compile. The grammatical/literary rationale and its limits are recorded
+in `docs/language/sanskrit.md`; the 178-entry bibliography includes primary
+Pāṇinian sūtra references and eight arXiv Sanskrit/Indic-language papers whose
+metadata was checked directly. This is a deterministic formal programming
+language, not a natural-Sanskrit parser or an AGI claim.
+
+`website/site.सूत्र` still compiles and runs through the actual PEACOCK
+CLI/compiler/VM to generate twelve static HTML routes, responsive CSS and SVG;
+four integration tests validate the export. `सञ्चय.निधिरचना` remains
+capability-gated and sandbox-rooted. GitHub recognition remains local preparation,
+not upstream Linguist acceptance. See `STATUS.md` for observed commands and
+artifacts, and `ROADMAP.md` for remaining self-hosting, native-code, platform,
+and advanced-AI work.

@@ -34,11 +34,11 @@ labels, terminators and binop operand types.
 {
   "format": "peacock-bytecode",
   "format_version": 1,
-  "language_version": "0.1",
-  "compiler_version": "0.1.0",
+  "language_version": "0.2",
+  "compiler_version": "0.2.0",
   "module": "hello",
   "uses": ["nn"],
-  "source_path": "examples/hello.pac",
+  "source_path": "examples/hello.सूत्र",
   "source_sha256": "…",
   "functions": {
     "main": {
@@ -57,7 +57,7 @@ labels, terminators and binop operand types.
 }
 ```
 
-Images are canonical JSON (sorted keys, compact separators) inside a `.pkb`
+Images are canonical JSON (sorted keys, compact separators) inside a `.बीज`
 container with a SHA-256 digest. The VM verifies the image again on load.
 
 ## Instruction set

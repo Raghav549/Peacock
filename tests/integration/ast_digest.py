@@ -1,6 +1,6 @@
 """Canonical AST digest for differential testing against the self-hosted parser.
 
-The self-hosted parser (`selfhost/parser.pac`) prints this exact S-expression
+The self-hosted parser (`selfhost/parser.सूत्र`) prints this exact S-expression
 format. This module produces the same text from the bootstrap AST, which is the
 oracle. It is test infrastructure, not part of the language implementation.
 """
@@ -9,9 +9,46 @@ from __future__ import annotations
 
 from peacock.compiler import ast_nodes as A
 from peacock.compiler.pipeline import compile_source
+from peacock.sanskrit import (
+    INTERNAL_TO_SOURCE,
+    LEGACY_KEYWORDS,
+    devanagari_digits,
+)
+
+
+_AST_LABELS = {
+    "ann": "प्रकाराङ्कन",
+    "arg": "तर्क",
+    "assign": "नियोजन",
+    "b": "द्वि",
+    "block": "खण्ड",
+    "call": "आह्वान",
+    "cap": "अधिकार",
+    "error": "दोष",
+    "expr": "अभिव्यक्ति",
+    "field": "क्षेत्र",
+    "layer": "स्तर",
+    "list": "सूची",
+    "opt": "विकल्प",
+    "param": "प्राचल",
+    "params": "प्राचलावली",
+    "ret": "प्रत्यागत",
+    "sym": "प्रतीक",
+    "t": "प्रकार",
+    "tylist": "सूचीप्रकार",
+    "u": "एक",
+}
+
+
+def _source_word(word: str) -> str:
+    return INTERNAL_TO_SOURCE.get(word, LEGACY_KEYWORDS.get(word, word))
 
 
 def node(name: str, *parts: str) -> str:
+    # Declaration labels and value identifiers have separate namespaces: the
+    # former is `model` -> प्रतिमान, the latter `model` -> प्रतिमानमूल्य.
+    name = _AST_LABELS.get(name, LEGACY_KEYWORDS.get(name, _source_word(name)))
+    parts = tuple(_source_word(part) for part in parts)
     if parts:
         return "(" + name + " " + " ".join(parts) + ")"
     return "(" + name + ")"
@@ -25,7 +62,7 @@ def type_digest(ty: A.TypeExpr) -> str:
     if isinstance(ty, A.TensorTypeExpr):
         parts = ["tensor", ty.dtype]
         if ty.shape is not None:
-            parts.append(node("shape", *[str(d) for d in ty.shape]))
+            parts.append(node("shape", *[devanagari_digits(d) for d in ty.shape]))
         return node(*parts)
     raise ValueError(f"unsupported type in corpus: {type(ty).__name__}")
 

@@ -1,8 +1,8 @@
 {
   "name": "peacock-language",
   "displayName": "PEACOCK",
-  "description": "Syntax highlighting and language configuration for PEACOCK (.pac). Prepared tooling; PEACOCK is not yet recognised by GitHub Linguist.",
-  "version": "0.1.0",
+  "description": "Syntax highlighting and language configuration for PEACOCK (.सूत्र). Prepared tooling; PEACOCK is not yet recognised by GitHub Linguist.",
+  "version": "0.2.0",
   "publisher": "peacock-language",
   "license": "MIT",
   "engines": {
@@ -25,7 +25,7 @@
           "peacock"
         ],
         "extensions": [
-          ".pac"
+          ".सूत्र"
         ],
         "configuration": "./language-configuration.json"
       }

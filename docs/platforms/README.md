@@ -6,15 +6,15 @@ and presents `Canvas` frames through a `Backend`:
 | Backend | What it does | Status |
 |---|---|---|
 | `HeadlessBackend` | keeps the latest frame, optionally writes PNG frames | implemented |
-| `WebBackend` | writes PNGs, `latest.png`, `manifest.json`, static `index.html` | implemented; reachable from `.pac` with `--present DIR` |
-| `ServerBackend` | stdlib HTTP server for viewer, `/frame.png`, `/manifest.json`, `/healthz` | implemented; reachable from `.pac` with `--serve PORT` |
+| `WebBackend` | writes PNGs, `latest.png`, `manifest.json`, static `index.html` | implemented; reachable from `.सूत्र` with `--present DIR` |
+| `ServerBackend` | stdlib HTTP server for viewer, `/frame.png`, `/manifest.json`, `/healthz` | implemented; reachable from `.सूत्र` with `--serve PORT` |
 | Desktop shell | native window + input | not implemented |
 | Android shell | SDK/NDK + JNI/ABI bridge + packaging | not implemented |
 | iOS shell | Swift/Objective-C host, signing | not implemented (requires macOS/Xcode) |
 | WASM host | browser runtime + ABI | not implemented |
 
 This frame-oriented `WebBackend` is distinct from the PEACOCK-authored static
-application website at [`website/site.pac`](../../website/site.pac), which exports
+application website at [`website/site.सूत्र`](../../website/site.सूत्र), which exports
 twelve routes as HTML/CSS/SVG through the actual CLI. It is a site generator,
 not a VM platform target or general interactive browser runtime; see
 [`website/README.md`](../../website/README.md).
@@ -41,14 +41,14 @@ with ServerBackend(host="127.0.0.1", port=8080) as host:
     input("serving at " + host.url)
 ```
 
-## Presenting from a `.pac` program
+## Presenting from a `.सूत्र` program
 
-`graphics.present(canvas)` is now a native with the `ui` capability. The CLI
+`चित्र.प्रदर्शय(चित्रपट्ट)` is now a native with the `दृश्य` capability. The CLI
 attaches a `WebBackend` with `--present DIR`:
 
 ```bash
-./bin/peacock run examples/present.pac --grant ui --present out/preview
-./bin/peacock run examples/present.pac --grant ui --serve 8099 --linger 30
+./bin/peacock run examples/present.सूत्र --grant दृश्य --present out/preview
+./bin/peacock run examples/present.सूत्र --grant दृश्य --serve 8099 --linger 30
 ```
 
 With `--present` each call writes a frame, updates `latest.png`/`index.html` and

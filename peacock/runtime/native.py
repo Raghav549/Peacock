@@ -8,6 +8,7 @@ third-party ML or UI framework.
 from __future__ import annotations
 
 import math
+import unicodedata
 from dataclasses import dataclass
 from typing import Any
 
@@ -25,7 +26,8 @@ from peacock.intelligence.tensor import Tensor, TensorError, absolute
 from peacock.intelligence import tensor as T
 from peacock.intelligence.training import evaluate_accuracy, evaluate_loss, train_model
 from peacock.runtime.errors import VMFault
-from peacock.runtime.values import UNIT, RangeValue, format_value, is_int
+from peacock.runtime.values import UNIT, RangeValue, format_value, is_int, type_name
+from peacock.sanskrit import internalise_enum, surface
 
 # ---------------------------------------------------------------------------
 # Capability metadata
@@ -62,55 +64,55 @@ def _fail(message: str, code: str = "PE4002") -> None:
 
 def _need_tensor(value, where: str) -> Tensor:
     if not isinstance(value, Tensor):
-        _fail(f"{where} expects a Tensor, got {type(value).__name__}")
+        _fail(f"{where} expects a आयाम, got {type_name(value)}")
     return value
 
 
 def _need_color(value, where: str) -> Color:
     if not isinstance(value, Color):
-        _fail(f"{where} expects a Color, got {type(value).__name__}")
+        _fail(f"{where} expects a वर्ण, got {type_name(value)}")
     return value
 
 
 def _need_canvas(value, where: str) -> Canvas:
     if not isinstance(value, Canvas):
-        _fail(f"{where} expects a Canvas, got {type(value).__name__}")
+        _fail(f"{where} expects a चित्रपट, got {type_name(value)}")
     return value
 
 
 def _need_model(value, where: str) -> Model:
     if not isinstance(value, Model):
-        _fail(f"{where} expects a Model, got {type(value).__name__}")
+        _fail(f"{where} expects a प्रतिमानप्रकार, got {type_name(value)}")
     return value
 
 
 def _need_dataset(value, where: str) -> Dataset:
     if not isinstance(value, Dataset):
-        _fail(f"{where} expects a Dataset, got {type(value).__name__}")
+        _fail(f"{where} expects a दत्तसमूह, got {type_name(value)}")
     return value
 
 
 def _need_int(value, where: str) -> int:
     if not is_int(value):
-        _fail(f"{where} expects an Int, got {type(value).__name__}")
+        _fail(f"{where} expects a पूर्णाङ्क, got {type_name(value)}")
     return value
 
 
 def _need_float(value, where: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
-        _fail(f"{where} expects a Float, got {type(value).__name__}")
+        _fail(f"{where} expects a दशमलव, got {type_name(value)}")
     return float(value)
 
 
 def _need_str(value, where: str) -> str:
     if not isinstance(value, str):
-        _fail(f"{where} expects a String, got {type(value).__name__}")
+        _fail(f"{where} expects an अक्षरमाला, got {type_name(value)}")
     return value
 
 
 def _need_list(value, where: str) -> list:
     if not isinstance(value, list):
-        _fail(f"{where} expects a List, got {type(value).__name__}")
+        _fail(f"{where} expects a सूची, got {type_name(value)}")
     return value
 
 
@@ -164,7 +166,7 @@ def _len(ctx, args):
         return len(value)
     if isinstance(value, Dataset):
         return len(value)
-    _fail(f"len() is not defined for {type(value).__name__}")
+    _fail(f"दैर्घ्य() is not defined for {type_name(value)}")
     return 0
 
 
@@ -198,15 +200,15 @@ def _int(ctx, args):
     if isinstance(value, float):
         truncated = int(value)
         if not (-(2**63) <= truncated < 2**63):
-            _fail("Int conversion overflow", "PE4004")
+            _fail("पूर्णाङ्क conversion overflow", "PE4004")
         return truncated
-    _fail("int() expects Int or Float")
+    _fail("पूर्णीकरण() expects पूर्णाङ्क or दशमलव")
 
 
 def _float(ctx, args):
     value = args[0]
     if isinstance(value, bool) or not isinstance(value, (int, float)):
-        _fail("float() expects Int or Float")
+        _fail("दशमलवीकरण() expects पूर्णाङ्क or दशमलव")
     return float(value)
 
 
@@ -218,7 +220,7 @@ def _abs(ctx, args):
         return abs(value)
     if isinstance(value, float):
         return abs(value)
-    _fail("abs() expects Int or Float")
+    _fail("निरपेक्ष() expects पूर्णाङ्क or दशमलव")
 
 
 def _type_name(ctx, args):
@@ -552,8 +554,8 @@ def _nn_dataset(ctx, args):
 def _nn_train(ctx, args):
     model = _need_model(args[0], "nn.train model")
     dataset = _need_dataset(args[1], "nn.train dataset")
-    objective = _need_str(args[2], "nn.train loss")
-    optimiser = _need_str(args[3], "nn.train optimiser")
+    objective = internalise_enum(_need_str(args[2], "nn.train loss"))
+    optimiser = internalise_enum(_need_str(args[3], "nn.train optimiser"))
     epochs = _need_int(args[4], "nn.train epochs")
     learning_rate = _need_float(args[5], "nn.train learning_rate")
     batch_size = _need_int(args[6], "nn.train batch_size")
@@ -589,7 +591,7 @@ def _nn_accuracy(ctx, args):
 def _nn_loss(ctx, args):
     model = _need_model(args[0], "nn.loss model")
     dataset = _need_dataset(args[1], "nn.loss dataset")
-    objective = _need_str(args[2], "nn.loss objective")
+    objective = internalise_enum(_need_str(args[2], "nn.loss objective"))
     return _wrap_engine_errors(evaluate_loss, model, dataset, objective)
 
 
@@ -621,34 +623,39 @@ def _text_char_at(ctx, args):
     value = _need_str(args[0], "text.char_at")
     index = _need_int(args[1], "text.char_at index")
     if not (0 <= index < len(value)):
-        _fail(f"index {index} out of bounds for String of length {len(value)}")
+        _fail(f"index {index} out of bounds for अक्षरमाला of length {len(value)}")
     return value[index]
 
 
 def _single_char(value: str, where: str) -> str:
     if len(value) != 1:
-        _fail(f"{where} expects a one-character String, got length {len(value)}")
+        _fail(f"{where} expects a one-character अक्षरमाला, got length {len(value)}")
     return value
 
 
 def _text_is_alpha(ctx, args):
     ch = _single_char(_need_str(args[0], "text.is_alpha"), "text.is_alpha")
-    return ("a" <= ch <= "z") or ("A" <= ch <= "Z")
+    return ch.isalpha()
 
 
 def _text_is_digit(ctx, args):
     ch = _single_char(_need_str(args[0], "text.is_digit"), "text.is_digit")
-    return "0" <= ch <= "9"
+    return ch.isdecimal()
 
 
 def _text_is_alnum(ctx, args):
     ch = _single_char(_need_str(args[0], "text.is_alnum"), "text.is_alnum")
-    return _text_is_alpha(ctx, [ch]) or _text_is_digit(ctx, [ch])
+    return ch.isalpha() or ch.isdecimal()
+
+
+def _text_is_mark(ctx, args):
+    ch = _single_char(_need_str(args[0], "text.is_mark"), "text.is_mark")
+    return unicodedata.category(ch) in {"Mn", "Mc", "Me"}
 
 
 def _text_is_space(ctx, args):
     ch = _single_char(_need_str(args[0], "text.is_space"), "text.is_space")
-    return ch in " \t\n\r"
+    return ch.isspace()
 
 
 def _text_ord(ctx, args):
@@ -684,7 +691,8 @@ def _motion_spring_steps(ctx, args):
 
 
 def _motion_ease(ctx, args):
-    return _wrap_engine_errors(ease, _need_str(args[0], "ease name"), _need_float(args[1], "ease t"))
+    name = internalise_enum(_need_str(args[0], "ease name"))
+    return _wrap_engine_errors(ease, name, _need_float(args[1], "ease t"))
 
 
 # ---------------------------------------------------------------------------
@@ -721,7 +729,7 @@ def call_method(ctx: NativeContext, receiver, name: str, args: list):
                 return receiver.features
             if name == "labels":
                 return receiver.labels
-        _fail(f"{type(receiver).__name__} has no method '{name}'")
+        _fail(f"{type_name(receiver)} has no method '{surface(name)}'")
     except TensorError as exc:
         raise VMFault(str(exc), "PE6001") from exc
     except (ColorError, CanvasError) as exc:
@@ -739,12 +747,12 @@ def _list_method(receiver: list, name: str, args: list):
         return UNIT
     if name == "pop":
         if not receiver:
-            _fail("pop() on an empty List", "PE4002")
+            _fail("निष्कासय() on an empty सूची", "PE4002")
         return receiver.pop()
     if name == "get":
         idx = _need_int(args[0], "List.get index")
         if not (0 <= idx < len(receiver)):
-            _fail(f"index {idx} out of bounds for List of length {len(receiver)}", "PE4002")
+            _fail(f"index {idx} out of bounds for सूची of length {len(receiver)}", "PE4002")
         return receiver[idx]
     if name == "contains":
         return args[0] in receiver
@@ -757,17 +765,17 @@ def _list_method(receiver: list, name: str, args: list):
         sep = _need_str(args[0], "join separator")
         for item in receiver:
             if not isinstance(item, str):
-                _fail("join() requires List<String>")
+                _fail("संयोजय() requires सूची<अक्षरमाला>")
         return sep.join(receiver)
     if name == "sort":
         if any(isinstance(v, bool) or not isinstance(v, (int, float)) for v in receiver):
-            _fail("sort() requires a List of Int or Float")
+            _fail("क्रमय() requires a सूची of पूर्णाङ्क or दशमलव")
         receiver.sort()
         return UNIT
     if name == "reverse":
         receiver.reverse()
         return UNIT
-    _fail(f"List has no method '{name}'")
+    _fail(f"सूची has no method '{surface(name)}'")
     return UNIT
 
 
@@ -796,7 +804,7 @@ def _string_method(receiver: str, name: str, args: list):
         if not (0 <= start <= end <= len(receiver)):
             _fail(f"substring bounds [{start}, {end}) invalid for string of length {len(receiver)}")
         return receiver[start:end]
-    _fail(f"String has no method '{name}'")
+    _fail(f"अक्षरमाला has no method '{surface(name)}'")
     return ""
 
 
@@ -829,7 +837,7 @@ def _tensor_method(receiver: Tensor, name: str, args: list):
         shape = _need_list(args[0], "reshape dims")
         for d in shape:
             if not is_int(d):
-                _fail("reshape dims must be Ints")
+                _fail("पुनराकृति dims must be पूर्णाङ्क values")
         return T.reshape(receiver, shape)
     if name == "transpose" and not args:
         return T.transpose(receiver)
@@ -843,7 +851,7 @@ def _tensor_method(receiver: Tensor, name: str, args: list):
         return UNIT
     if name == "item" and not args:
         return float(receiver.item())
-    _fail(f"Tensor has no method '{name}'")
+    _fail(f"आयाम has no method '{surface(name)}'")
     return UNIT
 
 
@@ -880,7 +888,7 @@ def get_property(ctx: NativeContext, receiver, name: str):
             return receiver.features
         if name == "labels":
             return receiver.labels
-    _fail(f"{type(receiver).__name__} has no property '{name}'")
+    _fail(f"{type_name(receiver)} has no property '{surface(name)}'")
     return UNIT
 
 
@@ -940,6 +948,7 @@ _IMPLS = {
     "text.is_alpha": _text_is_alpha,
     "text.is_digit": _text_is_digit,
     "text.is_alnum": _text_is_alnum,
+    "text.is_mark": _text_is_mark,
     "text.is_space": _text_is_space,
     "text.ord": _text_ord,
     "text.chr": _text_chr,
@@ -953,7 +962,7 @@ _IMPLS.update(_math_impls())
 def call_native(ctx: NativeContext, name: str, args: list):
     impl = _IMPLS.get(name)
     if impl is None:
-        raise VMFault(f"native function '{name}' is not implemented", "PE4999")
+        raise VMFault(f"native function '{surface(name)}' is not implemented", "PE4999")
     result = impl(ctx, args)
     if result is None:
         raise VMFault(f"native function '{name}' returned no value", "PE4999")
