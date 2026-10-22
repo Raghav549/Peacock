@@ -62,6 +62,22 @@ class Handler:
     end: int
     target: int
     stack_len: int
+    kind: str = "catch"
+
+
+@dataclass
+class Completion:
+    kind: str  # error, return or jump
+    value: object = None
+    target: int = -1
+    error: PeacockError | None = None
+
+
+@dataclass
+class Cleanup:
+    start: int
+    resume: int
+    handler_depth: int
 
 
 @dataclass
@@ -75,6 +91,9 @@ class Frame:
     handlers: list[Handler] = field(default_factory=list)
     caps: frozenset[str] = frozenset()
     pending_error: str | None = None
+    completions: list[Completion] = field(default_factory=list)
+    cleanups: list[Cleanup] = field(default_factory=list)
+    skip_trace_error: PeacockError | None = None
 
 
 @dataclass
@@ -211,7 +230,10 @@ class VM:
                 raise
             except PeacockError as exc:
                 line, column = frame.lines[ip] if ip < len(frame.lines) else (0, 0)
-                add_trace(exc, frame.name, line, column)
+                if frame.skip_trace_error is exc:
+                    frame.skip_trace_error = None
+                else:
+                    add_trace(exc, frame.name, line, column)
                 handled = self._handle_exception(frame, ip, exc)
                 if not handled:
                     raise
@@ -380,8 +402,9 @@ class VM:
             raise VMFault(message, "PE4020")
         elif op == "JUMP":
             target = instr[1]
-            self._prune_handlers(frame, target)
-            frame.pc = target
+            if not self._begin_completion(frame, ip, "jump", target=target):
+                self._prune_handlers(frame, target)
+                frame.pc = target
         elif op == "JUMP_IF_FALSE":
             if not stack:
                 raise VMFault("stack underflow in JUMP_IF_FALSE", "PE4999")
@@ -390,8 +413,9 @@ class VM:
                 raise VMFault("branch condition must be सत्यता", "PE4002")
             if not condition:
                 target = instr[1]
-                self._prune_handlers(frame, target)
-                frame.pc = target
+                if not self._begin_completion(frame, ip, "jump", target=target):
+                    self._prune_handlers(frame, target)
+                    frame.pc = target
         elif op == "TRY_BEGIN":
             target, end = instr[1], instr[2]
             if end < frame.pc:
@@ -405,12 +429,41 @@ class VM:
                 raise VMFault("CATCH executed without a pending error", "PE4999")
             stack.append(frame.pending_error)
             frame.pending_error = None
+        elif op == "FINALLY_BEGIN":
+            target, end = instr[1], instr[2]
+            if end < frame.pc:
+                raise VMFault("invalid finally region", "PE4999")
+            frame.handlers.append(Handler(frame.pc, end, target, len(stack), "finally"))
+        elif op == "FINALLY_END":
+            if not frame.handlers or frame.handlers[-1].kind != "finally" or frame.handlers[-1].end != ip:
+                raise VMFault("FINALLY_END without a matching region", "PE4999")
+            handler = frame.handlers[-1]
+            self._enter_finally(frame, len(frame.handlers) - 1, handler, Completion("jump", target=instr[1]))
+        elif op == "FINALLY_RESUME":
+            if not frame.cleanups or not frame.completions or frame.cleanups[-1].resume != ip:
+                raise VMFault("FINALLY_RESUME without a matching saved completion", "PE4999")
+            frame.cleanups.pop()
+            completion = frame.completions.pop()
+            if completion.kind == "jump":
+                self._prune_handlers(frame, completion.target)
+                frame.pc = completion.target
+            elif completion.kind == "return":
+                return True, completion.value
+            elif completion.kind == "error" and completion.error is not None:
+                frame.skip_trace_error = completion.error
+                raise completion.error
+            else:
+                raise VMFault("invalid saved finally completion", "PE4999")
         elif op == "RET":
             if instr[1]:
                 if not stack:
                     raise VMFault("stack underflow in RET", "PE4999")
-                return True, stack.pop()
-            return True, UNIT
+                value = stack.pop()
+            else:
+                value = UNIT
+            if self._begin_completion(frame, ip, "return", value=value):
+                return False, None
+            return True, value
         elif op == "NOP":
             pass
         else:
@@ -425,15 +478,73 @@ class VM:
                 return index, handler
         return None, None
 
+    @staticmethod
+    def _abort_cleanups_to_handler(frame: Frame, index: int) -> None:
+        while frame.cleanups and frame.cleanups[-1].handler_depth > index:
+            frame.cleanups.pop()
+            frame.completions.pop()
+
+    @staticmethod
+    def _abort_all_cleanups(frame: Frame) -> None:
+        frame.cleanups.clear()
+        frame.completions.clear()
+
+    @staticmethod
+    def _cleanup_resume(frame: Frame, handler: Handler) -> int:
+        nested = 0
+        for ip in range(handler.target, len(frame.code)):
+            op = frame.code[ip][0]
+            if op == "FINALLY_BEGIN":
+                nested += 1
+            elif op == "FINALLY_RESUME":
+                if nested == 0:
+                    return ip
+                nested -= 1
+        raise VMFault("finally handler has no FINALLY_RESUME", "PE4999")
+
+    def _enter_finally(self, frame: Frame, index: int, handler: Handler, completion: Completion) -> None:
+        resume = self._cleanup_resume(frame, handler)
+        self._abort_cleanups_to_handler(frame, index)
+        del frame.handlers[index:]
+        frame.stack = frame.stack[: handler.stack_len]
+        frame.pending_error = None
+        frame.cleanups.append(Cleanup(handler.target, resume, index))
+        frame.completions.append(completion)
+        frame.pc = handler.target
+
     def _handle_exception(self, frame: Frame, ip: int, exc: PeacockError) -> bool:
         index, handler = self._find_handler(frame, ip)
         if handler is None:
             return False
-        del frame.handlers[index:]
-        frame.stack = frame.stack[: handler.stack_len]
-        frame.pending_error = exc.message
-        frame.pc = handler.target
+        if handler.kind == "finally":
+            self._enter_finally(frame, index, handler, Completion("error", error=exc))
+        else:
+            self._abort_cleanups_to_handler(frame, index)
+            del frame.handlers[index:]
+            frame.stack = frame.stack[: handler.stack_len]
+            frame.pending_error = exc.message
+            frame.pc = handler.target
         return True
+
+    def _begin_completion(self, frame: Frame, ip: int, kind: str, *, value=None, target: int = -1) -> bool:
+        if kind == "return":
+            # A return from any cleanup supersedes every older saved outcome.
+            self._abort_all_cleanups(frame)
+        elif kind == "jump":
+            # Ordinary branches inside cleanup preserve its saved outcome;
+            # leaving cleanup abandons that outcome in favour of the new jump.
+            while frame.cleanups and not (frame.cleanups[-1].start <= target <= frame.cleanups[-1].resume):
+                frame.cleanups.pop()
+                frame.completions.pop()
+        for index in range(len(frame.handlers) - 1, -1, -1):
+            handler = frame.handlers[index]
+            if handler.kind != "finally" or not (handler.start <= ip < handler.end):
+                continue
+            if kind == "jump" and handler.start <= target < handler.end:
+                continue
+            self._enter_finally(frame, index, handler, Completion(kind, value=value, target=target))
+            return True
+        return False
 
     def _prune_handlers(self, frame: Frame, target: int) -> None:
         frame.handlers = [

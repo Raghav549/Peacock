@@ -1,4 +1,4 @@
-# PEACOCK 0.3 idioms and common mistakes
+# PEACOCK 0.4 idioms and common mistakes
 
 Valid patterns:
 

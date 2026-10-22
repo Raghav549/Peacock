@@ -5,7 +5,7 @@ document states what is enforced, what is not, and how to report a problem.
 
 ## Supported version
 
-Security fixes target the current `0.3.x` reference implementation. There is no
+Security fixes target the current `0.4.x` reference implementation. There is no
 long-term-support branch yet.
 
 ## Reporting a vulnerability
@@ -26,22 +26,25 @@ coordinate disclosure.
 
 ### Capabilities
 
-Three capabilities exist in v0.3:
+Four capabilities exist in v0.4:
 
 | Capability | Authority |
 |---|---|
 | `गणना` | create trainable tensors, autodiff, model init/train/predict, save/load |
 | `सञ्चय` | read/write files and create directories inside the host sandbox root |
-| `दृश्य` | hand rendered 2D/3D frames to a host-attached presentation backend |
+| `दृश्य` | attach rendered frames or retained UI to a host presentation/event backend |
+| `सञ्जाल` | bind/use PEACOCK HTTP server handles and invoke a host-configured LLM agent |
 
 A program must **declare** a capability in each function that performs a
 protected operation. The host must **independently grant** it. Declaration is not
 authority. The VM checks both before dispatch; `peacock audit` reports static
 usage but is not an enforcement mechanism.
 
-`दृश्य` is presentation-only: it grants no input, window-management, clipboard or
-display-query authority. A host may grant `दृश्य` without attaching a backend; the
-call then fails with `PE4006` before any data leaves the VM.
+`दृश्य` authorizes attachment of a presentation/event host; it grants no clipboard
+or display-query API. Local UI queue operations do not themselves open a window.
+A host may grant `दृश्य` without attaching a backend; presentation then fails
+with `PE4006` before a frame/document is handed to a backend. `सञ्जाल` does not
+provide a general URL client or choose LLM credentials/endpoints.
 
 Capability denials raise `PE4001`. They may be caught by PEACOCK code, but a
 caught denial grants no authority and the operation does not occur. Panics
@@ -85,7 +88,12 @@ inside natives and are catchable; they do not allow allocating beyond the stated
 limits. Agent rules, state size and planning expansions are bounded and require
 `गणना`; UI node counts, grid columns and text/HTML sizes are bounded; 3-D mesh
 resolution, light counts, triangle work and canvas dimensions are bounded. These
-are implementation guards, not a complete host-memory quota. Grammar corpus,
+are implementation guards, not a complete host-memory quota. UI events are
+bounded to 1024 queued records with key/text limits; native HTTP servers are
+limited to eight handles, 16 KiB request headers, 1 MiB UTF-8 bodies and bounded
+text responses. LLM agents have step, response-byte, tool-output, token and
+character budgets, but host tool handlers must implement their own I/O timeouts.
+OpenCL operations are limited to 16,777,216 output elements. Grammar corpus,
 search and pratyāhāra operations are offline and need no capability.
 
 ### Artifacts and models
@@ -105,10 +113,12 @@ not a formally verified parser.
 
 Integer arithmetic is checked; overflow is a fault, not wraparound. Division and
 remainder by zero are faults. Bounds are checked. Uninitialised locals are
-faults. There is **no language-level garbage collector** in 0.3; the Python host
-owns memory and cycles are not collected. A program can still consume host
-memory within the tensor/canvas limits; step and element budgets are the primary
-mitigations.
+faults. There is **no independent language-level memory manager or GC API** in
+0.4; the CPython host owns VM objects and applies its own reference counting and
+cyclic GC outside PEACOCK semantics. The native C subset instead tracks and
+releases run-scoped allocations and enforces resource bounds. A program can still consume host
+memory within tensor/canvas/server limits; step and element budgets are the
+primary mitigations, not a complete process-memory quota.
 
 ### External boundaries
 
@@ -121,14 +131,34 @@ mitigations.
 * A presentation backend receives in-process `Canvas` objects. Backend
   exceptions are wrapped as `PE5003` host errors; they cannot corrupt VM state.
   The static-web backend writes PNGs and an HTML viewer with no script.
-* HTTP hosting (`peacock run --serve`) uses the standard-library server; it
-  serves only fixed routes and the latest presented frame. It has no
-  authentication, TLS or multi-tenant isolation, binds to `127.0.0.1` by default,
-  and should be placed behind a hardened proxy if exposed. `--linger -1` keeps it
-  running after the program ends, so it must be stopped deliberately.
-* The web viewer and `दृश्य` UI export are static HTML with no JavaScript. UI
-  text/attributes are escaped and link schemes are restricted; exported HTML is
-  still data for the browser, not a native accessibility or windowing sandbox.
+* Frame HTTP hosting (`peacock run --serve`) uses fixed routes and the latest
+  presented frame. Interactive `--ui-serve` additionally accepts same-origin
+  event POSTs and serves fragments. Neither has authentication, TLS or
+  multi-tenant isolation; both bind to `127.0.0.1` by default. Anyone who can
+  reach the interactive port may drive program events. Use OS isolation/a
+  hardened proxy for deliberate exposure. `--linger -1` requires deliberate
+  shutdown.
+* PEACOCK-owned `सेवक` sockets are likewise plaintext and unauthenticated. They
+  parse bounded HTTP/1.1 text requests but do not implement chunked transfer,
+  pipelining or concurrent dispatch. Binding a non-loopback numeric address is
+  an explicit source/host decision under `सञ्जाल`, not a safe-production-server
+  claim.
+* Static web/frame and `दृश्य` HTML exports contain no JavaScript. The explicit
+  interactive UI host injects a small same-origin event/refresh script. UI text
+  and attributes are escaped and link schemes restricted; exported HTML is data
+  for the browser, not an accessibility or windowing sandbox.
+* The X11 host uses `ctypes` and core X11 drawing. It requires a trusted working
+  display/client library and is not a memory-safe or complex-script-complete
+  widget toolkit. No real-display validation was available in this environment.
+* LLM responses and tool outputs are untrusted data. The provider requires HTTPS
+  remotely, disables redirects and bounds responses; tool schemas/capabilities
+  prevent accidental dispatch but do not prove that a requested action is safe.
+  Default tools are offline grammar/calculator operations only. API keys come
+  from host environment configuration and are excluded from agent traces.
+* Native AOT rejects privileged/unsupported opcodes before C compilation. Its C
+  runtime checks operations and returns library faults to the host, but generated
+  C is not formally memory-safe, is not a sandbox for malicious host tools, and
+  the current shared-library state is neither thread-safe nor reentrant.
 * `दृश्य.रक्ष` and 3-D output through `चित्र.रक्ष` use the same `सञ्चय`-gated
   `HostPolicy.write_bytes` sandbox as other file writes; they do not open paths
   directly.
@@ -142,7 +172,9 @@ mitigations.
 * protection from a compromised Python interpreter or OS;
 * denial of service from heavy but in-budget computation (e.g. large matmuls);
 * production-grade multi-tenant isolation;
-* mobile/desktop targets (not implemented).
+* verified Android/iOS packages, actual X11/OpenCL hardware behavior, or mobile
+  platform store/signing guarantees in the current Linux headless environment;
+* safety or semantic correctness of an externally hosted LLM/model.
 
 ## Security regression evidence
 
@@ -153,6 +185,10 @@ paths, NUL bytes, symlink escapes, file-size limits, step/depth/output/tensor/
 dataset/epoch limits, unknown grants, panic non-catchability, unknown natives,
 unknown capabilities in tampered images, and artifact digest tampering. The
 fuzzers (`tests/integration/test_fuzzing.py`, `peacock fuzz`) exercise the lexer,
-parser, artifact and model loaders with deterministic malformed inputs.
+parser, artifact and model loaders with deterministic malformed inputs. Additional
+integration tests cover native-library recoverable faults/output failures,
+recoverable finalization, HTTP request limits/capability checks, UI enabled-tree
+dispatch, LLM schema/grant/redirect/budget failures and explicit OpenCL fallback
+behavior.
 
 A passing test suite is evidence, not a guarantee. Report gaps.

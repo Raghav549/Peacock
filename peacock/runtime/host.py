@@ -33,6 +33,14 @@ class HostPolicy:
     #: Optional callable that receives a Canvas when a program calls
     #: ``चित्र.प्रदर्शय``. Attached by the CLI or an embedding host.
     presenter: object | None = None
+    #: Optional interactive UI presenter, attached explicitly by the host.
+    ui_presenter: object | None = None
+    #: Optional callable (objective, max_steps) configured by an embedding host.
+    #: Endpoint, model, credentials and tool registry never come from source.
+    llm_runner: object | None = None
+    #: Native HTTP handles are host-owned and closed even after a VM fault.
+    server_handles: dict[int, object] = field(default_factory=dict, repr=False)
+    next_server_handle: int = 1
 
     def __post_init__(self):
         unknown = self.grants - KNOWN_CAPABILITIES
@@ -79,6 +87,48 @@ class HostPolicy:
             raise
         except Exception as exc:  # pragma: no cover - defensive boundary
             raise HostError(f"presentation backend failed: {exc}", "PE5003") from exc
+
+    def present_ui(self, ui) -> None:
+        """Present a retained UI through an explicitly attached interactive host."""
+
+        self.require("ui")
+        if self.ui_presenter is None:
+            raise HostError(
+                "no interactive UI backend is attached; run with --ui-serve PORT or attach one from an embedding host",
+                "PE4006",
+            )
+        try:
+            self.ui_presenter(ui)
+        except HostError:
+            raise
+        except Exception as exc:
+            raise HostError(f"interactive UI backend failed: {exc}", "PE5003") from exc
+
+    def run_autonomous_agent(self, objective: str, max_steps: int):
+        """Run a host-configured LLM agent under an explicit network grant."""
+
+        self.require("network")
+        if self.llm_runner is None:
+            raise HostError(
+                "no LLM agent runner is configured; use --llm-url/--llm-model or attach one from an embedding host",
+                "PE4006",
+            )
+        try:
+            return self.llm_runner(objective, max_steps)
+        except HostError:
+            raise
+        except Exception as exc:
+            raise HostError(f"LLM agent runner failed: {exc}", "PE5003") from exc
+
+    def close(self) -> None:
+        """Release host-owned native server resources (idempotently)."""
+
+        handles, self.server_handles = self.server_handles, {}
+        for server in handles.values():
+            try:
+                server.close()
+            except Exception:
+                pass  # cleanup must preserve the original VM result
 
     def resolve_path(self, path: str, *, write: bool = False) -> Path:
         if not isinstance(path, str):

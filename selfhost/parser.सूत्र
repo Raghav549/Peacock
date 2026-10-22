@@ -153,7 +153,7 @@
     स्थापय keywords = [
         "प्रकरण", "उपयोग", "रूपेण", "कार्य", "स्थापय", "परिवर्तनीय", "यदि", "अन्यथा", "यावत्", "प्रति",
         "मध्ये", "प्रत्यानय", "विच्छिन्दु", "अनुवर्तय", "संघटन", "प्रतिमान", "अभ्यास",
-        "अधिकार", "यत्न", "गृह्ण", "क्षिप", "निश्चिनु", "सत्य", "असत्य",
+        "अधिकार", "यत्न", "गृह्ण", "अन्ते", "क्षिप", "निश्चिनु", "सत्य", "असत्य",
         "तथा", "वा", "न"
     ];
     स्थापय two_char_ops = [
@@ -815,15 +815,23 @@
 कार्य parse_try(p: Parser) -> अक्षरमाला {
     advance(p);
     स्थापय body = parse_block(p);
-    यदि न at_kw(p, "गृह्ण") {
-        error_here(p, "expected 'गृह्ण' after यत्न block");
+    स्थापय parts = [body];
+    यदि at_kw(p, "गृह्ण") {
+        advance(p);
+        expect_op(p, "(");
+        स्थापय नाम = expect_ident(p, "a गृह्ण binding").पाठ्य;
+        expect_op(p, ")");
+        parts.योजय(नाम);
+        parts.योजय(parse_block(p));
     }
-    advance(p);
-    expect_op(p, "(");
-    स्थापय नाम = expect_ident(p, "a गृह्ण binding").पाठ्य;
-    expect_op(p, ")");
-    स्थापय catch_body = parse_block(p);
-    प्रत्यानय node("यत्न", [body, नाम, catch_body]);
+    यदि at_kw(p, "अन्ते") {
+        advance(p);
+        parts.योजय(node("अन्ते", [parse_block(p)]));
+    }
+    यदि दैर्घ्य(parts) == १ {
+        error_here(p, "expected 'गृह्ण' or 'अन्ते' after यत्न block");
+    }
+    प्रत्यानय node("यत्न", parts);
 }
 
 कार्य parse_throw(p: Parser) -> अक्षरमाला {

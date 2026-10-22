@@ -7,6 +7,7 @@ third-party ML or UI framework.
 
 from __future__ import annotations
 
+import json
 import math
 import unicodedata
 from dataclasses import dataclass
@@ -25,11 +26,13 @@ from peacock.frontend.png import encode_png
 from peacock.frontend.spring import SpringConfig, settle
 from peacock.intelligence.agent import Agent, AgentError
 from peacock.intelligence.datasets import Dataset, make_dataset, spiral_dataset, xor_dataset
+from peacock.intelligence.gpu import GPUError, backend_names as gpu_backend_names, create_backend as create_gpu_backend
 from peacock.intelligence.layers import Model
 from peacock.intelligence.serialization import model_from_bytes, model_to_bytes
 from peacock.intelligence.tensor import Tensor, TensorError, absolute
 from peacock.intelligence import tensor as T
 from peacock.intelligence.training import evaluate_accuracy, evaluate_loss, train_model
+from peacock.platforms.httpd import BoundedHTTPServer, ServerError
 from peacock.runtime.errors import VMFault
 from peacock.runtime.values import UNIT, RangeValue, format_value, is_int, type_name
 from peacock.sanskrit import internalise_enum, surface, surface_enum
@@ -138,6 +141,12 @@ def _need_str(value, where: str) -> str:
     return value
 
 
+def _need_bool(value, where: str) -> bool:
+    if not isinstance(value, bool):
+        _fail(f"{where} expects a सत्यता, got {type_name(value)}")
+    return value
+
+
 def _need_list(value, where: str) -> list:
     if not isinstance(value, list):
         _fail(f"{where} expects a सूची, got {type_name(value)}")
@@ -168,6 +177,10 @@ def _wrap_engine_errors(fn, *args):
         raise VMFault(str(exc), "PE7001") from exc
     except CanvasError as exc:
         raise VMFault(str(exc), "PE7001") from exc
+    except GPUError as exc:
+        raise VMFault(str(exc), "PE6002") from exc
+    except ServerError as exc:
+        raise VMFault(str(exc), "PE5003") from exc
     except (ValueError, TypeError, ArithmeticError, OverflowError) as exc:
         raise VMFault(str(exc) or exc.__class__.__name__, "PE4002") from exc
 
@@ -845,6 +858,60 @@ def _ui_node_count(ctx, args):
     return len(_need_ui(args[0], "ui.node_count").nodes)
 
 
+def _ui_present(ctx, args):
+    ctx.host.present_ui(_need_ui(args[0], "ui.present"))
+    return UNIT
+
+
+def _ui_bind(ctx, args):
+    ui = _need_ui(args[0], "ui.bind")
+    kind = internalise_enum(_need_str(args[2], "UI event kind"))
+    _wrap_engine_errors(ui.bind, _need_int(args[1], "UI node"), kind, _need_str(args[3], "UI action"))
+    return UNIT
+
+
+def _ui_post_event(ctx, args):
+    ui = _need_ui(args[0], "ui.post_event")
+    kind = internalise_enum(_need_str(args[1], "UI event kind"))
+    return _wrap_engine_errors(
+        ui.post_event, kind, _need_int(args[2], "event node"),
+        _need_float(args[3], "event x"), _need_float(args[4], "event y"),
+        _need_str(args[5], "event key"), _need_str(args[6], "event text"),
+    )
+
+
+def _ui_next_event(ctx, args):
+    ui = _need_ui(args[0], "ui.next_event")
+    event = _wrap_engine_errors(ui.next_event, _need_int(args[1], "event timeout"))
+    if event is None:
+        return []
+    record = event.as_strings()
+    record[1] = surface_enum(record[1])
+    return record
+
+
+def _ui_pending_events(ctx, args):
+    return _need_ui(args[0], "ui.pending_events").pending_events()
+
+
+def _ui_set_text(ctx, args):
+    ui = _need_ui(args[0], "ui.set_text")
+    _wrap_engine_errors(ui.set_text, _need_int(args[1], "UI node"), _need_str(args[2], "UI text"))
+    return UNIT
+
+
+def _ui_set_enabled(ctx, args):
+    ui = _need_ui(args[0], "ui.set_enabled")
+    _wrap_engine_errors(ui.set_enabled, _need_int(args[1], "UI node"), _need_bool(args[2], "UI enabled"))
+    return UNIT
+
+
+def _ui_focus(ctx, args):
+    ui = _need_ui(args[0], "ui.focus")
+    _wrap_engine_errors(ui.focus, _need_int(args[1], "UI node"))
+    return UNIT
+
+
 # -- software 3-D -------------------------------------------------------------
 def _scene_create(ctx, args):
     return Scene3D()
@@ -933,6 +1000,126 @@ def _agent_trace(ctx, args):
 
 def _agent_facts(ctx, args):
     return _need_agent(args[0], "agent.facts").fact_lines()
+
+
+def _agent_autonomous(ctx, args):
+    objective = _need_str(args[0], "autonomous objective")
+    max_steps = _need_int(args[1], "autonomous max steps")
+    if not 1 <= max_steps <= 64:
+        _fail("autonomous max steps must be between 1 and 64", "PE4003")
+    result = ctx.host.run_autonomous_agent(objective, max_steps)
+    status = getattr(result, "status", None)
+    text = getattr(result, "text", None)
+    steps = getattr(result, "steps", None)
+    trace = getattr(result, "trace", None)
+    if status not in {"succeeded", "stalled"} or not isinstance(text, str):
+        _fail("host LLM runner returned an invalid status/text", "PE5003")
+    if not is_int(steps) or not 0 <= steps <= 64 or not isinstance(trace, list):
+        _fail("host LLM runner returned invalid steps/trace", "PE5003")
+    try:
+        records = [json.dumps(row, ensure_ascii=False, allow_nan=False, sort_keys=True) for row in trace]
+    except (TypeError, ValueError) as exc:
+        _fail(f"host LLM runner returned a non-JSON trace: {exc}", "PE5003")
+    return [surface_enum(status), text, str(steps), *records]
+
+
+# -- CPU / OpenCL tensor acceleration ---------------------------------------
+def _gpu_backend_name(value) -> str:
+    return internalise_enum(_need_str(value, "compute backend"))
+
+
+def _gpu_backends(ctx, args):
+    return [surface_enum(name) for name in gpu_backend_names()]
+
+
+def _gpu_info(ctx, args):
+    backend = _wrap_engine_errors(create_gpu_backend, _gpu_backend_name(args[0]))
+    try:
+        info = backend.info
+        return [
+            "पश्चात्तन्त्र=" + surface_enum(info.backend),
+            "यन्त्र=" + info.name,
+            "निर्मातृ=" + info.vendor,
+            "आवृत्ति=" + info.version,
+            "भौतिक=" + ("सत्य" if info.hardware else "असत्य"),
+        ]
+    finally:
+        backend.close()
+
+
+def _gpu_operation(ctx, args, operation: str):
+    backend = _wrap_engine_errors(create_gpu_backend, _gpu_backend_name(args[0]))
+    try:
+        tensors = [_need_tensor(value, f"gpu.{operation} tensor") for value in args[1:]]
+        return _wrap_engine_errors(getattr(backend, operation), *tensors)
+    finally:
+        backend.close()
+
+
+def _gpu_add(ctx, args):
+    return _gpu_operation(ctx, args, "add")
+
+
+def _gpu_multiply(ctx, args):
+    return _gpu_operation(ctx, args, "multiply")
+
+
+def _gpu_relu(ctx, args):
+    return _gpu_operation(ctx, args, "relu")
+
+
+def _gpu_matmul(ctx, args):
+    return _gpu_operation(ctx, args, "matmul")
+
+
+# -- PEACOCK-controlled synchronous HTTP servers ----------------------------
+def _server_value(ctx, value):
+    handle = _need_int(value, "server handle")
+    server = ctx.host.server_handles.get(handle)
+    if server is None:
+        _fail(f"unknown or closed HTTP server handle {handle}", "PE4006")
+    return handle, server
+
+
+def _server_listen(ctx, args):
+    if len(ctx.host.server_handles) >= 8:
+        _fail("a host may own at most 8 HTTP server handles", "PE4003")
+    address = _need_str(args[0], "HTTP listen host")
+    port = _need_int(args[1], "HTTP listen port")
+    server = _wrap_engine_errors(BoundedHTTPServer, address, port)
+    handle = ctx.host.next_server_handle
+    ctx.host.next_server_handle += 1
+    ctx.host.server_handles[handle] = server
+    return handle
+
+
+def _server_port(ctx, args):
+    _handle, server = _server_value(ctx, args[0])
+    return server.port
+
+
+def _server_accept(ctx, args):
+    _handle, server = _server_value(ctx, args[0])
+    timeout = _need_int(args[1], "HTTP accept timeout")
+    record = _wrap_engine_errors(server.accept, timeout)
+    return [] if record is None else record
+
+
+def _server_respond(ctx, args):
+    _handle, server = _server_value(ctx, args[0])
+    request_id = _need_str(args[1], "HTTP request id")
+    status = _need_int(args[2], "HTTP response status")
+    body = _need_str(args[3], "HTTP response body")
+    content_type = _need_str(args[4], "HTTP response content-type")
+    _wrap_engine_errors(server.respond, request_id, status, body, content_type)
+    return UNIT
+
+
+def _server_close(ctx, args):
+    handle, server = _server_value(ctx, args[0])
+    del ctx.host.server_handles[handle]
+    _wrap_engine_errors(server.close)
+    return UNIT
 
 
 # -- motion -----------------------------------------------------------------
@@ -1225,6 +1412,14 @@ _IMPLS = {
     "ui.to_html": _ui_html,
     "ui.save": _ui_save,
     "ui.node_count": _ui_node_count,
+    "ui.present": _ui_present,
+    "ui.bind": _ui_bind,
+    "ui.post_event": _ui_post_event,
+    "ui.next_event": _ui_next_event,
+    "ui.pending_events": _ui_pending_events,
+    "ui.set_text": _ui_set_text,
+    "ui.set_enabled": _ui_set_enabled,
+    "ui.focus": _ui_focus,
     "scene3d.create": _scene_create,
     "scene3d.cube": _scene_cube,
     "scene3d.sphere": _scene_sphere,
@@ -1241,6 +1436,18 @@ _IMPLS = {
     "agent.status": _agent_status,
     "agent.trace": _agent_trace,
     "agent.facts": _agent_facts,
+    "agent.autonomous": _agent_autonomous,
+    "gpu.backends": _gpu_backends,
+    "gpu.info": _gpu_info,
+    "gpu.add": _gpu_add,
+    "gpu.multiply": _gpu_multiply,
+    "gpu.relu": _gpu_relu,
+    "gpu.matmul": _gpu_matmul,
+    "server.listen": _server_listen,
+    "server.port": _server_port,
+    "server.accept": _server_accept,
+    "server.respond": _server_respond,
+    "server.close": _server_close,
     "nn.parameter": _nn_parameter,
     "nn.max_abs_diff": _nn_max_abs_diff,
     "nn.mse": _nn_mse,

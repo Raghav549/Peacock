@@ -545,12 +545,20 @@ class Parser:
     def parse_try(self) -> TryStmt:
         start = self.advance().span
         body = self.parse_block()
-        self.expect(TokenKind.CATCH, "after try block")
-        self.expect(TokenKind.LPAREN, "before catch binding")
-        name_tok = self.expect(TokenKind.IDENT, "as catch binding")
-        self.expect(TokenKind.RPAREN, "after catch binding")
-        catch_body = self.parse_block()
-        return TryStmt(self._merge(start), body, str(name_tok.value), catch_body)
+        catch_name: str | None = None
+        catch_body = None
+        finally_body = None
+        if self.match(TokenKind.CATCH):
+            self.expect(TokenKind.LPAREN, "before catch binding")
+            name_tok = self.expect(TokenKind.IDENT, "as catch binding")
+            self.expect(TokenKind.RPAREN, "after catch binding")
+            catch_name = str(name_tok.value)
+            catch_body = self.parse_block()
+        if self.match(TokenKind.FINALLY):
+            finally_body = self.parse_block()
+        if catch_body is None and finally_body is None:
+            self.error("PE2028", "expected 'गृह्ण' or 'अन्ते' after try block", self.current.span)
+        return TryStmt(self._merge(start), body, catch_name, catch_body, finally_body)
 
     def parse_throw(self) -> ThrowStmt:
         start = self.advance().span

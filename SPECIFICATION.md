@@ -1,6 +1,6 @@
-# PEACOCK Language Specification — version 0.3
+# PEACOCK Language Specification — version 0.4
 
-Status: **implemented subset**. This document describes what the v0.3 toolchain
+Status: **implemented subset**. This document describes what the v0.4 toolchain
 actually accepts and executes. It is not a description of every feature PEACOCK
 will eventually have. Anything not specified here is either rejected by the
 compiler or reserved for a later version.
@@ -24,12 +24,13 @@ use-decl       = "उपयोग" IDENT [ ";" ]
 ```
 
 * `प्रकरण` is optional but, if present, MUST be the first item.
-* A module name does not create a namespace for values; v0.3 has one flat
+* A module name does not create a namespace for values; v0.4 has one flat
   value namespace per program.
 * `उपयोग` imports a standard-library namespace: `गणित`, `तन्त्रजाल`, `रङ्ग`,
-  `चित्र`, `गति`, `सञ्चय`, `पाठ्य`, or `प्रक्रिया`. Aliases (`उपयोग तन्त्रजाल रूपेण n`) are
+  `चित्र`, `गति`, `सञ्चय`, `पाठ्य`, `प्रक्रिया`, `व्याकरण`, `दृश्य`, `त्रिअयाम`,
+  `अभिकर्तृ`, `गणनयन्त्र`, or `सेवक`. Aliases (`उपयोग तन्त्रजाल रूपेण n`) are
   rejected (PE2005). A namespace MUST be imported before its members are used.
-* There are no user-defined file imports in 0.3. The whole program is one file.
+* There are no user-defined file imports in 0.4. The whole program is one file.
 * Declarations are order-independent: a function may call one declared later.
 * Names are Unicode identifiers. The first character is `_` or a Unicode
   letter; later characters may also be Unicode decimal digits or combining
@@ -84,7 +85,7 @@ produce PE1003/PE1004 with an explanation. Logical negation is the keyword
 
 ## 3. Grammar (EBNF)
 
-The following is the complete v0.3 grammar. `[ x ]` is optional, `{ x }` is
+The following is the complete v0.4 grammar. `[ x ]` is optional, `{ x }` is
 repetition, and alternatives are separated by `|`.
 ```
 program        = [ module-decl ] { item } EOF
@@ -126,7 +127,9 @@ return-stmt    = "प्रत्यानय" [ expr ] ";"
 break-stmt     = "विच्छिन्दु" ";"
 continue-stmt  = "अनुवर्तय" ";"
 capability-stmt= "अधिकार" IDENT { "," IDENT } ";"
-try-stmt       = "यत्न" block "गृह्ण" "(" IDENT ")" block
+try-stmt       = "यत्न" block ( catch-clause [ finally-clause ] | finally-clause )
+catch-clause   = "गृह्ण" "(" IDENT ")" block
+finally-clause = "अन्ते" block
 throw-stmt     = "क्षिप" expr ";"
 assert-stmt    = "निश्चिनु" [ "(" ] expr [ "," expr ] [ ")" ] ";"
                 (* `निश्चिनु cond, "msg";` and `निश्चिनु(cond, "msg");` are both accepted *)
@@ -222,7 +225,7 @@ p.x = 5;
 ```
 
 Constructors take every field positionally, exactly once. Fields are mutable.
-Structs have no methods, inheritance, generics, or visibility modifiers in 0.3.
+Structs have no methods, inheritance, generics, or visibility modifiers in 0.4.
 
 ### 4.5 Opaque host types
 
@@ -286,13 +289,24 @@ Semantics:
 ### 6.1 Errors
 
 `क्षिप expr;` raises a catchable runtime value; the expression must be a
-`अक्षरमाला` in 0.3. `यत्न { ... } गृह्ण (e) { ... }` binds the message as `अक्षरमाला`.
+`अक्षरमाला` in 0.4. `यत्न { ... } गृह्ण (e) { ... }` binds the message as
+`अक्षरमाला`. A `यत्न` MUST have a catch clause, an `अन्ते` cleanup clause, or a
+catch followed by cleanup; multiple catch clauses are not supported.
+
+`अन्ते { ... }` runs exactly once when its protected region completes normally,
+throws, returns, or transfers control with `विच्छिन्दु`/`अनुवर्तय`. Nested cleanup
+regions unwind from inner to outer. The VM saves the pending error/value/jump,
+restores it after cleanup, and then resumes that completion. A new throw, return
+or loop transfer in cleanup supersedes the saved completion while still
+unwinding outer cleanups. A `गृह्ण` handles a protected error before an adjacent
+`अन्ते` runs; if the catch itself throws, cleanup still runs.
+
 An uncaught `क्षिप` terminates the run with `PE4020`, a stack trace and exit
-code 3; this is what a `.सूत्र` program sees when it raises without a handler.
-Runtime faults (arithmetic, bounds, assertions, native failures) are catchable
-in the same way. Host capability denials (`PE4001`) are catchable but grant no
-authority; resource limits (`PE4003`) are **not** catchable and terminate the
-program. `विह्वल(सन्देश)` is an uncatchable fault.
+code 3. Runtime faults (arithmetic, bounds, assertions, native failures) are
+catchable in the same way. Host capability denials (`PE4001`) are catchable but
+grant no authority. Resource limits (`PE4003`) and `विह्वल(सन्देश)` are fatal:
+they bypass catch and cleanup execution rather than extending a run whose host
+budget has been exhausted.
 
 `निश्चिनु(cond, "message");` or `निश्चिनु cond, "message";` raises PE4010 with the
 message when `cond` is false. The message defaults to `"assertion failed"`.
@@ -301,13 +315,14 @@ message when `cond` is false. The message defaults to `"assertion failed"`.
 
 ## 7. Capabilities
 
-A capability is a named authority granted by the embedding host. v0.3 defines:
+A capability is a named authority granted by the embedding host. v0.4 defines:
 
 | Capability | Protects |
 |---|---|
 | `गणना` | tensor/autodiff/model operations and agent planning/execution |
 | `सञ्चय` | all file reads and writes, including `चित्र.रक्ष` and `दृश्य.रक्ष` |
-| `दृश्य` | handing rendered frames to a host presentation backend (`चित्र.प्रदर्शय`) |
+| `दृश्य` | attaching rendered frames or retained UI to a host presentation backend |
+| `सञ्जाल` | PEACOCK-controlled HTTP listeners/connections and host-configured LLM providers |
 
 Rules:
 
@@ -321,13 +336,19 @@ Rules:
    that the host did not grant fails with PE4001 at the first protected call.
 5. `peacock audit` reports declared and statically visible privileged calls. It
    does not replace the runtime check.
-6. `दृश्य` governs *presentation*, not input: a program can hand a frame to the
-   host, but v0.3 exposes no window, pointer, keyboard or display query. A host
-   may grant `दृश्य` while attaching no backend; the call then fails with PE4006
-   (a host configuration error, not a capability denial).
+6. `दृश्य` governs host attachment. `चित्र.प्रदर्शय` presents a canvas and
+   `दृश्य.प्रदर्शय` attaches a retained UI to a browser or native-window host.
+   Local event binding, queueing and hit-testing do not themselves grant a host
+   window or network listener. A host may grant `दृश्य` while attaching no
+   backend; presentation then fails with PE4006 (a host configuration error,
+   not a capability denial).
+7. `सञ्जाल` does not provide a general URL-fetch API. Server natives can bind
+   only numeric IP addresses through the bounded server implementation. LLM
+   endpoint/model/credentials are configured by the host, not by source-level
+   tool arguments; declaring the capability does not choose or grant a provider.
 
 The default CLI grants nothing. Use `--grant गणना`, `--grant सञ्चय`,
-`--grant दृश्य`, or a comma-separated combination.
+`--grant दृश्य`, `--grant सञ्जाल`, or a comma-separated combination.
 
 ---
 
@@ -394,7 +415,7 @@ decides (static-web frames, HTTP server, or an embedding host). Without a host
 grant the call fails with PE4001; with a grant but no backend it fails with
 PE4006. Both are catchable and neither presents a frame. The native does not
 mutate the canvas, so a program may keep drawing and present again (a frame
-sequence). There is no frame clock, input or vsync in 0.3.
+sequence). There is no frame clock, input or vsync in 0.4.
 
 चित्रपट properties: `विस्तार`, `औन्नत्य`. Methods: `रक्ष(पथ)` (capability `सञ्चय`).
 Dimensions are 1–4096 per side with a total-pixel safety limit; colours are
@@ -441,8 +462,23 @@ return integer IDs. `प्रवाह` and `जालक` perform native layou
 `स्पर्शपरीक्षा` expose geometry; `अन्वीक्षा` reports overflow, empty labels,
 contrast and touch-target findings. `एचटीएमएलपाठ्य` exports responsive escaped
 `<html lang="sa">` without JavaScript, and `रक्ष` writes it with capability
-`सञ्चय`. Button event dispatch, native text shaping and native window/accessibility
-integration are not defined in 0.3. See [docs/frontend/ui-builder.md](docs/frontend/ui-builder.md).
+`सञ्चय`.
+
+`बन्धन(रचना, ग्रन्थि, घटनाप्रकार, क्रिया)` binds an inspectable action string.
+Supported surface events are `स्पर्श`, `अधःस्पर्श`, `उत्सर्ग`, `कुञ्जिका`, `पाठ्य`,
+`अवधान`, `प्रेषण`, `पिदध्मि` and wildcard `*` for bindings. Bindings bubble through
+enabled ancestors. `घटनाप्रेषय` posts a bounded local/host event,
+`अग्रघटना(रचना, विलम्ब)` returns `[]` on timeout or a homogeneous record
+`[id, kind, node, x, y, key, text, handler, action]`, and `घटनासंख्या` returns
+the queue length. `पाठ्यस्थापय`, `सक्रियतास्थापय`, `अवधान` mutate text, enabled
+state and focus. `प्रदर्शय` requires `दृश्य` and an attached interactive host.
+
+The CLI attaches these hosts with `--ui-serve PORT` or `--window`. Browser events
+use same-origin `/event` POSTs; the X11 host maps native pointer/key/close events
+to the same queue. The event queue is bounded at 1024. Native accessibility APIs,
+full complex-script shaping, text-input widgets and a general frame scheduler
+remain outside this UI model. See [docs/frontend/ui-builder.md](docs/frontend/ui-builder.md)
+and [docs/platforms/README.md](docs/platforms/README.md).
 
 ### 8.12 `त्रिअयाम`
 
@@ -460,8 +496,34 @@ tracing and GPU execution are not defined. See
 condition/action/effect rules. `योजना` performs bounded Dijkstra search;
 `चलाय` applies the plan; `स्थिति`, `अनुसरण`, and `तथ्यावली` expose the result.
 Planning is deterministic and limited to 1024 steps/rules and 4096 expanded
-states. This is not an arbitrary tool execution or AGI interface. See
+states. Separately, `स्वायत्त(उद्देश्य, अधिकतमचरण)` requires `सञ्जाल` and a
+host-configured LLM runner. It returns `[status, text, steps, trace-json]` for a
+bounded chat/tool loop; only host-registered, schema-validated tools are
+available. This is neither unrestricted tool execution nor AGI. See
 [docs/ai-engine/agents.md](docs/ai-engine/agents.md).
+
+### 8.14 `गणनयन्त्र` (operations require `गणना`)
+
+`पश्चात्तन्त्राणि()` lists usable backends and `विवरण(तन्त्र)` returns
+backend/device/vendor/version/hardware strings. `संकलय`, `गुणय`, `धनाङ्क` and
+`आव्यूहगुणन` take a backend name (`स्वयम्`, `क्रमक`, or `त्वरक`) plus tensors.
+The CPU backend is the reference. `त्वरक` requires an actual OpenCL
+GPU/accelerator and never silently falls back; `स्वयम्` may select CPU. OpenCL
+supports bounded Float32 addition, multiplication, ReLU and rank-2 matrix
+multiplication, not GPU autodiff or general model execution. See
+[docs/ai-engine/tensors.md](docs/ai-engine/tensors.md).
+
+### 8.15 `सेवक` (capability `सञ्जाल`)
+
+`श्रृणु(सङ्केत, द्वार)` binds a numeric-IP synchronous HTTP listener and returns
+an integer host handle; `द्वार(सेवक)` returns its actual port. `स्वीकुरु(सेवक,
+विलम्ब)` accepts one request or returns `[]` on timeout. A request is the
+homogeneous record `[id, method, target, headers-json, UTF-8-body]`.
+`प्रत्युत्तरय(सेवक, अभिप्राय, स्थितिः, body, content-type)` completes the one
+outstanding request; `पिदध्मि(सेवक)` closes the listener/connection. Header,
+body, response and handle limits are enforced. Chunked requests, pipelining,
+TLS, authentication, concurrency and binary bodies are not implemented. Host
+cleanup closes remaining handles. See [docs/platforms/README.md](docs/platforms/README.md).
 
 ---
 
@@ -477,7 +539,7 @@ states. This is not an arbitrary tool execution or AGI interface. See
 }
 ```
 
-* Exactly one input and one output are supported in 0.3.
+* Exactly one input and one output are supported in 0.4.
 * Inputs/outputs must be floating tensors with a statically known shape. The
   model's feature dimension is the last input dimension.
 * The stack must be non-empty. `सघन(एककानि: N, सक्रियण: A)` is the only
@@ -502,7 +564,7 @@ Training fields and defaults:
 | `समूहमान` | पूर्णाङ्क | 16 | ≥ 1 |
 | `बीज` | पूर्णाङ्क | 0 | any पूर्णाङ्क |
 
-Values must be literals in 0.3 (PE3010). Unknown fields are rejected.
+Values must be literals in 0.4 (PE3010). Unknown fields are rejected.
 
 ---
 
@@ -544,24 +606,34 @@ layout.
 
 ---
 
-## 12. Not in 0.3
+## 12. Not in 0.4
 
 The following are **not** part of this version and must not be assumed to work:
 
 * user-defined modules/files, generics, traits, enums, pattern matching,
   closures, first-class functions, operator overloading;
 * classes/inheritance, interfaces, visibility, `सार्वजनिक`, `स्थिर`;
-* concurrency, async/await, threads, generators;
+* general concurrency, async/await, language threads or generators (host HTTP
+  and window implementations use bounded implementation threads internally);
 * garbage collection tuning, arenas, manual memory management;
-* a native code generator, LLVM/Wasm backend, GPU kernels;
+* whole-language native AOT, LLVM or Wasm. The separate C backend implements
+  only the subset in [docs/native.md](docs/native.md) and rejects other opcodes;
 * multiple model inputs/outputs, layers other than सघन, convolution/attention
   layers, optimisers other than SGD/Adam;
-* UI event dispatch, native text shaping, native accessibility/window integration;
-* GPU/ray-traced 3D, smooth-normal interpolation, textures or mesh file formats;
+* GPU autodiff/training, CUDA/Metal/Vulkan, asynchronous device graphs, or
+  GPU/ray-traced 3D; smooth-normal interpolation, textures and mesh formats;
+* complete native complex-script text shaping/accessibility, text-input widgets,
+  or a general UI frame scheduler. The X11/browser event hosts are concrete but
+  limited implementations, not a cross-platform widget framework;
 * a complete executable Aṣṭādhyāyī, Sanskrit sentence segmentation, declension,
   conjugation or automatic samāsa analysis;
-* autonomous LLM/network agents or AGI;
-* Android/iOS/desktop native shells;
+* AGI, unconstrained autonomy, model-provided authority, or a built-in hosted
+  LLM. The bounded agent uses an explicitly configured external/local provider;
+* verified Android/iOS packages or devices in this release environment. Shell
+  sources exist, but SDK/Xcode execution is still required; only the Linux
+  desktop shell was executed here;
+* general HTTPS clients/servers, HTTP chunking/pipelining, binary request bodies
+  or multi-request concurrent server dispatch;
 * self-hosting (the bootstrap compiler is Python; tokenizer, parser and
   experimental semantic-shadow components are PEACOCK programs, not a self-hosted
   compiler).

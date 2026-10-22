@@ -1,303 +1,228 @@
 # PEACOCK Status
 
-Last verified: **2026-10-22** (working tree on the Arena development branch;
-not committed). Re-run the commands below before trusting any number.
+Last verified: **2026-10-22** on `arena/e6263f04-peacock` (working tree;
+not a released/tagged upstream version). Re-run the commands before relying on
+any number. Canonical source extension: `.सूत्र`. The compiler is **not
+self-hosting**. GitHub does **not** yet recognise PEACOCK; local Linguist
+metadata and the prepared submission are not upstream acceptance.
 
-Canonical source extension: `.सूत्र`. The compiler is **not self-hosting**; the
-reference implementation is a Python bootstrap. GitHub does **not** yet
-recognise PEACOCK as a language; the Linguist submission is prepared, not
-accepted.
+## 1. Current verification
 
-## 1. Verification commands and results
+### Complete suite
 
 ```bash
-./bin/peacock test
-# Ran 559 tests in 40.359s — OK (v0.3.0, 2026-10-22)
+python -m unittest discover -s tests -q
+# Ran 611 tests in 47.223s
+# OK (skipped=2)
 ```
 
-This run is from the current uncommitted Arena working tree and includes the
-Sanskrit lexical/Unicode, native grammar/agent/UI/3-D/colour, semantic-shadow,
-filesystem capability, documentation and PEACOCK-authored website regressions.
+The two skips are explicit environment gates: the real OpenCL device parity
+test and the real X11 open/draw/close test. CPU fallbacks, source-only mobile
+shells and compile-only checks are not counted as hardware/device validation.
 
-| Suite | Tests | Result |
-|---|---:|---|
-| `tests/compiler` | 227 | OK |
-| `tests/ai` | 88 | OK |
-| `tests/frontend` | 94 | OK |
-| `tests/security` | 37 | OK |
-| `tests/integration` | 73 | OK |
-| `tests/unit` | 34 | OK |
-| `tests/benchmarks` | 6 | OK |
-| **Total** | **559** | **OK** |
+### Additional checks
 
 ```bash
 ./bin/peacock fuzz --iterations 1000 --seed 1
-# lexer OK handled=1000 crashes=0
-# parser OK handled=1000 crashes=0
+# lexer    OK handled=1000 crashes=0
+# parser   OK handled=1000 crashes=0
 # artifact OK handled=1000 crashes=0
-# model OK handled=666 crashes=0
+# model    OK handled=666  crashes=0
+
+python -m unittest tests.unit.test_documentation -q
+# Ran 7 tests — OK
+
+git diff --check
+# clean
 ```
 
-The fuzzers are deterministic but not exhaustive. A clean run is evidence against
-crashes on those inputs, not a security proof.
+Focused development runs also passed:
 
-## 2. Featured real executions
-
-All commands were run from the repository root on the reference machine.
-
-| Command | Observed result |
+| Area | Observed result |
 |---|---|
-| `./bin/peacock run examples/hello.सूत्र` | `Hello from PEACOCK`; 6 bytecode steps |
-| `./bin/peacock run examples/tour.सूत्र` | prints `sum: 55`, `caught: doubled() does not accept negative numbers`, `types: अक्षरमाला, दशमलव, सूची` |
-| `./bin/peacock run examples/xor.सूत्र --grant गणना` | 400 epochs, final loss `0.0013468142908857894`, accuracy `1.0` |
-| `./bin/peacock run examples/spiral.सूत्र --grant गणना` | 48 samples, 250 epochs, final loss `0.06998025545183473`, accuracy `1.0` |
-| `./bin/peacock run examples/tensors.सूत्र --grant गणना` | autodiff and closed-form MSE gradients agree, `max abs difference: 0.0` |
-| `./bin/peacock run examples/vyakarana.सूत्र` | prints 3,983 sūtra texts / 4 executable sandhi rules, pratyāhāra membership, anuvṛtti and `रामेन्द्रः`, `नद्यत्र`, `महर्षिः` |
-| `./bin/peacock व्याकरण संधि राम इन्द्रः` | `रामेन्द्रः — 6.1.87 आद्गुणः` |
-| `./bin/peacock run examples/agents.सूत्र --grant गणना` | minimum-cost plan reaches `सिद्ध` with two trace entries; omission of `गणना` is denied |
-| `./bin/peacock run examples/colour_lab.सूत्र` | weighted Oklab, subtractive and gamut examples print `rgb(81 71 210)`, `rgb(0 0 0)`, `rgb(255 101 81)` |
-| `./bin/peacock run examples/ui_builder.सूत्र --grant सञ्चय --root .` | exports accessible, responsive, script-free Sanskrit `examples/out/ui.html`; hit test and audit assertions pass |
-| `./bin/peacock run examples/scene3d.सूत्र --grant सञ्चय --root .` | renders 588 triangles and writes a valid, lit/depth-buffered 320×200 `examples/out/scene3d.png` |
-| `./bin/peacock run examples/aurora.सूत्र --grant सञ्चय` | writes `examples/out/aurora.png` (960×540, 162,337 bytes, valid PNG) |
-| `./bin/peacock run selfhost/tokenizer.सूत्र --grant सञ्चय -- examples/tour.सूत्र` | prints `367`, equal to the bootstrap lexer's token count minus EOF |
-| `./bin/peacock run selfhost/parser.सूत्र --grant सञ्चय --root . --max-steps 300000000 -- examples/xor.सूत्र` | AST digest identical to the bootstrap on the 14-file corpus; parses its own 1,131-line source with identical digest |
-| `./bin/peacock run selfhost/type_model.सूत्र` | 56 PEACOCK assertions pass, including ErrorType iterable recovery |
-| `./bin/peacock check examples/tour.सूत्र --semantic-shadow --json` | Experimental VM-executed semantic probes pass; JSON includes type/semantic/builtin probe counts |
-| `./bin/peacock run examples/present.सूत्र --grant दृश्य --present out/preview` | prints `presented 4 frames`; manifest lists 4 × 320×180 frames; `latest.png` decodes to 230,400 RGBA bytes |
-| `./bin/peacock run examples/present.सूत्र --grant दृश्य` (no backend) | PE4006, exit 3; the host, not the program, decides where frames go |
-| `./bin/peacock run examples/present.सूत्र --grant दृश्य --serve 8099 --linger 2` | `/manifest.json` reports 4 frames and a 320×180 latest frame; `/frame.png` decodes; `/` serves script-free HTML; the port closes after exit |
-| `./bin/peacock build examples/hello.सूत्र -o /tmp/hello.बीज` | 615-byte verified artifact; language 0.3, format 1, SHA-256 `d176f5220259691dd8036af4e0fa242e09a86cb7ee659d906b90f1f95f5853b3` |
-| `python -m pip wheel . --no-deps --no-build-isolation` | 0.3.0 wheel contains native engines, corpus/literature/provenance; temporary installed copy passes version, 3,983/4 coverage and sandhi smoke tests |
-| `./bin/peacock check website/site.सूत्र` | PEACOCK source checks; 32 functions, 4,574 instructions |
-| `./bin/peacock run website/site.सूत्र --grant सञ्चय --root . --max-steps 10000000 -- website/dist` | Generates 12 HTML routes, responsive CSS and the project SVG through the real CLI/compiler/VM; no JS bundle |
-| `python -m unittest tests.integration.test_website -v` | 4 website export/audit tests pass |
+| `tests/integration/test_finally.py` | 8/8: normal/catch/throw, return, break/continue, nested cleanup, supersession, optimizer parity and disassembly |
+| self-host parser differential suite | 2/2: 15-file AST-digest corpus, finalization fixture, tokenizer/parser self-parse |
+| native AOT | 8/8: real builds, deterministic C, VM-identical output, recoverable ABI faults and zero live allocations after success/fault runs |
+| LLM + compute backends | 18 tests, 1 OpenCL skip: real loopback provider, schema/grant/budget/redirect checks, CPU and non-square matmul |
+| HTTP server/finalization/LLM/GPU combined regression | 31 tests, 1 OpenCL skip after the final server hardening |
 
-The integration suite re-runs the examples through the CLI, including the PNG
-decode, training report JSON, tokenizer parity, artifact tampering rejection and
-capability-denial exit code.
+Fuzzing is deterministic and limited to those inputs; it is not a security
+proof. Focused results are included in the complete-suite total, not added to it.
 
-## 3. Component status
+### Packaging and native execution
 
-### Working (implemented and tested)
+A `peacock_ai-0.4.0` wheel was built without dependencies, installed into an
+empty temporary target and checked for version, all 3,983 sūtra records, four
+executable sandhi IDs and `peacock/native/runtime.{c,h}`. The **installed**
+package then compiled `examples/native.सूत्र` with a host C compiler. The resulting
+standalone executable printed:
 
-* hand-written lexer, recursive-descent parser, AST, caret diagnostics, error
-  recovery, reserved-keyword messages;
-* static types (`पूर्णाङ्क`, `दशमलव`, `सत्यता`, `अक्षरमाला`, `एकक`, `अभाव`,
-  `सूची`, `आयाम`, structs, opaque host types), scopes, definite-return checks, homogeneous list literals,
-  static tensor shape/dtype checks;
-* Sanskrit reserved vocabulary, NFC identifiers, combining marks, Unicode decimal
-  digits, native type/option displays, and PE1007 rejection of withdrawn English
-  reserved words;
-* capability declarations, static enforcement, runtime enforcement, host grants;
-* typed PIR, verifier, constant/branch folding, DCE, peephole optimiser;
-* bytecode compiler, independent image verifier, `.बीज` container with SHA-256,
-  disassembler, capability audit;
-* stack VM with checked arithmetic, lists, strings, structs, ranges, try/catch,
-  uncatchable panics and resource budgets;
-* capability sandbox: path traversal/absolute/symlink/NUL/file-size rejection; `सञ्चय.निधिरचना` is grant-gated and sandbox-rooted;
-* tensor engine with broadcasting, matmul, reductions, activations, softmax,
-  reverse-mode autodiff; finite-difference checks pass;
-* Dense/Sequential models, XOR and spiral datasets, SGD/Adam, cross-entropy/MSE,
-  training reports, evaluation metrics, `.ज्ञान` save/load, int8 quantisation
-  helpers;
-* sRGB/XYZ/CIELAB/Oklab/Oklch colour, WCAG contrast, CIEDE2000, weighted linear/
-  perceptual/polar/approximate-subtractive mixing, gamut mapping, palettes and
-  gradients;
-* bounded production-rule agents with positive-cost Dijkstra planning,
-  cumulative-salience tie-breaking, execution and inspectable traces;
-* attributed offline corpus of 3,983 Aṣṭādhyāyī sūtra texts, reference/anuvṛtti
-  lookup, generic Māheśvara pratyāhāra expansion and four traced vowel-sandhi
-  implementations;
-* retained Sanskrit UI documents, flow/grid layout, hit testing, accessibility
-  audits and escaped responsive HTML export through the filesystem sandbox;
-* CPU 3-D cube/UV-sphere meshes, Euler transforms, perspective, back-face
-  culling, depth buffering and coloured point lights;
-* premultiplied RGBA canvas, 4×4 AA shapes, glow, aurora, PNG encode/decode with
-  CRC checks and HDR tone mapping;
-* easing, cubic Bézier, springs, timelines, flex layout, 2-D AABB physics;
-* headless, static-web and HTTP frame host adapters;
-* `चित्र.प्रदर्शय` native with the `दृश्य` capability and an attached-backend
-  contract; `--present DIR` drives `WebBackend` from a real program; backend
-  failures are wrapped as PE5003 and never leak host exceptions into the VM;
-* CLI (`version`, `check`, `run`, `build`, `disasm`, `audit`, `tokens`, `ast`,
-  `व्याकरण`, `bench`, `fuzz`, `test`) with JSON modes and exit codes;
-* deterministic fuzzers for lexer/parser/artifact/model loaders;
-* PEACOCK-written tokenizer with bootstrap token parity;
-* PEACOCK-written full-grammar parser (stage 2a) with canonical AST-digest parity
-  on examples, Linguist samples and itself; strict first-error diagnostics;
-* PEACOCK-authored static website exporter (`website/site.सूत्र`) with twelve
-  routes, reusable app-specific components, responsive CSS and SVG; actual CLI/
-  compiler/VM export and integration checks for links, structure and source;
-* opt-in semantic shadow checks on typed-AST relations, expressions, local
-  scopes/names, assignments, user-function calls/returns and loop conditions;
-  Python remains the authority and the kernel does not produce diagnostics.
+```text
+native total: 30
+native list: [1, 2, 3, 30]
+स्वतन्त्रम्
+```
 
-### Documentation, research and tooling
+The installed-package shared library returned the same output with zero live
+allocations. The same generated example completed under AddressSanitizer and
+UndefinedBehaviorSanitizer with leak detection enabled. The native
+shared-library/desktop path was also built and inspected during
+development: an x86-64 PIE desktop launcher used the generated PEACOCK C library
+plus system C/math libraries, not Python, and its output matched the VM
+byte-for-byte. Android/iOS were not built.
 
-* specification with full EBNF grammar, Sanskrit grammatical/literary rationale,
-  architecture, roadmap and status are checked in and cross-linked;
-* research programme: 178-entry bibliography, Sanskrit/Pāṇinian literature and
-  verified arXiv metadata, literature review, 18 open
-  questions, 23 ADRs and benchmark methodology;
-* Linguist package prepared (language entry, TextMate grammar, six compiled
-  samples, logo); **not submitted and not recognised by GitHub**;
-* VS Code package prepared (grammar + language configuration); **not published**;
-* documentation tests check relative links, citation keys, the grammar, sample
-  compilation, all fenced PEACOCK documentation examples, generated-grammar
-  freshness, and the PNG icon (7 tests).
+## 2. Working implementations
 
-### Partial
+* **Sanskrit language/core:** hand-written Unicode lexer, recursive-descent
+  parser and recovery diagnostics; NFC identifiers and Devanagari digits;
+  static types/scopes/returns; capability checking; typed PIR, verification and
+  optimisation; verified `.बीज` artifacts and disassembly.
+* **Runtime:** checked 64-bit arithmetic, lists/strings/structs/ranges, catchable
+  faults, uncatchable panic/resource exits, nested `यत्न`/`गृह्ण`/`अन्ते`
+  unwinding and cleanup supersession. `अन्ते` is included in the self-hosted
+  tokenizer/parser and AST-digest oracle.
+* **Independent native subset:** deterministic C11 control-flow generation,
+  checked values/operators/lists/strings/functions, standalone executables and
+  an embeddable `peacock_run` shared-library ABI with output callbacks and
+  recoverable errors. Unsupported opcodes fail before C compilation.
+* **AI:** broadcasting tensors, reverse-mode autodiff, Dense models, SGD/Adam,
+  XOR/spiral training, evaluation, `.ज्ञान` serialisation and int8 analysis;
+  deterministic production-rule/Dijkstra agents; bounded OpenAI-compatible
+  LLM/tool agents with schemas, grants, traces and aggregate budgets.
+* **Compute:** CPU addition/multiplication/ReLU/matmul and a real OpenCL 1.2
+  implementation using device kernels/buffers. CPU tests pass, including
+  non-square `[m,k] × [k,n]`; actual OpenCL execution remains untested here.
+* **Graphics/UI:** advanced sRGB/XYZ/Lab/Oklab/Oklch colour, CIEDE2000, weighted
+  and approximate-subtractive mixing, gamut mapping; RGBA canvas/PNG; CPU 3-D
+  meshes/depth/lights; retained Sanskrit UI, layout, audits, bounded bubbling
+  events, text/enabled/focus mutation and HTML export.
+* **Interactive hosts:** browser `/event` + `/fragment` UI host and native X11
+  window/pointer/key/close host. Real loopback browser event tests pass; the
+  display-dependent X11 test is skipped without `DISPLAY`.
+* **Servers:** fixed frame HTTP hosting and PEACOCK-owned synchronous HTTP
+  listeners with numeric-IP binding, bounded UTF-8 requests/responses, actual
+  port query and host cleanup. Real Sanskrit POST/201 and raw-socket negative
+  tests pass.
+* **Grammar:** attributed offline corpus of all 3,983 Aṣṭādhyāyī sūtra texts,
+  inheritance/anuvṛtti display, generic Māheśvara pratyāhāra expansion and four
+  explicitly traced vowel-sandhi rules (`6.1.77`, `6.1.87`, `6.1.88`, `6.1.101`).
+* **Self-host components:** PEACOCK-written tokenizer and full-grammar parser
+  with AST-digest parity; experimental VM-executed semantic-shadow probes.
+  Python remains authoritative for production semantics, IR, bytecode and VM.
+* **Applications/tooling:** twelve-route PEACOCK-authored static website,
+  examples, CLI compiler/VM/native/grammar/audit/bench/fuzz/test commands,
+  generated Linguist/VS Code grammars and linked subsystem manuals.
 
-* **Language:** no user modules, generics, closures, enums/match, traits,
-  concurrency, operator definitions, or first-class functions.
-* **Frontend:** the retained UI builder covers static component trees, layout,
-  hit testing, audits and HTML export; the twelve-route site is a separate real
-  `.सूत्र` application. There is no UI event runtime, native text shaping,
-  native accessibility API or window shell. 3-D is CPU mesh/flat-triangle
-  rendering, without GPU rasterisation, smooth normals or textures.
-  Motion/physics have no frame scheduler integration.
-* **Grammar:** all 3,983 sūtra texts are available offline, but only generic
-  pratyāhāra expansion, reference inheritance and four vowel-sandhi rules are
-  executable. Declension, conjugation, samāsa, kāraka and complete ordered rule
-  interaction are not implemented; connected literature is a catalogue, not a
-  bundled library of full texts.
-* **Platforms:** the `--present` static frame viewer and `--serve` HTTP frame host
-  are reachable from `.सूत्र`; separately, `website/site.सूत्र` produces static
-  application pages. There is no input, frame clock or vsync, and the HTTP frame
-  host is a development boundary, not a hardened server. No desktop window
-  shell, Android, iOS or WASM target.
-* **Models:** one input/output, Dense only, SGD/Adam, small synthetic datasets.
-* **Agents:** deterministic symbolic rules and string state only; no LLM,
-  arbitrary host-tool execution, persistent memory service, network swarm or
-  AGI claim.
-* **Self-hosting:** the PEACOCK tokenizer and full-grammar parser have the
-  existing parity evidence; `selfhost/type_model.सूत्र` now provides a broader
-  experimental type/expression/scope kernel. The opt-in compiler/CLI shadow
-  adapter emits VM-executed probes from the typed AST for supported expressions,
-  declarations, names, assignments, user-function signatures/calls, conditions
-  and returns. Tests cover the compiled `.सूत्र` corpus, valid/invalid cases and
-  selected diagnostic equality, including ErrorType iterable recovery. Python
-  remains authoritative; the kernel does not generate diagnostics and is not a
-  production switch. The parser still lacks error recovery, full `PE2xxx`
-  diagnostic/span parity and a typed self-hosted AST; production semantics, IR,
-  code generation and VM remain Python.
-* **Diagnostics:** warning quality is intentionally minimal; no machine-readable
-  fixes or LSP.
+## 3. Partial implementations and explicit boundaries
 
-### Planned / not implemented
+* **Native AOT:** only the opcodes/natives listed in `docs/native.md`. General
+  cleanup unwinding, structs/maps/objects, user modules, UI, HTTP, tensors/GPU
+  and model declarations are not silently
+  compiled. Embedded C state is currently process-global, not thread-safe or
+  reentrant; the ABI is not stable across versions.
+* **Language:** no user-defined modules/files, generics, closures, enums/match,
+  traits, first-class functions, general concurrency or async/await.
+* **LLM agents:** bounded iteration over host-registered tools, not AGI,
+  unrestricted autonomy or a bundled model. No external hosted-model quality
+  evaluation was performed. Tool handlers are cooperative and need their own
+  I/O timeouts; schema validation is not semantic proof that an action is safe.
+* **GPU:** four synchronous operations only. No OpenCL device was available;
+  CUDA/Metal/Vulkan, device-resident graphs, GPU autodiff/training and GPU 3-D
+  are not implemented.
+* **UI:** no complete complex-script shaping, native accessibility API,
+  text-input widget, drag/drop or general frame scheduler. Browser and X11 are
+  limited hosts, not a finished cross-platform widget toolkit.
+* **Servers:** plaintext development/native transports without authentication,
+  TLS, multi-tenant isolation, chunked requests, pipelining, binary bodies or
+  concurrent request dispatch. Loopback is the CLI default; exposure needs OS
+  isolation and a hardened proxy.
+* **Grammar:** 3,983 searchable texts are not 3,983 executable transformations.
+  Declension, conjugation, samāsa, kāraka, ordered rule interaction and complete
+  executable Pāṇini remain open. Connected-literature entries are a catalogue,
+  not bundled full texts.
+* **Models:** one input/output, Dense only, small local datasets and no general
+  data pipeline. Quantised models are analysis output, not an executable format.
+* **Self-hosting:** parser diagnostics/recovery and typed AST are incomplete;
+  the semantic shadow does not cover every native/member/model rule. There is
+  no compiler fixed point independent of Python.
+* **CPython-scale completeness:** user modules, maps/containers, independent GC,
+  concurrency, Unicode shaping, packaging and broad platform CI remain gaps.
+  The pinned inspection and the implemented `अन्ते` response are recorded in
+  [`docs/CPYTHON_AUDIT.md`](docs/CPYTHON_AUDIT.md).
 
-* native code generation, typed tensor buffers, GPU kernels;
-* convolution/attention/sequence layers, data pipeline, mixed precision;
-* UI event dispatch, native text shaping/windows/accessibility, GPU 3-D,
-  textures/smooth normals, image codecs beyond PNG;
-* a complete executable Pāṇinian derivation engine and full connected-literature
-  corpus;
-* desktop/Android/iOS/WASM hosts;
-* package manager, formatter, linter, LSP, debugger;
-* AGI research tooling beyond reproducibility and evaluation infrastructure.
+## 4. Platform evidence
 
-### Untested
+| Target | Current status | Evidence / missing gate |
+|---|---|---|
+| Linux VM/headless | working | complete suite and real CLI examples |
+| Static web/frame host | working | PNG/manifest/HTML and real HTTP tests |
+| Interactive browser UI | working development host | real POST wakes VM and republishes Sanskrit UI |
+| PEACOCK HTTP server | working bounded subset | real request/response and raw-socket limits |
+| Native executable/library | working documented subset | real C builds, `ctypes` ABI and installed-wheel smoke |
+| Linux desktop shell | executed | x86-64 PIE; VM-identical output |
+| Native X11 window | implementation + model tests | real display test skipped; requires X11/`DISPLAY` |
+| OpenCL | implementation + CPU reference | hardware parity skipped; no device/driver |
+| Android | source/generated-C only | SDK/NDK, JNI build, APK and emulator/device tests pending |
+| iOS | source only | Xcode simulator/device/signing/distribution tests pending |
+| WebAssembly | not implemented | backend and browser ABI required |
+| Non-Linux desktop | not tested | no hosts available |
 
-* mobile devices and emulators (no SDKs/macOS here);
-* GPU paths (none implemented);
-* multi-tenant or adversarial host isolation beyond the tests listed;
-* large models/datasets, long-running training, memory pressure;
-* non-Linux hosts;
-* browser rendering/interaction and visual layout of the generated website (the
-  static HTML/CSS is audited by source-level integration tests; no browser or
-  screenshot automation has been run);
-* any claim of formal verification or cryptographic security.
+## 5. Historical bootstrap benchmarks
 
-## 4. Benchmarks (reference machine)
+The checked-in reference snapshot was generated at commit `755fbc8` on a dirty
+working tree: CPython 3.11.2, Linux 6.1.158 x86_64, 2 vCPUs, 3.8 GiB RAM, no
+GPU. It was **not re-run** for 0.4 and contains no native-AOT/GPU comparison.
+Generate a new report with `./bin/peacock bench --json benchmarks/latest.json`.
 
-Environment: CPython 3.11.2, Linux 6.1.158 x86_64, 2 vCPUs, 3.8 GiB RAM, no GPU,
-historical reference snapshot generated at commit `755fbc8` on a dirty working
-tree (per the checked-in report metadata). It was not re-run as part of the
-current status update; full JSON is retained for reproducibility. Generate a new
-report with `./bin/peacock bench --json benchmarks/latest.json`.
-
-| Category | Measurement | Result |
+| Category | Measurement | Historical result |
 |---|---|---:|
 | Compiler | hello, full pipeline | 0.518 ms |
 | Compiler | tour (63 lines, 477 instrs) | 4.130 ms |
-| Compiler | selfhost tokenizer (235 lines, 1932 instrs) | 14.793 ms |
-| Compiler | 200 functions, 9.5 KiB | 28.592 ms |
+| Compiler | selfhost tokenizer | 14.793 ms |
 | Compiler | synthetic throughput | 311.6 KiB/s |
-| Compiler | peak memory, tokenizer compile | 0.843 MiB |
 | Runtime | tight loop, 640,027 steps | 224.9 ms |
 | Runtime | VM dispatch | 2.85 M steps/s |
-| Runtime | hello startup (load+run) | 0.136 ms |
 | Intelligence | 48×48 matmul | 8.032 ms (27.5 MFLOP/s) |
-| Intelligence | 128×128 softmax | 2.775 ms |
-| Intelligence | MLP train step, batch 16 | 2.547 ms |
-| Intelligence | XOR, 100 epochs | 30.148 ms (final loss 0.010279, acc 1.0) |
-| Intelligence | single inference | 0.039 ms |
+| Intelligence | XOR, 100 epochs | 30.148 ms (loss 0.010279, acc 1.0) |
 | Frontend | 320×180 gradient | 123.7 ms |
-| Frontend | 160×90 aurora | 100.6 ms |
 | Frontend | PNG encode 320×180 | 73.5 ms |
-| Frontend | 512×512 UI frame (40 shapes) | 30.7 ms |
 | Motion | spring substeps | 772,727 steps/s |
-| Motion | easing calls | 3.27 M calls/s |
 
-These numbers characterise the **pure-Python bootstrap**, not native PEACOCK.
-They must not be compared against optimised engines without identical workloads
-and methodology. See `research/benchmark-methodology.md`.
+These values describe the pure-Python bootstrap on one container, not native
+PEACOCK or production hardware. See `research/benchmark-methodology.md`.
 
-## 5. Platform support
+## 6. External boundaries and known deviations
 
-| Host | Status | Evidence / note |
-|---|---|---|
-| Linux headless | working | `tests/frontend/test_platforms.py` |
-| HTTP frame server | working | same suite, real HTTP requests |
-| Static web viewer (`WebBackend`) | working | HTML + PNG, no JavaScript |
-| PEACOCK-authored static website exporter | working | 12 routes via `website/site.सूत्र`; `tests/integration/test_website.py` (no browser visual suite) |
-| Desktop window | not implemented | needs a windowing boundary |
-| Android | not implemented | needs SDK/NDK + JNI/ABI bridge |
-| iOS | not implemented / blocked | requires macOS + Xcode, unavailable here |
-| WebAssembly | not implemented | needs a backend |
+* Core runtime/tests use Python 3.11 standard-library modules; no NumPy,
+  PyTorch, LLVM, React or third-party runtime package is required. Optional
+  native builds need a C compiler; X11/OpenCL/mobile toolchains are platform
+  boundaries. An LLM provider is contacted only when explicitly configured and
+  invoked; no provider is bundled.
+* Float32 tensors round on storage but arithmetic uses binary64 before storage;
+  this is a documented deviation from strict binary32 arithmetic.
+* `Int / Int` truncates toward zero and `%` takes the dividend's sign.
+* VM memory is managed by CPython, including its own cyclic GC outside PEACOCK
+  semantics. There is no independent language GC API; native AOT tracks and
+  releases run-scoped allocations. Neither provides a complete process-memory quota.
+* Capability confinement is process-level and best effort, with filesystem
+  TOCTOU exposure. It is not a kernel sandbox or proof of multi-tenant safety.
+* Tokenizer parity compares counts and non-string token classification; string
+  escape decoding is not fully differentially asserted. Parser AST digests
+  intentionally elide literal values and source spans.
+* `.gitattributes` is only a local language hint. The Linguist submission is
+  prepared, not submitted/accepted; VS Code metadata is not a published extension.
 
-## 6. External dependencies
+## 7. Next priorities
 
-Runtime and tests use only Python 3.11 standard-library modules (including
-`zlib`, `hashlib`, `struct`, `unittest`, `http.server`, `urllib`, `json`,
-`base64`, `threading`, `tempfile`, `pathlib`, `math`, `random`, `heapq`, `html`
-and `unicodedata`). There are no third-party runtime packages, network services
-or cloud APIs. The spiral training dataset is generated locally; the attributed
-Aṣṭādhyāyī text corpus is vendored as package data and used offline. PEACOCK
-source files are UTF-8; `.बीज` and `.ज्ञान` artifacts are binary.
+1. Broaden cited executable grammar rules and derivation/ambiguity tests.
+2. Harden UI tree concurrency, shaping/accessibility and real-display coverage.
+3. Expand VM/native differential coverage and make embedded native state
+   thread-safe before claiming concurrent embedding.
+4. Run Android/iOS/X11/OpenCL platform CI on real toolchains/hardware.
+5. Complete self-host parser diagnostics and semantic parity without promoting
+   the experimental shadow prematurely.
+6. Add user modules, deterministic packaging and the next independent compiler
+   stages; do not label bounded agents as AGI or subset servers as production
+   multi-tenant infrastructure.
 
-## 7. Known deviations and limitations
-
-* **Float32** tensors round on storage but arithmetic uses binary64 before the
-  store. This differs from strict IEEE-754 binary32 and is documented in the
-  spec.
-* **`Int / Int`** truncates toward zero; **`Int % Int`** takes the dividend's
-  sign. This is defined, not accidentally Python's floor division.
-* **No garbage collector** is implemented for PEACOCK values; the Python host
-  owns memory. Cycles are not collected.
-* **Capabilities** are enforced by the VM and the host policy, not by the OS.
-  `HostPolicy` is a best-effort sandbox and has TOCTOU exposure between path
-  resolution and file access.
-* **Quantisation** is tested for size/error at the parameter level; quantised
-  models are not yet a first-class executable artifact format.
-* **Tokenizer parity** currently compares counts and non-string token
-  classification; string escape decoding parity is not yet asserted.
-* **Parser parity** compares structural AST digests; literal values and source
-  spans are deliberately elided, and the self-hosted parser stops at the first
-  error with `PE4020` instead of reproducing the bootstrap `PE2xxx` diagnostics.
-* **GitHub recognition**: `.gitattributes` maps `.सूत्र` to `linguist-language=Peacock`
-  for this repository, but that is a local hint, not upstream recognition.
-  `linguist/` contains a prepared submission; it has not been accepted.
-* **Benchmark environment** is a small 2-vCPU container; numbers are not
-  representative of production hardware.
-
-## 8. Next steps
-
-1. Complete the parser stage (error recovery, diagnostic/span parity, typed AST)
-   and port the semantic analyser; add `enum`/`match` only as the port requires.
-2. Add a live `--serve`/`ServerBackend` path and input/frame-clock semantics on
-   top of the existing `चित्र.प्रदर्शय` contract.
-3. Add a native/WASM backend for the verified subset with honest, non-comparative
-   benchmark reporting.
-
-See [ROADMAP.md](ROADMAP.md) for phases and acceptance criteria.
+See [ROADMAP.md](ROADMAP.md) for acceptance criteria and dependencies.

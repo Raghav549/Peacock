@@ -23,7 +23,7 @@ Three layers, all required:
 ./bin/peacock run app.सूत्र --grant सञ्चय   # host grants authority
 ```
 
-Capabilities in 0.3: `गणना`, `सञ्चय`, `दृश्य`.
+Capabilities in 0.4: `गणना`, `सञ्चय`, `दृश्य`, `सञ्जाल`.
 
 ```bash
 ./bin/peacock run app.सूत्र --grant दृश्य --present out/preview   # frames on disk
@@ -40,9 +40,12 @@ sandbox and requires `सञ्चय`. It does not grant a broader filesystem s
 the root are still rejected. Confinement is best-effort and does not eliminate
 host-side TOCTOU races.
 
-`दृश्य` is presentation-only and carries no input or display-query authority.
-`peacock audit app.सूत्र --json` lists declared capabilities and statically visible
-privileged calls. It is informational only.
+`दृश्य` attaches frame or interactive UI presentation/event hosts; local event
+queue operations alone do not open a window. `सञ्जाल` gates PEACOCK HTTP server
+handles and host-configured LLM agents, but supplies neither an endpoint nor
+credentials and does not create a general URL client. `peacock audit app.सूत्र
+--json` lists declared capabilities and statically visible privileged calls. It
+is informational only.
 
 See [../../SECURITY.md](../../SECURITY.md) for the threat model, sandbox limits
 and reporting process.

@@ -165,7 +165,10 @@ def _collect_block_types(block: Block, found: list[T.Type]) -> None:
             _collect_expr_types(stmt.value, found)
         elif isinstance(stmt, TryStmt):
             _collect_block_types(stmt.body, found)
-            _collect_block_types(stmt.catch_body, found)
+            if stmt.catch_body is not None:
+                _collect_block_types(stmt.catch_body, found)
+            if stmt.finally_body is not None:
+                _collect_block_types(stmt.finally_body, found)
         elif isinstance(stmt, AssertStmt):
             _collect_expr_types(stmt.condition, found)
             if stmt.message is not None:
@@ -486,10 +489,13 @@ class _FunctionProbeEmitter:
             return
         if isinstance(stmt, TryStmt):
             self._emit_block(stmt.body, new_scope=True)
-            self._new_scope()
-            self._declare(stmt.catch_name, T.StringType, False, stmt.span)
-            self._emit_block(stmt.catch_body, new_scope=False)
-            self._end_scope()
+            if stmt.catch_body is not None:
+                self._new_scope()
+                self._declare(stmt.catch_name, T.StringType, False, stmt.span)
+                self._emit_block(stmt.catch_body, new_scope=False)
+                self._end_scope()
+            if stmt.finally_body is not None:
+                self._emit_block(stmt.finally_body, new_scope=True)
             return
         if isinstance(stmt, AssertStmt):
             self._emit_expr(stmt.condition)

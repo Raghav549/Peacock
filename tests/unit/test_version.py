@@ -7,12 +7,12 @@ from peacock.compiler import builtins
 
 class VersionTests(unittest.TestCase):
     def test_package_metadata(self):
-        self.assertEqual(peacock.__version__, "0.3.0")
-        self.assertEqual(peacock.LANGUAGE_VERSION, "0.3")
+        self.assertEqual(peacock.__version__, "0.4.0")
+        self.assertEqual(peacock.LANGUAGE_VERSION, "0.4")
         self.assertEqual(peacock.__codename__, "Fledgling")
 
     def test_capabilities_are_documented_and_small(self):
-        self.assertEqual(set(KNOWN_CAPABILITIES), {"compute", "fs", "ui"})
+        self.assertEqual(set(KNOWN_CAPABILITIES), {"compute", "fs", "ui", "network"})
         self.assertEqual(set(builtins.NAMESPACES), set(KNOWN_NAMESPACES) | {"text", "process", "fs"})
 
     def test_reserved_future_keywords(self):

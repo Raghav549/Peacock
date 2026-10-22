@@ -38,6 +38,7 @@ class TokenKind(str, Enum):
     CAPABILITY = "अधिकार"
     TRY = "यत्न"
     CATCH = "गृह्ण"
+    FINALLY = "अन्ते"
     THROW = "क्षिप"
     ASSERT = "निश्चिनु"
     TRUE = "सत्य"
@@ -112,7 +113,7 @@ KEYWORDS: dict[str, TokenKind] = {
         TokenKind.WHILE, TokenKind.FOR, TokenKind.IN, TokenKind.RETURN,
         TokenKind.BREAK, TokenKind.CONTINUE, TokenKind.STRUCT, TokenKind.MODEL,
         TokenKind.TRAINING, TokenKind.CAPABILITY, TokenKind.TRY, TokenKind.CATCH,
-        TokenKind.THROW, TokenKind.ASSERT, TokenKind.TRUE, TokenKind.FALSE,
+        TokenKind.FINALLY, TokenKind.THROW, TokenKind.ASSERT, TokenKind.TRUE, TokenKind.FALSE,
         TokenKind.AND, TokenKind.OR, TokenKind.NOT, TokenKind.ENUM,
         TokenKind.MATCH, TokenKind.IMPL, TokenKind.PUB, TokenKind.CONST,
         TokenKind.IMPORT, TokenKind.ASYNC, TokenKind.AWAIT, TokenKind.SPAWN,
@@ -136,11 +137,11 @@ RESERVED_FUTURE = {
 
 # Stable internal capability/namespace names stored in verified bytecode.  The
 # corresponding source spellings live in peacock.sanskrit and are never aliases.
-KNOWN_CAPABILITIES = ("compute", "fs", "ui")
+KNOWN_CAPABILITIES = ("compute", "fs", "ui", "network")
 SOURCE_CAPABILITIES = tuple(INTERNAL_TO_SOURCE[name] for name in KNOWN_CAPABILITIES)
 KNOWN_NAMESPACES = (
     "math", "nn", "colour", "graphics", "motion", "vyakarana", "ui",
-    "scene3d", "agent",
+    "scene3d", "agent", "gpu", "server",
 )
 
 #: Withdrawn English words are recognized only to issue PE1007.

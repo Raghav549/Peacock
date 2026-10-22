@@ -21,7 +21,7 @@ Optimisation passes:
 
 1. constant folding of literal arithmetic and comparisons;
 2. constant branch folding (`if true/false`);
-3. unreachable code elimination (keeping try-scope markers balanced);
+3. unreachable code elimination (keeping try/finally markers, labels and resume records balanced);
 4. dead temporary elimination when a temporary has no uses and no effects;
 5. peephole (e.g. `not not`, identity arithmetic where safe).
 
@@ -34,8 +34,8 @@ labels, terminators and binop operand types.
 {
   "format": "peacock-bytecode",
   "format_version": 1,
-  "language_version": "0.3",
-  "compiler_version": "0.3.0",
+  "language_version": "0.4",
+  "compiler_version": "0.4.0",
   "module": "hello",
   "uses": ["nn"],
   "source_path": "examples/hello.सूत्र",
@@ -91,6 +91,9 @@ container with a SHA-256 digest. The VM verifies the image again on load.
 | `TRY_BEGIN` | catch target, end | push handler record |
 | `TRY_END` | — | pop handler record |
 | `CATCH` | — | push pending error message |
+| `FINALLY_BEGIN` | protected end, cleanup target | push finalization handler |
+| `FINALLY_END` | normal continuation | enter cleanup with saved normal jump |
+| `FINALLY_RESUME` | — | restore saved error/return/jump completion |
 | `NOP` | — | — |
 
 ## Frame layout and exceptions
@@ -101,6 +104,13 @@ handler whose range contains the faulting instruction, truncates the stack to th
 recorded depth, sets `pending_error`, and jumps to the handler. A `throw` inside a
 catch replaces the pending error and unwinds outward. `PanicError` and
 `ResourceLimitError` bypass handlers.
+
+`FINALLY_BEGIN` records a separate cleanup region. Normal exit, catchable error,
+return and loop transfer save a completion and push a cleanup record; nested
+regions therefore have independent state. Cleanup ends at `FINALLY_RESUME`, which
+restores the saved completion unless cleanup itself supplied a superseding throw,
+return or jump. Optimisation preserves these records even when normal-path
+reachability alone would consider them dead.
 
 ## Verification
 
@@ -122,5 +132,5 @@ format error before executing anything.
 
 The bytecode is not a register machine, has no GC metadata, no debug sections
 beyond line/column pairs, no linking, no separate compilation and no dynamic
-dispatch. These are deliberate 0.1 constraints; changing them requires a version
+dispatch. These are deliberate current bootstrap constraints; changing them requires a version
 bump and an ADR.

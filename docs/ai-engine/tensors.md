@@ -24,4 +24,37 @@ for matmul/softmax/MSE and a small MLP, with tolerances appropriate to Float32.
 That is numerical evidence, not a proof.
 
 Limits: one input/output per declared model, Dense layers only, small datasets,
-no convolution/attention/GPU. Trainable tensors require the `गणना` capability.
+and no convolution/attention layers. Trainable tensors require the `गणना`
+capability. Accelerated operations below are separate from autodiff/training and
+do not provide GPU gradients or GPU model execution.
+
+## Compute backends (0.4)
+
+`peacock/intelligence/gpu.py` and the `गणनयन्त्र` native namespace expose a CPU
+reference backend and a real OpenCL 1.2 backend without NumPy/PyTorch. Supported
+operations are equal-shape Float32/Float64 addition, multiplication, ReLU and
+compatible rank-2 matrix multiplication. OpenCL returns Float32 tensors.
+
+```bash
+./bin/peacock run examples/gpu.सूत्र --grant गणना
+# "स्वतः" selects OpenCL when usable and otherwise CPU.
+# "त्वरक" explicitly requires an OpenCL GPU/accelerator; it never falls back.
+# "क्रमक" explicitly selects CPU.
+```
+
+`गणनयन्त्र.पश्चात्तन्त्राणि()` lists usable backend names;
+`गणनयन्त्र.विवरण(name)` reports backend/device/vendor/version and whether this is
+hardware. `संकलय`, `गुणय`, `धनाङ्क` and `आव्यूहगुणन` perform the operations.
+
+The OpenCL path dynamically loads the platform driver, enumerates actual GPU or
+accelerator devices, compiles four kernels, allocates device buffers, enqueues
+work, waits and reads results. Each operation is synchronous and bounded to
+16,777,216 output elements; contexts and per-operation resources are released.
+Matrix multiplication validates `[m,k] × [k,n]`, not equal elementwise shapes.
+
+CPU operation tests pass, including non-square matrix multiplication. The
+OpenCL hardware parity test is **skipped in the current environment because no
+OpenCL device/driver is available**. Source presence, CPU fallback and kernel
+text are not evidence of GPU execution. CUDA, Metal, Vulkan, asynchronous
+streams, device-resident tensor graphs and distributed compute are not
+implemented.

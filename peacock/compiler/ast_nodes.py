@@ -232,8 +232,9 @@ class ThrowStmt(Stmt):
 @dataclass
 class TryStmt(Stmt):
     body: Block
-    catch_name: str
-    catch_body: Block
+    catch_name: str | None = None
+    catch_body: Block | None = None
+    finally_body: Block | None = None
     slot: int = -1
 
 

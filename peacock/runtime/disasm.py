@@ -17,8 +17,11 @@ def _label_targets(image: dict) -> dict[tuple[str, int], str]:
             if instr[0] in ("JUMP", "JUMP_IF_FALSE"):
                 target = instr[1]
                 labels.setdefault((name, target), f"L_{target}")
-            elif instr[0] == "TRY_BEGIN":
-                labels.setdefault((name, instr[1]), f"CATCH_{instr[1]}")
+            elif instr[0] in ("TRY_BEGIN", "FINALLY_BEGIN"):
+                prefix = "CATCH" if instr[0] == "TRY_BEGIN" else "FINALLY"
+                labels.setdefault((name, instr[1]), f"{prefix}_{instr[1]}")
+            elif instr[0] == "FINALLY_END":
+                labels.setdefault((name, instr[1]), f"END_FINALLY_{instr[1]}")
     return labels
 
 
@@ -59,7 +62,7 @@ def disassemble(image: dict) -> str:
             for index, arg in enumerate(instr[1:], start=1):
                 if instr[0] in ("JUMP", "JUMP_IF_FALSE") and index == 1:
                     args.append(labels.get((name, arg), str(arg)))
-                elif instr[0] == "TRY_BEGIN" and index == 1:
+                elif instr[0] in ("TRY_BEGIN", "FINALLY_BEGIN", "FINALLY_END") and index == 1:
                     args.append(labels.get((name, arg), str(arg)))
                 else:
                     args.append(repr(_source_argument(instr[0], index, arg)))

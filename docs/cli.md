@@ -11,8 +11,9 @@ peacock <command> [options]
 |---|---|
 | `version` | versions, extension, implementation status |
 | `check <file.सूत्र>` | full pipeline; `--json`, `--no-opt`, `--quiet`, experimental `--semantic-shadow` |
-| `run <file.सूत्र\|file.बीज>` | compile if needed, execute; `--grant`, `--root`, `--json`, `--report`, `--max-steps`, `--present DIR`, `--serve PORT` |
+| `run <file.सूत्र\|file.बीज>` | compile if needed, execute; grants/root/budgets, frame/UI hosts and optional host-configured LLM provider |
 | `build <file.सूत्र> [-o file.बीज]` | verified image + SHA-256; optional experimental `--semantic-shadow` |
+| `native <file.सूत्र> -o BIN` | compile the documented AOT subset to an executable or `--library` shared library; `--cc`, `--keep-c`, `--max-steps`, `--no-opt` |
 | `disasm <file>` | human-readable instructions, models, training declarations |
 | `audit <file.सूत्र>` | static capability report; `--json` |
 | `tokens <file.सूत्र>` | token dump (debug) |
@@ -90,8 +91,37 @@ available afterwards (`-1` serves until interrupted). `--serve-host` defaults to
 # routes: /  /frame.png  /manifest.json  /healthz
 ```
 
-`--present` and `--serve` are mutually exclusive (exit 2). A port that cannot be
-bound is a usage error. The HTTP host has no authentication or TLS.
+`--present`, `--serve`, `--ui-serve` and `--window` are mutually exclusive
+(exit 2). A port that cannot be bound is a host error. The HTTP hosts have no
+authentication or TLS.
+
+### Interactive UI and native window
+
+`--ui-serve PORT` lazily attaches the interactive retained-UI host on the first
+`दृश्य.प्रदर्शय`; `--serve-host` controls its bind address and `--linger` also
+applies after completion. `--window` instead attaches the native X11 host and
+requires a working `DISPLAY`. Both deliver events to `दृश्य.अग्रघटना`.
+
+```bash
+./bin/peacock run examples/ui_events.सूत्र --grant दृश्य --ui-serve 8080
+./bin/peacock run examples/ui_events.सूत्र --grant दृश्य --window
+```
+
+### Host-configured LLM agent
+
+`अभिकर्तृ.स्वायत्त` needs both source/host `सञ्जाल` authority and a provider
+configured with `--llm-url URL --llm-model NAME`. The URL is an
+OpenAI-compatible `/v1` base; remote HTTP is rejected in favour of HTTPS.
+`--llm-key-env VAR` optionally reads the bearer key from that environment
+variable. The key is not accepted as a source argument or included in traces.
+
+```bash
+./bin/peacock run examples/autonomous_agent.सूत्र --grant सञ्जाल \
+  --llm-url http://127.0.0.1:8000/v1 --llm-model local-model
+```
+
+No provider is contacted unless the program actually invokes the agent. See
+[the agent manual](ai-engine/agents.md) and [native AOT](native.md).
 
 ## Arguments
 
@@ -124,4 +154,7 @@ the human-readable audit and disassembly render their Sanskrit source spellings.
 
 * `.बीज` programs run without source; the image is re-verified.
 * `check` on a `.pk`/`.peacock` file fails with a usage error: rename to `.सूत्र`.
-* The CLI never downloads anything and never reads credentials.
+* The CLI never downloads dependencies or compiler inputs. Network access occurs
+  only for explicit server natives or an explicitly configured LLM provider.
+  Credentials are read only from the variable named by `--llm-key-env`; do not
+  put keys in source, command arguments or committed files.

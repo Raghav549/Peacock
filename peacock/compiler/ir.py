@@ -384,18 +384,31 @@ class IRBuilder:
         self.emit("label", args=(exit_lbl,))
 
     def _try(self, stmt: TryStmt) -> None:
-        catch_lbl = self.label("catch")
-        join = self.label("endtry")
-        self.emit("try_begin", args=(catch_lbl,), span=stmt.span)
-        self.stmt(stmt.body)
-        self.emit("try_end", span=stmt.span)
-        self.emit("jump", args=(join,), span=stmt.span)
-        self.emit("label", args=(catch_lbl,))
-        err = self.new_reg()
-        self.emit("catch", err, dest_type=T.StringType, span=stmt.span)
-        self.emit("slot_set", args=(stmt.slot, err), span=stmt.span)
-        self.stmt(stmt.catch_body)
-        self.emit("label", args=(join,))
+        finally_lbl = self.label("finally") if stmt.finally_body is not None else None
+        normal_lbl = self.label("endfinally") if stmt.finally_body is not None else None
+        if finally_lbl is not None:
+            self.emit("finally_begin", args=(finally_lbl,), span=stmt.span)
+        if stmt.catch_body is not None:
+            catch_lbl = self.label("catch")
+            join = self.label("endtry")
+            self.emit("try_begin", args=(catch_lbl,), span=stmt.span)
+            self.stmt(stmt.body)
+            self.emit("try_end", span=stmt.span)
+            self.emit("jump", args=(join,), span=stmt.span)
+            self.emit("label", args=(catch_lbl,))
+            err = self.new_reg()
+            self.emit("catch", err, dest_type=T.StringType, span=stmt.span)
+            self.emit("slot_set", args=(stmt.slot, err), span=stmt.span)
+            self.stmt(stmt.catch_body)
+            self.emit("label", args=(join,))
+        else:
+            self.stmt(stmt.body)
+        if finally_lbl is not None:
+            self.emit("finally_end", args=(normal_lbl,), span=stmt.span)
+            self.emit("label", args=(finally_lbl,))
+            self.stmt(stmt.finally_body)
+            self.emit("finally_resume", span=stmt.span)
+            self.emit("label", args=(normal_lbl,))
 
     # -- expressions -------------------------------------------------------
     def expr(self, expr: Expr) -> int:
@@ -658,6 +671,7 @@ class IRVerifier:
                 labels.add(label)
         reg_types: dict[int, T.Type] = {}
         try_depth = 0
+        finally_depth = 0
         for index, instr in enumerate(fn.instrs):
             op = instr.op
             if instr.dest is not None:
@@ -697,12 +711,19 @@ class IRVerifier:
                 self._check_reg(fn, index, a, reg_types)
                 self._check_reg(fn, index, b, reg_types)
                 self._check_binop_type(fn, index, instr, reg_types)
-            elif op == "jump" or op == "try_begin":
+            elif op in ("jump", "try_begin", "finally_begin", "finally_end"):
                 target = instr.args[0]
                 if target not in labels:
                     self.fail(fn, index, f"jump target '{target}' does not exist")
                 if op == "try_begin":
                     try_depth += 1
+                elif op == "finally_begin":
+                    finally_depth += 1
+                elif op == "finally_end":
+                    if finally_depth == 0:
+                        self.fail(fn, index, "finally_end without finally_begin")
+                    else:
+                        finally_depth -= 1
             elif op == "try_end":
                 if try_depth == 0:
                     self.fail(fn, index, "try_end without try_begin")
@@ -785,7 +806,7 @@ class IRVerifier:
                 value = instr.args[0]
                 if value is not None:
                     self._check_reg(fn, index, value, reg_types)
-            elif op in ("nop", "label", "try_end"):
+            elif op in ("nop", "label", "try_end", "finally_resume"):
                 pass
             elif op == "slot_set":
                 self._check_reg(fn, index, instr.args[1], reg_types)
@@ -798,6 +819,8 @@ class IRVerifier:
                 reg_types[instr.dest] = instr.dest_type
         if try_depth != 0:
             self.errors.append(f"function '{fn.name}': {try_depth} unclosed try block(s)")
+        if finally_depth != 0:
+            self.errors.append(f"function '{fn.name}': {finally_depth} unclosed finally block(s)")
         if fn.instrs and fn.instrs[-1].op not in ("return", "throw", "jump"):
             self.errors.append(
                 f"function '{fn.name}': ends with '{fn.instrs[-1].op}', "
