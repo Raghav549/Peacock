@@ -9,3 +9,8 @@ benchmarks/latest.json
 dist/
 build/
 *.egg-info/
+shells/desktop/generated/
+shells/ios/generated/
+shells/ios/*.objects/
+shells/android/app/src/main/cpp/generated/
+shells/*/build/

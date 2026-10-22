@@ -9,6 +9,8 @@ host shells are documented but not implemented in 0.3.
 from .base import Backend, Frame
 from .headless import HeadlessBackend
 from .server import ServerBackend
+from .ui import UIWebBackend
 from .web import WebBackend
+from .window import NativeWindowBackend
 
-__all__ = ["Backend", "Frame", "HeadlessBackend", "ServerBackend", "WebBackend"]
+__all__ = ["Backend", "Frame", "HeadlessBackend", "NativeWindowBackend", "ServerBackend", "UIWebBackend", "WebBackend"]

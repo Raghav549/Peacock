@@ -1,6 +1,6 @@
 # Sanskrit-native grammar and literary foundations
 
-This document explains the linguistic design of PEACOCK 0.3. The
+This document explains the linguistic design of PEACOCK 0.4. The
 [normative specification](../../SPECIFICATION.md) remains the complete authority
 for EBNF, types, evaluation, capabilities, diagnostics, and runtime limits. This
 document supplies the vocabulary rationale, the relationship to Sanskrit

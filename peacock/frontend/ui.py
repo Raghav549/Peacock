@@ -8,9 +8,12 @@ module does not invent an event loop or claim a native windowing backend.
 
 from __future__ import annotations
 
+from collections import deque
 from dataclasses import dataclass, field
 from html import escape
 import math
+import threading
+import time
 from urllib.parse import urlsplit
 
 from .colour import Color, ColorError
@@ -35,6 +38,28 @@ class UINode:
     font_size: float = 18.0
     href: str | None = None
     children: list[int] = field(default_factory=list)
+    enabled: bool = True
+
+
+@dataclass(slots=True, frozen=True)
+class UIEvent:
+    id: int
+    kind: str
+    node: int
+    x: float
+    y: float
+    key: str
+    text: str
+    handler: int
+    action: str
+
+    def as_strings(self) -> list[str]:
+        """Stable homogeneous record exposed to `.सूत्र` programs."""
+
+        return [
+            str(self.id), self.kind, str(self.node), str(self.x), str(self.y),
+            self.key, self.text, str(self.handler), self.action,
+        ]
 
 
 class UIBuilder:
@@ -50,6 +75,18 @@ class UIBuilder:
         self.nodes: dict[int, UINode] = {
             0: UINode(0, "root", -1, 0.0, 0.0, float(width), float(height), background=background)
         }
+        self._events: deque[UIEvent] = deque()
+        self._bindings: dict[tuple[int, str], str] = {}
+        self._condition = threading.Condition()
+        self._next_event_id = 1
+        self.focus_node = -1
+        self.revision = 0
+        self.max_events = 1024
+
+    def _touch(self) -> None:
+        with self._condition:
+            self.revision += 1
+            self._condition.notify_all()
 
     def _number(self, value: float, name: str, minimum: float = 0.0) -> float:
         if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < minimum:
@@ -65,6 +102,8 @@ class UIBuilder:
         return node
 
     def _add(self, node: UINode) -> int:
+        if len(self.nodes) >= 10_000:
+            raise UIError("UI node limit is 10000 including the root")
         parent = self._parent(node.parent)
         node.x = self._number(node.x, "x")
         node.y = self._number(node.y, "y")
@@ -72,6 +111,7 @@ class UIBuilder:
         node.height = self._number(node.height, "height", 1e-6)
         self.nodes[node.id] = node
         parent.children.append(node.id)
+        self._touch()
         return node.id
 
     def panel(self, parent: int, x: float, y: float, width: float, height: float, background: Color) -> int:
@@ -118,6 +158,7 @@ class UIBuilder:
             else:
                 child.x, child.y = cursor, padding
                 cursor += child.width + gap
+        self._touch()
 
     def grid(self, parent: int, columns: int = 2, gap: float = 0.0, padding: float = 0.0) -> None:
         container = self._parent(parent)
@@ -141,6 +182,7 @@ class UIBuilder:
             child.y = cursor
             child.width = cell_width
             row_height = max(row_height, child.height)
+        self._touch()
 
     def bounds(self, node_id: int) -> tuple[float, float, float, float]:
         node = self.nodes.get(node_id)
@@ -165,6 +207,112 @@ class UIBuilder:
             if nx <= x < nx + width and ny <= y < ny + height:
                 return node_id
         return -1
+
+    def _node(self, node_id: int) -> UINode:
+        if isinstance(node_id, bool) or not isinstance(node_id, int) or node_id not in self.nodes:
+            raise UIError(f"unknown UI node {node_id}")
+        return self.nodes[node_id]
+
+    def bind(self, node_id: int, kind: str, action: str) -> None:
+        self._node(node_id)
+        if kind not in {"click", "pointer_down", "pointer_up", "key", "text", "focus", "submit", "close", "*"}:
+            raise UIError(f"unsupported UI event kind {kind!r}")
+        if not isinstance(action, str) or not action.strip() or len(action) > 256:
+            raise UIError("UI action must be a non-empty string of at most 256 characters")
+        self._bindings[(node_id, kind)] = action.strip()
+        self._touch()
+
+    def set_text(self, node_id: int, text: str) -> None:
+        node = self._node(node_id)
+        if node.kind not in {"text", "button", "link"}:
+            raise UIError("only text, button and link nodes accept text mutation")
+        if not isinstance(text, str) or len(text) > 100_000:
+            raise UIError("UI text must be a string of at most 100000 characters")
+        node.text = text
+        self._touch()
+
+    def set_enabled(self, node_id: int, enabled: bool) -> None:
+        if not isinstance(enabled, bool):
+            raise UIError("UI enabled state must be सत्यता")
+        self._node(node_id).enabled = enabled
+        self._touch()
+
+    def focus(self, node_id: int) -> None:
+        node = self._node(node_id)
+        if node.kind not in {"button", "link"} or not self._enabled_in_tree(node_id):
+            raise UIError("only enabled button/link nodes can receive focus")
+        self.focus_node = node_id
+        self._touch()
+
+    def pending_events(self) -> int:
+        with self._condition:
+            return len(self._events)
+
+    def _enabled_in_tree(self, node_id: int) -> bool:
+        current = node_id
+        while current >= 0:
+            if not self.nodes[current].enabled:
+                return False
+            current = self.nodes[current].parent
+        return True
+
+    def _action(self, node_id: int, kind: str) -> tuple[int, str]:
+        if not self._enabled_in_tree(node_id):
+            return -1, ""
+        current = node_id
+        while current >= 0:
+            binding = self._bindings.get((current, kind)) or self._bindings.get((current, "*"))
+            if binding is not None:
+                return current, binding
+            current = self.nodes[current].parent
+        return -1, ""
+
+    def post_event(
+        self,
+        kind: str,
+        node_id: int = -1,
+        x: float = 0.0,
+        y: float = 0.0,
+        key: str = "",
+        text: str = "",
+    ) -> int:
+        if kind not in {"click", "pointer_down", "pointer_up", "key", "text", "focus", "submit", "close"}:
+            raise UIError(f"unsupported UI event kind {kind!r}")
+        x, y = self._number(x, "event x"), self._number(y, "event y")
+        if not isinstance(key, str) or not isinstance(text, str) or len(key) > 128 or len(text) > 16_384:
+            raise UIError("UI event key/text limits exceeded")
+        if node_id == -1:
+            node_id = self.focus_node if kind in {"key", "text"} else self.hit_test(x, y)
+        if node_id != -1:
+            self._node(node_id)
+        if kind == "focus" and node_id >= 0:
+            self.focus(node_id)
+        handler, action = self._action(node_id, kind) if node_id >= 0 else (-1, "")
+        with self._condition:
+            if len(self._events) >= self.max_events:
+                raise UIError("UI event queue is full")
+            event_id = self._next_event_id
+            self._next_event_id += 1
+            self._events.append(UIEvent(event_id, kind, node_id, x, y, key, text, handler, action))
+            self._condition.notify_all()
+        return event_id
+
+    def next_event(self, timeout_ms: int = 0) -> UIEvent | None:
+        if isinstance(timeout_ms, bool) or not isinstance(timeout_ms, int) or not 0 <= timeout_ms <= 60_000:
+            raise UIError("UI event timeout must be an integer from 0 to 60000 ms")
+        deadline = time.monotonic() + timeout_ms / 1000.0
+        with self._condition:
+            while not self._events:
+                remaining = deadline - time.monotonic()
+                if timeout_ms == 0 or remaining <= 0:
+                    return None
+                self._condition.wait(remaining)
+            return self._events.popleft()
+
+    def present(self) -> None:
+        """Publish the current revision to an attached interactive host."""
+
+        self._touch()
 
     def _background(self, node: UINode) -> Color:
         current: UINode | None = node
@@ -231,9 +379,11 @@ class UIBuilder:
             if node.kind == "panel":
                 return f'<section {common} aria-label="पटल {node.id}">{children}</section>'
             if node.kind == "button":
-                return f'<button {common} type="button">{content}</button>'
+                disabled = "" if self._enabled_in_tree(node.id) else ' disabled aria-disabled="true"'
+                return f'<button {common} type="button"{disabled}>{content}</button>'
             if node.kind == "link":
-                return f'<a {common} href="{escape(node.href or "", quote=True)}">{content}</a>'
+                disabled = "" if self._enabled_in_tree(node.id) else ' aria-disabled="true" tabindex="-1"'
+                return f'<a {common} href="{escape(node.href or "", quote=True)}"{disabled}>{content}</a>'
             return f'<p {common}>{content}</p>'
 
         body = "".join(render(node_id) for node_id in self.nodes[0].children)
@@ -246,3 +396,11 @@ class UIBuilder:
             f"style=\"--ui-width:{self.width}px;--ui-ratio:{self.width}/{self.height};background:{background}\" "
             f"aria-label=\"{escape(self.title, quote=True)}\">{body}</main></body></html>\n"
         )
+
+    def to_fragment(self) -> str:
+        """Return the current `<main>` subtree for interactive host refreshes."""
+
+        html = self.to_html()
+        start = html.index("<main ")
+        end = html.rindex("</main>") + len("</main>")
+        return html[start:end]

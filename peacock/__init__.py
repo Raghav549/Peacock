@@ -12,9 +12,9 @@ Public components:
     peacock.frontend  — colour science, software rasteriser, layout, motion
 """
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 __codename__ = "Fledgling"
 
 #: Language version accepted by this toolchain. Independent of the toolchain version.
-#: 0.3 adds native grammar, agent, UI, 3-D and advanced-colour facilities.
-LANGUAGE_VERSION = "0.3"
+#: 0.4 adds finalization, bounded LLM agents, compute backends, native AOT and hosts.
+LANGUAGE_VERSION = "0.4"

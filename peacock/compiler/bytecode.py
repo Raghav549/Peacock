@@ -52,6 +52,9 @@ OPCODES: dict[str, tuple[int, int]] = {
     "TRY_BEGIN": (2, 2),
     "TRY_END": (0, 0),
     "CATCH": (0, 0),
+    "FINALLY_BEGIN": (2, 2),
+    "FINALLY_END": (1, 1),
+    "FINALLY_RESUME": (0, 0),
     "NOP": (0, 0),
 }
 
@@ -107,6 +110,7 @@ class BytecodeCompiler:
         labels: dict[str, int] = {}
         patches: list[tuple[int, int, str]] = []  # (instruction index, arg index, label)
         try_stack: list[tuple[int, str]] = []  # (TRY_BEGIN index, catch label)
+        finally_stack: list[int] = []  # FINALLY_BEGIN instruction indices
 
         def emit(instr: list[Any], span) -> int:
             code.append(instr)
@@ -258,6 +262,19 @@ class BytecodeCompiler:
             elif op == "catch":
                 emit(["CATCH"], span)
                 emit(["STORE_SLOT", instr.dest], span)
+            elif op == "finally_begin":
+                idx = emit(["FINALLY_BEGIN", "@", -1], span)
+                patches.append((idx, 1, instr.args[0]))
+                finally_stack.append(idx)
+            elif op == "finally_end":
+                if not finally_stack:
+                    raise BytecodeError("finally_end without finally_begin in IR")
+                begin_idx = finally_stack.pop()
+                code[begin_idx][2] = len(code)
+                idx = emit(["FINALLY_END", "@"], span)
+                patches.append((idx, 1, instr.args[0]))
+            elif op == "finally_resume":
+                emit(["FINALLY_RESUME"], span)
             elif op == "nop":
                 emit(["NOP"], span)
             else:
@@ -270,6 +287,8 @@ class BytecodeCompiler:
             code[idx][argi] = labels[label]
         if try_stack:
             raise BytecodeError("unclosed try_begin while lowering")
+        if finally_stack:
+            raise BytecodeError("unclosed finally_begin while lowering")
         if not code:
             code.append(["RET", 0])
             lines.append([0, 0])
@@ -352,11 +371,11 @@ def verify_image(image: dict[str, Any]) -> None:
                 slot = instr[1]
                 if not isinstance(slot, int) or not (0 <= slot < slots):
                     raise BytecodeError(f"function '{name}' instruction {ip}: slot out of range")
-            elif op in ("JUMP", "JUMP_IF_FALSE"):
+            elif op in ("JUMP", "JUMP_IF_FALSE", "FINALLY_END"):
                 target = instr[1]
                 if not isinstance(target, int) or not (0 <= target < len(code)):
                     raise BytecodeError(f"function '{name}' instruction {ip}: jump target invalid")
-            elif op == "TRY_BEGIN":
+            elif op in ("TRY_BEGIN", "FINALLY_BEGIN"):
                 target, end = instr[1], instr[2]
                 if not isinstance(target, int) or not (0 <= target < len(code)):
                     raise BytecodeError(f"function '{name}' instruction {ip}: catch target invalid")

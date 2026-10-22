@@ -39,6 +39,7 @@ CORE_CORPUS = [
     "linguist/samples/capabilities.सूत्र",
     "linguist/samples/tensors.सूत्र",
     "selfhost/fixtures/core_syntax.सूत्र",
+    "selfhost/fixtures/finally.सूत्र",
 ]
 
 SELF_PARSE_CORPUS = [

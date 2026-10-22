@@ -123,7 +123,7 @@ class Optimizer:
         out: list[IRInstr] = []
         for instr in instrs:
             op = instr.op
-            if op in ("label", "jump", "try_begin", "try_end", "catch"):
+            if op in ("label", "jump", "try_begin", "try_end", "catch", "finally_begin", "finally_end", "finally_resume"):
                 self._reset_boundary(constants)
             if op == "const" and instr.dest is not None:
                 constants[instr.dest] = instr.args[0]
@@ -201,19 +201,50 @@ class Optimizer:
             elif instr.op == "try_begin":
                 work.append(labels.get(instr.args[0], -1))
                 work.append(index + 1)
+            elif instr.op == "finally_begin":
+                work.append(labels.get(instr.args[0], -1))
+                work.append(index + 1)
+                # Even a body that always throws needs the structural end and
+                # the normal continuation after the exception cleanup path.
+                nested = 0
+                seen_end = False
+                for candidate_index in range(index + 1, len(instrs)):
+                    candidate = instrs[candidate_index]
+                    if candidate.op == "finally_begin":
+                        nested += 1
+                    elif candidate.op == "finally_end":
+                        if nested == 0 and not seen_end:
+                            seen_end = True
+                            work.append(candidate_index)
+                            work.append(labels.get(candidate.args[0], -1))
+                        elif nested:
+                            nested -= 1
+                    elif candidate.op == "finally_resume" and seen_end and nested == 0:
+                        # The resume is a structural cleanup boundary even if
+                        # the cleanup itself always throws or returns.
+                        work.append(candidate_index)
+                        break
+            elif instr.op == "finally_end":
+                work.append(labels.get(instr.args[0], -1))
+                work.append(index + 1)
+            elif instr.op == "finally_resume":
+                work.append(index + 1)
             else:
                 work.append(index + 1)
         # Exception-scope markers are structural. A `throw` terminates a normal
         # path, so the matching `try_end` can be unreachable while the handler is
         # reachable. Keep both halves of any try scope that is reachable at all,
         # otherwise the verifier would see an unbalanced scope after DCE.
-        stack: list[int] = []
+        stack: list[tuple[str, int]] = []
         pairs: list[tuple[int, int]] = []
         for index, instr in enumerate(instrs):
-            if instr.op == "try_begin":
-                stack.append(index)
-            elif instr.op == "try_end" and stack:
-                pairs.append((stack.pop(), index))
+            if instr.op in ("try_begin", "finally_begin"):
+                stack.append((instr.op, index))
+            elif instr.op in ("try_end", "finally_end") and stack:
+                begin_op, begin_index = stack.pop()
+                expected = "try_begin" if instr.op == "try_end" else "finally_begin"
+                if begin_op == expected:
+                    pairs.append((begin_index, index))
         structural: set[int] = set()
         for begin, end in pairs:
             if begin in reachable or end in reachable:
@@ -238,7 +269,7 @@ class Optimizer:
         # Remove labels that are not referenced by any control-flow or handler.
         used: set[str] = set()
         for instr in out:
-            if instr.op in ("jump", "try_begin"):
+            if instr.op in ("jump", "try_begin", "finally_begin", "finally_end"):
                 used.add(instr.args[0])
             elif instr.op == "branch":
                 used.add(instr.args[1])

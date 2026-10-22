@@ -1,0 +1,17 @@
+// Host example (no key in source):
+// ./bin/peacock run examples/autonomous_agent.सूत्र --grant सञ्जाल \
+//   --llm-url https://provider.example/v1 --llm-model MODEL --llm-key-env PROVIDER_KEY
+प्रकरण autonomous_agent_demo
+
+उपयोग अभिकर्तृ
+
+कार्य मुख्य() -> एकक {
+    अधिकार सञ्जाल;
+    स्थापय परिणाम = अभिकर्तृ.स्वायत्त("सूत्रं 1.1.1 पठित्वा संक्षेपेण वद", ४);
+    मुद्रय("agent status: " + परिणाम[०]);
+    मुद्रय("agent answer: " + परिणाम[१]);
+    मुद्रय("agent steps: " + परिणाम[२]);
+    यदि दैर्घ्य(परिणाम) > ३ {
+        मुद्रय("first trace: " + परिणाम[३]);
+    }
+}

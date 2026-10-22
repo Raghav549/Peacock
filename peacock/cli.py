@@ -151,8 +151,8 @@ def cmd_version(argv: list[str]) -> int:
     print(f"python: {platform.python_version()} on {platform.platform()}")
     print(f"machine: {platform.machine()}, cpus: {os.cpu_count()}")
     print(
-        "implementation status: phases 0-4 substantially implemented; 5-7 and 9 partial; "
-        "NOT self-hosting; see STATUS.md"
+        "implementation status: working 0.4 subsets; phases 5-9 and 11 partial; "
+        "NOT self-hosting; NOT complete; see STATUS.md"
     )
     return EXIT_OK
 
@@ -205,12 +205,15 @@ def cmd_run(argv: list[str]) -> int:
     main_argv, program_args = _split_program_args(argv)
     parser = argparse.ArgumentParser(prog="peacock run")
     parser.add_argument("file", type=Path, help=".सूत्र source or .बीज artifact")
-    parser.add_argument("--grant", action="append", default=[], help="Sanskrit host capability grants (सञ्चय, गणना, दृश्य)")
+    parser.add_argument("--grant", action="append", default=[], help="Sanskrit host capability grants (सञ्चय, गणना, दृश्य, सञ्जाल)")
     parser.add_argument("--root", default=".", help="filesystem sandbox root (default: cwd)")
     parser.add_argument("--no-opt", action="store_true")
     parser.add_argument("--max-steps", type=int, default=2_000_000)
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--report", type=Path, default=None, help="write a training report JSON if one was produced")
+    parser.add_argument("--llm-url", default=None, help="host-configured OpenAI-compatible /v1 endpoint for अभिकर्तृ.स्वायत्त")
+    parser.add_argument("--llm-model", default=None, help="model name for the host-configured LLM provider")
+    parser.add_argument("--llm-key-env", default=None, help="environment variable containing the provider key (never a source argument)")
     parser.add_argument(
         "--present",
         type=Path,
@@ -225,20 +228,49 @@ def cmd_run(argv: list[str]) -> int:
         help="serve presented frames over HTTP on PORT while the program runs (requires --grant दृश्य)",
     )
     parser.add_argument(
+        "--ui-serve",
+        type=int,
+        default=None,
+        metavar="PORT",
+        help="serve an interactive retained UI on PORT after दृश्य.प्रदर्शय (requires --grant दृश्य)",
+    )
+    parser.add_argument(
+        "--window", action="store_true", default=None,
+        help="present दृश्य in a native X11 window (requires X11 and DISPLAY)",
+    )
+    parser.add_argument(
         "--serve-host",
         default="127.0.0.1",
-        help="HTTP bind address for --serve (use 0.0.0.0 for a container preview)",
+        help="HTTP bind address for --serve/--ui-serve (use 0.0.0.0 for a container preview)",
     )
     parser.add_argument(
         "--linger",
         type=float,
         default=0.0,
         metavar="SECONDS",
-        help="keep the --serve HTTP host alive after the program ends; -1 serves until interrupted",
+        help="keep the HTTP host alive after the program ends; -1 serves until interrupted",
     )
     args = parser.parse_args(main_argv)
-    if args.present is not None and args.serve is not None:
-        raise CLIError("--present and --serve are mutually exclusive; choose one backend")
+    if sum(option is not None for option in (args.present, args.serve, args.ui_serve, args.window)) > 1:
+        raise CLIError("--present, --serve, --ui-serve and --window are mutually exclusive; choose one backend")
+    if (args.llm_url is None) != (args.llm_model is None):
+        raise CLIError("--llm-url and --llm-model must be supplied together")
+    if args.llm_key_env is not None and args.llm_url is None:
+        raise CLIError("--llm-key-env requires --llm-url and --llm-model")
+    llm_runner = None
+    if args.llm_url is not None:
+        api_key = None
+        if args.llm_key_env is not None:
+            if args.llm_key_env not in os.environ:
+                raise CLIError(f"LLM key environment variable {args.llm_key_env!r} is not set")
+            api_key = os.environ[args.llm_key_env]
+        from peacock.intelligence.default_agent import build_llm_runner
+        from peacock.intelligence.llm import LLMError
+
+        try:
+            llm_runner = build_llm_runner(args.llm_url, args.llm_model, api_key)
+        except LLMError as exc:
+            raise CLIError(str(exc)) from exc
 
     grants = _grant_set(args.grant)
     source = None
@@ -254,6 +286,7 @@ def cmd_run(argv: list[str]) -> int:
         stats = result.stats
 
     backend = None
+    ui_backend = None
     if args.present is not None:
         from peacock.platforms import WebBackend
 
@@ -269,12 +302,26 @@ def cmd_run(argv: list[str]) -> int:
         except OSError as exc:
             raise CLIError(f"cannot serve on {args.serve_host}:{args.serve}: {exc}") from exc
         print(f"serving at {backend.url}", file=sys.stderr, flush=True)
+    elif args.ui_serve is not None:
+        from peacock.platforms import UIWebBackend
+
+        ui_backend = UIWebBackend(
+            host=args.serve_host, port=args.ui_serve, title=f"{args.file.stem} — PEACOCK UI"
+        )
+        print(f"interactive UI will serve at {ui_backend.url} on first दृश्य.प्रदर्शय", file=sys.stderr, flush=True)
+    elif args.window is not None:
+        from peacock.platforms import NativeWindowBackend
+
+        ui_backend = NativeWindowBackend(title=f"{args.file.stem} — PEACOCK")
+        print("native X11 window will open on first दृश्य.प्रदर्शय", file=sys.stderr, flush=True)
 
     host = HostPolicy(
         grants=grants,
         root=args.root,
         max_steps=args.max_steps,
         presenter=backend.present if backend is not None else None,
+        ui_presenter=ui_backend.present if ui_backend is not None else None,
+        llm_runner=llm_runner,
     )
     capture = io.StringIO() if args.json else None
     stdout = capture if capture is not None else sys.stdout
@@ -291,7 +338,9 @@ def cmd_run(argv: list[str]) -> int:
     except ArtifactFormatError as exc:
         print(f"invalid program image: {exc}", file=sys.stderr)
         exit_code = EXIT_RUNTIME
-    if backend is not None:
+    for active_backend in (backend, ui_backend):
+        if active_backend is None:
+            continue
         if exit_code == EXIT_OK and args.linger != 0.0:
             if args.linger < 0:
                 try:
@@ -301,7 +350,8 @@ def cmd_run(argv: list[str]) -> int:
                     pass
             else:
                 time.sleep(args.linger)
-        backend.close()
+        active_backend.close()
+    host.close()
     if exit_code != EXIT_OK:
         return exit_code
     if args.report is not None:
@@ -328,6 +378,7 @@ def cmd_run(argv: list[str]) -> int:
                     "compiler": stats,
                     "grants": sorted(grants),
                     "frames_presented": backend.frame_count if backend is not None else 0,
+                    "ui_presented": ui_backend.present_count if ui_backend is not None else 0,
                 },
                 indent=2,
             )
@@ -363,6 +414,37 @@ def cmd_build(argv: list[str]) -> int:
         f"module {result.image.get('module')!r}: {result.stats.get('functions')} function(s), "
         f"{result.stats.get('instructions')} instructions, language {result.image['language_version']}"
     )
+    return EXIT_OK
+
+
+def cmd_native(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="peacock native")
+    parser.add_argument("file", type=Path, help=".सूत्र source in the documented native AOT subset")
+    parser.add_argument("-o", "--output", type=Path, required=True)
+    parser.add_argument("--cc", default="cc", help="C11 compiler used for the final native link")
+    parser.add_argument("--keep-c", type=Path, default=None, help="retain generated C and runtime for audit")
+    parser.add_argument("--library", action="store_true", help="build an embeddable shared library with peacock_run instead of an executable")
+    parser.add_argument("--max-steps", type=int, default=2_000_000)
+    parser.add_argument("--no-opt", action="store_true")
+    args = parser.parse_args(argv)
+    result, source = _compile(args.file, optimize=not args.no_opt)
+    _print_diagnostics(result, source)
+    if not result.ok:
+        return EXIT_DIAGNOSTICS
+    from peacock.native import NativeBuildError, NativeCodegenError, build_native, build_native_library
+
+    try:
+        if args.library:
+            output = build_native_library(result.image, args.output, compiler=args.cc, keep_c=args.keep_c)
+        else:
+            output = build_native(
+                result.image, args.output, compiler=args.cc,
+                keep_c=args.keep_c, max_steps=args.max_steps,
+            )
+    except (NativeBuildError, NativeCodegenError) as exc:
+        raise CLIError(str(exc), EXIT_DIAGNOSTICS) from exc
+    print(f"built native {'shared library' if args.library else 'executable'} {output}")
+    print("runtime: PEACOCK C runtime + system C/math libraries; no Python dependency")
     return EXIT_OK
 
 
@@ -586,6 +668,7 @@ COMMANDS = {
     "check": cmd_check,
     "run": cmd_run,
     "build": cmd_build,
+    "native": cmd_native,
     "disasm": cmd_disasm,
     "audit": cmd_audit,
     "bench": cmd_bench,
@@ -603,6 +686,7 @@ commands:
   run <file.सूत्र|file.बीज>   compile (if needed) and execute
   check <file.सूत्र>          lex, parse, type check, lower and verify
   build <file.सूत्र>          write a .बीज bytecode artifact
+  native <file.सूत्र> -o BIN  AOT-compile the supported subset to an executable/library
   disasm <file>             disassemble a source file or artifact
   audit <file.सूत्र>          static capability audit
   व्याकरण <operation>        sūtra lookup, search, pratyāhāra and sandhi
@@ -613,8 +697,10 @@ commands:
   test                      run the unit/integration test suite
   version                   print versions and status
 
-Run options: --grant सञ्चय,गणना,दृश्य  --root DIR  --max-steps N  --json  --report FILE
-             --present DIR | --serve PORT [--serve-host ADDR] [--linger SECONDS]
+Run options: --grant सञ्चय,गणना,दृश्य,सञ्जाल  --root DIR  --max-steps N  --json  --report FILE
+             [--llm-url URL --llm-model NAME [--llm-key-env VAR]]
+             --present DIR | --serve PORT | --ui-serve PORT | --window
+             [--serve-host ADDR] [--linger SECONDS]
 Program arguments: peacock run app.सूत्र --grant सञ्चय -- arg1 arg2
 """
 

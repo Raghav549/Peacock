@@ -57,17 +57,18 @@ point criteria are met. Do not label components self-hosted merely because a
 
 ## Optional platform/tooling dependencies
 
-No native platform target is currently claimed. Future requirements are
-conditional and must be separately documented and version-pinned before use:
+Optional native/platform workflows have separate tool requirements. Source
+presence or a host syntax check is not treated as platform execution:
 
 | Target/workflow | Likely external tooling | Current status |
 |---|---|---|
 | Static website export | Browser for viewing; optional Python standard-library static HTTP server | Implemented by `website/site.सूत्र` as HTML/CSS/SVG export, with actual CLI integration tests. No browser automation or visual-regression tooling is installed. Not the same as the frame `WebBackend`; no JS or general interactive UI runtime. |
 | WebAssembly | WASM assembler/runtime or a PEACOCK-authored emitter and browser ABI | No backend currently exists. Prefer specifying ABI and validating generated artifacts before choosing a tool. |
-| Desktop | OS window/input APIs and platform toolchains | No desktop shell currently exists. |
-| Android | Android SDK/NDK, Java/Kotlin or JNI boundary, signing/package tools | No Android build validated. |
-| iOS | macOS, Xcode, Apple SDKs, signing credentials | No iOS build validated; unavailable in this Linux environment. |
-| Accelerated AI/rendering | Vendor GPU SDKs/drivers or documented portable APIs | No GPU kernel/backend currently exists. CPU implementation only. |
+| Native AOT/desktop shell | C11 compiler and system C/math linker; no Python in the resulting program | Executed on Linux x86-64 for the documented subset, including installed-wheel and shared-library/desktop checks. |
+| Native X11 UI | X11 client library and working `DISPLAY` | Dynamically loaded implementation and event-model tests; real-display test skipped here. |
+| Android | Android SDK/NDK, Gradle/CMake/JNI, signing/package tools | Activity/JNI/C sources and strict generated-C host checks only; no APK or device validation. |
+| iOS | macOS, Xcode, Apple SDKs, signing credentials | SwiftUI/Objective-C/C sources only; unavailable and unbuilt in this Linux environment. |
+| OpenCL tensor operations | OpenCL 1.2 platform library and GPU/accelerator driver | Backend and kernels implemented; CPU reference passes, actual OpenCL parity test skipped without a device. CUDA/Metal/Vulkan and GPU rendering are not implemented. |
 | VS Code extension | VS Code runtime for manual integration testing; no npm runtime dependency currently required by the grammar files | Package is prepared, not published or editor-integration tested. |
 | Linguist contribution | Ruby/Bundler and Linguist's own grammar/sample tools in an upstream checkout | Not run; proposed contribution is not submitted and usage evidence is presently inadequate. |
 
@@ -75,12 +76,13 @@ conditional and must be separately documented and version-pinned before use:
 
 Current direct run: Python 3.11+ and `./bin/peacock <command>`. For package
 installation, use `python -m pip install .` in an isolated environment. On
-2026-10-22, `pip wheel . --no-deps --no-build-isolation` produced
-`peacock_ai-0.3.0-py3-none-any.whl` (287,956 bytes); its 66 members included the
-native engines, 1,321,310-byte sūtra corpus, literature catalogue and provenance.
-A temporary `--target` installation outside the checkout passed `version`,
-3,983/4 coverage and `रामेन्द्रः` sandhi smoke tests. This validates the local
-wheel path, not a published release or every platform. No lockfile is applicable
+2026-10-22, `pip wheel . --no-deps --no-build-isolation` produced a
+`peacock_ai-0.4.0` wheel containing the native engines, sūtra corpus, literature/
+provenance and `peacock/native/runtime.{c,h}`. A temporary `--target`
+installation outside the checkout passed `version`, 3,983/4 coverage and native
+resource checks. The installed package also compiled `examples/native.सूत्र`
+into a standalone executable whose output matched the VM. This validates the
+local wheel path, not a published release or every platform. No lockfile is applicable
 while runtime dependencies are empty. Platform-specific dependencies must not be
 added to the core requirement set unless the implementation genuinely imports
 them and has tests/build coverage.

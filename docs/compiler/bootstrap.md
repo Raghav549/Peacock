@@ -65,16 +65,17 @@ no Python translation layer.
 
 ### Stage 2 — Parser and AST (partial)
 
-`selfhost/parser.सूत्र` (1,132 lines, 55 functions) is a recursive-descent parser
-written in PEACOCK. It lexes and parses the full 0.3 grammar — प्रकरण/उपयोग/संघटन,
-functions, statements, expressions, model and training declarations — and prints
+`selfhost/parser.सूत्र` (1,139 lines, 55 functions) is a recursive-descent parser
+written in PEACOCK. It lexes and parses the full 0.4 grammar — प्रकरण/उपयोग/संघटन,
+functions, statements including `अन्ते`, expressions, model and training declarations — and prints
 a canonical S-expression AST digest.
 
 **Done:**
 
 * byte-identical AST digest with the bootstrap parser on seven core `examples/`,
-  all six `linguist/samples/`, `selfhost/fixtures/core_syntax.सूत्र`, and on its own
-  source plus `selfhost/tokenizer.सूत्र`;
+  all six `linguist/samples/`, `selfhost/fixtures/core_syntax.सूत्र` and
+  `selfhost/fixtures/finally.सूत्र`, and on its own source plus
+  `selfhost/tokenizer.सूत्र`;
 * model, training and layer declarations, including named layer arguments and
   bare symbolic arguments (`activation: relu`);
 * strict first-error reporting with `PE4020`, line and column;
@@ -88,7 +89,7 @@ a canonical S-expression AST digest.
   self-hosted AST needs sum types/enums or a documented tagged representation;
 * user modules/imports beyond the built-in namespaces.
 
-Because 0.3 still lacks sum types, the port currently emits strings. That is sufficient
+Because 0.4 still lacks sum types, the port currently emits strings. That is sufficient
 for syntax parity and self-parsing, but not for the semantic analyser. The
 language additions that stage 3 will require are:
 

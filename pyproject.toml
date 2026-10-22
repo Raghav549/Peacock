@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "peacock-ai"
-version = "0.3.0"
+version = "0.4.0"
 description = "PEACOCK AI bootstrap toolchain (temporary; not the long-term implementation)"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -20,3 +20,4 @@ include = ["peacock*"]
 
 [tool.setuptools.package-data]
 "peacock.vyakarana" = ["data/*.json", "data/*.md"]
+"peacock.native" = ["*.c", "*.h"]

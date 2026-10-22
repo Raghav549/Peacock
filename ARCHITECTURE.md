@@ -1,6 +1,6 @@
 # PEACOCK Architecture
 
-Status: describes the v0.3 bootstrap implementation. The language definition is
+Status: describes the v0.4 bootstrap implementation. The language definition is
 independent of this implementation; the Python toolchain is a temporary host
 (ADR-0001). Components marked **planned** do not exist yet.
 
@@ -15,8 +15,8 @@ PEACOCK is being built as an AI-native language and computing ecosystem:
   security and enforced resource budgets;
 * an ecosystem that can eventually host its own compiler and tools.
 
-Non-goals for v0.3: being a general-purpose replacement for Python, claiming a
-complete interactive native-window UI, matching GPU performance, interpreting
+Non-goals for v0.4: being a general-purpose replacement for Python, claiming a
+complete cross-platform native UI, matching GPU performance, interpreting
 every Pāṇinian rule, or claiming AGI. The reference implementation remains
 small enough to audit and test.
 
@@ -123,6 +123,7 @@ index_set base idx src     make_list dst items       make_range dst start end
 len dst value              assert cond msg           throw value
 jump label                 branch cond then else     label name
 try_begin catch_label end  try_end                   catch dst
+finally_begin end_label    finally_end normal_label  finally_resume
 model_init dst Name seed   training_method dst Training method args
 return value
 ```
@@ -131,8 +132,9 @@ Registers are typed. `IRVerifier` checks slot ranges, jump targets, duplicate
 labels, stack-ish structure of try scopes, terminators, and binop operand types.
 `optimizer.py` performs constant folding, constant branch folding, unreachable
 code elimination, dead-temporary elimination, and simple peephole rewrites. It
-preserves try/catch scope markers structurally. The verifier runs before and
-after optimisation.
+preserves try/catch/finally scope markers and their structural labels, including
+cleanup/resume records that are unreachable only on the normal path. The verifier
+runs before and after optimisation.
 
 ### 3.5 Bytecode
 
@@ -175,10 +177,13 @@ SHA-256 digest (`intelligence/serialization.py`).
 * a fixed slot array (locals/parameters, `None` means uninitialised);
 * an operand stack;
 * a program counter and source-line table;
-* active exception handlers (`start`, `end`, `target`, stack depth);
+* active exception/finalization handlers (`start`, `end`, `target`, stack depth);
+* stacked cleanup records and saved error/return/jump completions for nested
+  `अन्ते` regions;
 * declared capabilities.
 
-Execution is single-threaded and deterministic. There is no garbage collector
+Execution of each VM is single-threaded and deterministic; explicit host HTTP
+and X11 adapters use implementation threads at the boundary. There is no garbage collector
 in the language; values are Python objects owned by the host process. Reference
 cycles are the host's responsibility. This is a documented bootstrap limitation,
 not the planned memory model.
@@ -202,7 +207,11 @@ strings and tensors. Assertions raise PE4010.
 `compiler/diagnostics.py` defines the shared hierarchy: `CapabilityError`
 (PE4001), `ResourceLimitError` (PE4003), `PanicError` (PE4011), `HostError`,
 `ArtifactError`. PEACOCK `try/catch` catches `PeacockError` subclasses except
-`PanicError` and `ResourceLimitError`, which always terminate.
+`PanicError` and `ResourceLimitError`, which always terminate. Catchable faults,
+normal region exits, returns and loop transfers enter `अन्ते` through a cleanup
+stack. `FINALLY_RESUME` restores the saved completion; a cleanup throw/return/
+jump supersedes it while outer cleanup records remain active. Fatal panic and
+resource-limit exits deliberately bypass this machinery.
 
 ### 4.5 Capabilities and sandbox
 
@@ -216,12 +225,14 @@ Three enforcement layers:
    dataset/epoch/file budgets, resolves filesystem paths inside a sandbox root
    (rejecting `..` traversal, absolute paths outside the root, symlink escapes,
    NUL bytes and oversized files), permits `सञ्चय.निधिरचना` only within that root,
-   and forwards
-   `चित्र.प्रदर्शय` frames to an attached backend, failing
-   with PE4006 when none is attached.
+   and forwards `चित्र.प्रदर्शय` frames or `दृश्य.प्रदर्शय` documents to attached
+   backends, failing with PE4006 when none is attached. It also owns bounded
+   HTTP server handles and the optional host-configured LLM runner.
 
-The source capabilities are `गणना`, `सञ्चय` and `दृश्य`. `दृश्य` is presentation-only: it
-grants no input, window management or display query.
+The source capabilities are `गणना`, `सञ्चय`, `दृश्य` and `सञ्जाल`. `दृश्य`
+attaches presentation/event hosts; local queue operations alone do not open a
+window. `सञ्जाल` gates native HTTP servers and LLM agent execution but does not
+select an endpoint or supply credentials.
 
 This is best-effort process-level isolation, **not** a kernel sandbox. See
 [SECURITY.md](SECURITY.md).
@@ -243,8 +254,14 @@ This is best-effort process-level isolation, **not** a kernel sandbox. See
   metadata, SHA-256, and int8 quantisation helpers.
 * `agent.py`: inspectable string blackboards, condition/action/effect rules,
   positive-cost Dijkstra planning with cumulative-salience tie-breaking, bounded
-  state expansion, execution and before/after traces. No arbitrary host tools or
-  hidden network calls are embedded in the agent abstraction.
+  state expansion, execution and before/after traces.
+* `llm.py`, `default_agent.py`: a bounded non-streaming provider, JSON-schema
+  tool registry, capability checks, aggregate budgets and sanitized offline
+  default tools. Endpoint/credentials are host configuration; redirects are not
+  followed and no shell/filesystem/network tool is registered by default.
+* `gpu.py`: CPU reference and dynamically loaded OpenCL 1.2 operations for
+  addition, multiplication, ReLU and rank-2 matmul. Explicit `त्वरक` never falls
+  back; automatic selection may use CPU. This is separate from autodiff/training.
 
 Gradient correctness is checked against finite differences in tests
 (`test_tensor.py`, `test_training.py`) with tolerances around 1e-9 for the
@@ -265,16 +282,18 @@ small analytic cases. This is numerical validation, not a proof.
   sizes and overflow reporting.
 * `physics.py`: fixed-step AABB rigid bodies with gravity, restitution,
   friction and positional correction.
-* `ui.py`: retained UI nodes, flow/grid layout, absolute hit testing, contrast/
-  overflow/touch-target audits and escaped responsive Sanskrit HTML export.
+* `ui.py`: retained UI nodes, flow/grid layout, absolute hit testing, bounded
+  bubbling event dispatch, text/enabled/focus mutation, contrast/overflow/
+  touch-target audits and escaped responsive Sanskrit HTML export.
 * `scene3d.py`: cube/UV-sphere meshes, Euler transforms, perspective projection,
   back-face culling, reciprocal-depth buffering and coloured point lights.
 
-The 2-D and 3-D renderers are CPU-only. The UI toolkit currently targets static
-component/layout/HTML workflows; text shaping, input/event dispatch and native
-accessibility/window integration remain planned. The separate static website
-exporter is an application of the toolchain, not a substitute for those host
-APIs.
+The 2-D and 3-D renderers are CPU-only. Interactive UI hosts are implemented in
+`platforms/ui.py` (browser events/fragments) and `platforms/window.py` (native
+X11 pointer/key/close events and retained-tree drawing). Complex-script shaping,
+native accessibility and a general frame scheduler remain gaps. The separate
+static website exporter is an application of the toolchain, not a substitute for
+those host APIs.
 
 `peacock/vyakarana/` is a sibling native engine, independent of the compiler:
 `corpus.py` loads the attributed 3,983-text corpus and inheritance references;
@@ -284,24 +303,33 @@ separate architectural metrics.
 
 ## 7. Host boundaries and platforms
 
-`peacock/platforms/` defines a `Frame` and `Backend` contract plus three
-implementations:
+`peacock/platforms/` defines frame and interactive-host contracts:
 
 * `HeadlessBackend` — keeps the latest frame, optionally writes PNGs.
 * `WebBackend` — writes frames, `latest.png`, a manifest and a static HTML
   viewer (no JavaScript/framework).
 * `ServerBackend` — a stdlib HTTP host serving the latest frame, manifest,
   viewer and health check.
+* `UIWebBackend` — a lazy interactive UI host with same-origin event POSTs and
+  fragment refresh, attached by `--ui-serve`.
+* `NativeWindowBackend` — a dynamically loaded X11 window/event/drawing host,
+  attached by `--window`.
+* `httpd.BoundedHTTPServer` — program-owned synchronous numeric-IP listeners,
+  bounded UTF-8 requests/responses and host-owned handles, gated by `सञ्जाल`.
 
-They are driven by the `चित्र.प्रदर्शय(चित्रपट्ट)` native (capability `दृश्य`): the
-host attaches a backend through `HostPolicy(presenter=...)`, and the CLI exposes
-this as `--present DIR` with a `WebBackend` or `--serve PORT` with a
-`ServerBackend`. The VM never imports `peacock/platforms`; it calls the host
-policy, so a future window, Android or web host can attach a different backend
-without changing language semantics. A native window shell, input events
-and mobile shells are roadmap work; Android and iOS require platform toolchains
-and signing, and are documented as **not implemented**, not stubbed as if they
-worked.
+Frame presentation uses `HostPolicy(presenter=...)`; retained UI uses
+`ui_presenter=...`. The VM calls host policy rather than importing platform
+backends. Browser and X11 events therefore implement the same language-level
+queue without changing compiler semantics.
+
+`peacock/native/` is a separate AOT branch from verified bytecode: it validates
+a strict opcode/native subset, emits direct C control flow and checked runtime
+calls, and builds either an executable or a shared library. `peacock_run` uses
+output callbacks and recoverable error boundaries instead of terminating its
+host. `shells/desktop/` embeds that ABI in a small Linux desktop launcher;
+`shells/android/` and `shells/ios/` contain Activity/JNI and SwiftUI/Objective-C
+hosts around generated C. Only the Linux build/run was executed in this
+environment; mobile source presence is not device validation.
 
 Separately, `website/site.सूत्र` is a verified PEACOCK-authored static-site
 exporter, not an extension of the frame `WebBackend`. Its single `.सूत्र`
@@ -321,8 +349,13 @@ See [website/README.md](website/README.md).
 | `zlib` | DEFLATE in PNG | documented platform compression library; PNG framing/CRC are ours |
 | `hashlib` | SHA-256 digests | standard library primitive |
 | OS filesystem | `सञ्चय` capability | documented interop boundary behind the sandbox |
-| Browser | static web preview | presentation only; no JS framework or language runtime |
-| HTTP stdlib | server host | transport boundary, not language semantics |
+| Browser | static preview and explicit interactive UI host | presentation/events; no JS framework or browser language runtime |
+| HTTP stdlib / OS sockets | frame, UI and PEACOCK-controlled server hosts | bounded transport boundary, not implicit language authority |
+| Host C11 compiler | optional native AOT executables/libraries | explicit build boundary; generated runtime has no Python dependency |
+| X11 | optional native window host | dynamically loaded; requires a real display for execution |
+| OpenCL 1.2 | optional tensor accelerator | dynamically loaded; explicit hardware requests never silently fall back |
+| OpenAI-compatible HTTP(S) provider | optional bounded LLM agent | host-configured endpoint/model/key; invoked only by the program |
+| Android SDK/NDK, Xcode | mobile shell builds | required for platform verification; unavailable in the current environment |
 
 No NumPy, PyTorch, TensorFlow, JAX, LLVM, MLIR, Rust, Node, React or Flutter is
 used in the core. No code from other language implementations was copied;
@@ -333,15 +366,20 @@ research ideas are cited in `research/references.bib`.
 The reference engine is pure Python. Representative measurements on the
 recorded machine are in [STATUS.md](STATUS.md) and
 `benchmarks/latest.json` when generated. They characterise this bootstrap only
-and are not used to claim superiority over other languages. The VM is a switch
-dispatch over Python lists; there is no JIT, tiering or native code. Tensors are
-flat lists, not contiguous typed buffers. The optimiser operates on a
-straight-line IR, not an SSA graph with dominance frontiers.
+and are not used to claim superiority over other languages. The reference VM is
+a switch dispatch over Python lists with no JIT or tiering. The separate native
+AOT path emits C for a verified subset and uses bounded native values; it is not
+whole-language native compilation. CPU tensors are flat lists; OpenCL operations
+use temporary contiguous device buffers but do not retain a device tensor graph.
+The optimiser operates on a straight-line IR, not an SSA graph with dominance
+frontiers.
 
-Planned performance work (phase 8): typed buffers, a register-based bytecode or
-closure IR, a native backend for a subset, and profile-guided intrinsics.
-Memory: no GC tuning, no arenas; host process memory is the limit. Canvas and
-tensor sizes are bounded by host policy and explicit library limits.
+Planned performance work includes typed CPU buffers, a register-based bytecode
+or closure IR, wider native/AOT coverage, device-resident operations and
+profile-guided intrinsics. Memory: no language GC tuning or arenas; the Python
+host manages VM object lifetimes, while the native subset tracks allocations
+per run and releases them on normal/fault boundaries. Canvas and tensor sizes are bounded by host policy and
+explicit library limits.
 
 ## 10. Testing strategy
 
@@ -369,9 +407,9 @@ compiler stages, and (b) host services. The self-hosting plan reimplements (a)
 in `.सूत्र` while keeping OS access behind natives:
 
 1. tokenizer — **done** (`selfhost/tokenizer.सूत्र`, parity-tested);
-2. parser and AST — **partial** (`selfhost/parser.सूत्र`): full 0.3 syntax,
+2. parser and AST — **partial** (`selfhost/parser.सूत्र`): full 0.4 syntax,
    including model/training declarations, with canonical AST-digest parity on the
-   14-file corpus and self-parse; strict first-error reporting, no recovery or
+   15-file corpus and self-parse; strict first-error reporting, no recovery or
    `PE2xxx` diagnostic parity yet, and no typed AST nodes;
 3. semantic analyser and type checker — **shadow prototype**:
    `semantic_mode="shadow"` / `--semantic-shadow` emits PEACOCK VM probes from
@@ -392,10 +430,16 @@ See `docs/compiler/bootstrap.md` and ADR-0003.
 * The VM interprets JSON images directly; there is no linker, separate
   compilation, or module cache.
 * No user modules, generics, closures, or first-class functions.
-* No native code generation.
-* No GPU tensors, no convolution/attention layers, no data loader pipeline.
-* No UI event runtime, native text shaping/accessibility/windowing, GPU 3D,
-  smooth mesh normals or texture pipeline.
+* Native AOT is a small verified subset, with no general cleanup/object/module
+  support, stable cross-version plugin ABI, garbage collector or mobile run
+  evidence. The current C library state is not thread-safe/reentrant.
+* OpenCL covers four synchronous tensor operations only; there are no device-
+  resident/autodiff tensors, convolution/attention layers or data loader pipeline.
+* UI has no complete complex-script shaping/native accessibility stack, text
+  input widgets or general frame scheduler; 3D has no GPU path, smooth mesh
+  normals or texture pipeline. Actual X11/OpenCL hardware was unavailable here.
+* Android/iOS source shells still need SDK/Xcode build, lifecycle, packaging,
+  simulator/device and distribution verification.
 * The complete sūtra corpus is searchable, but only the documented pratyāhāra
   and four sandhi operations are executable; there is no full Pāṇinian deriver.
 * Capability isolation is process-level and best effort; it is not a hardened

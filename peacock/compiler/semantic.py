@@ -921,12 +921,23 @@ class SemanticAnalyzer:
         if isinstance(stmt, TryStmt):
             self.loop_depth += 0  # break/continue inside try are governed by enclosing loop
             self._check_block(stmt.body, new_scope=True)
-            self._push_scope()
-            sym = self._declare(stmt.catch_name, T.StringType, False, stmt.span)
-            stmt.slot = sym.slot
-            self._check_block(stmt.catch_body, new_scope=False)
-            self._pop_scope()
-            stmt.always_returns = stmt.body.always_returns and stmt.catch_body.always_returns
+            if stmt.catch_body is not None:
+                self._push_scope()
+                sym = self._declare(stmt.catch_name, T.StringType, False, stmt.span)
+                stmt.slot = sym.slot
+                self._check_block(stmt.catch_body, new_scope=False)
+                self._pop_scope()
+            if stmt.finally_body is not None:
+                self._check_block(stmt.finally_body, new_scope=True)
+            if stmt.finally_body is not None and stmt.finally_body.always_returns:
+                stmt.always_returns = True
+            elif stmt.catch_body is not None:
+                stmt.always_returns = stmt.body.always_returns and stmt.catch_body.always_returns
+            else:
+                # Without a catch, normal body completion and exceptional
+                # completion both pass through finally; neither falls through
+                # when the body always returns/throws.
+                stmt.always_returns = stmt.body.always_returns
             return
         if isinstance(stmt, AssertStmt):
             cond = self._check_expr(stmt.condition)

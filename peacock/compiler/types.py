@@ -1,4 +1,4 @@
-"""PEACOCK's static type model (v0.3).
+"""PEACOCK's static type model (v0.4).
 
 The model is deliberately small and explicit. There is no implicit numeric
 conversion between ``Int`` and ``Float``; tensor dtypes follow the promotion

@@ -40,6 +40,7 @@ _AST_LABELS = {
     "error": "दोष",
     "expr": "अभिव्यक्ति",
     "field": "क्षेत्र",
+    "finally": "अन्ते",
     "layer": "स्तर",
     "list": "सूची",
     "opt": "विकल्प",
@@ -147,7 +148,12 @@ def stmt_digest(s: A.Stmt) -> str:
     if isinstance(s, A.ThrowStmt):
         return node("throw", expr_digest(s.value))
     if isinstance(s, A.TryStmt):
-        return node("try", stmt_digest(s.body), s.catch_name, stmt_digest(s.catch_body))
+        parts = [stmt_digest(s.body)]
+        if s.catch_body is not None:
+            parts.extend([s.catch_name, stmt_digest(s.catch_body)])
+        if s.finally_body is not None:
+            parts.append(node("finally", stmt_digest(s.finally_body)))
+        return node("try", *parts)
     if isinstance(s, A.AssertStmt):
         parts = ["assert", expr_digest(s.condition)]
         if s.message is not None:
