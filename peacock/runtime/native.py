@@ -15,10 +15,15 @@ from typing import Any
 from peacock.compiler import builtins as B
 from peacock.compiler.diagnostics import PanicError, PeacockError, ResourceLimitError, RuntimeError_
 from peacock.frontend.canvas import Canvas, CanvasError
-from peacock.frontend.colour import Color, ColorError, palette
+from peacock.frontend.colour import (
+    Color, ColorError, delta_e_2000, map_gamut, mix_weighted, palette,
+)
 from peacock.frontend.easing import ease
+from peacock.frontend.scene3d import Scene3D, Scene3DError
+from peacock.frontend.ui import UIBuilder, UIError
 from peacock.frontend.png import encode_png
 from peacock.frontend.spring import SpringConfig, settle
+from peacock.intelligence.agent import Agent, AgentError
 from peacock.intelligence.datasets import Dataset, make_dataset, spiral_dataset, xor_dataset
 from peacock.intelligence.layers import Model
 from peacock.intelligence.serialization import model_from_bytes, model_to_bytes
@@ -27,7 +32,12 @@ from peacock.intelligence import tensor as T
 from peacock.intelligence.training import evaluate_accuracy, evaluate_loss, train_model
 from peacock.runtime.errors import VMFault
 from peacock.runtime.values import UNIT, RangeValue, format_value, is_int, type_name
-from peacock.sanskrit import internalise_enum, surface
+from peacock.sanskrit import internalise_enum, surface, surface_enum
+from peacock.vyakarana import (
+    EXPECTED_SUTRAS, EXECUTABLE_RULE_IDS, CorpusError, PratyaharaError,
+    SandhiError, expand as expand_pratyahara, get_sutra, join as sandhi_join,
+    literature as grammar_literature, search as search_sutras,
+)
 
 # ---------------------------------------------------------------------------
 # Capability metadata
@@ -89,6 +99,24 @@ def _need_model(value, where: str) -> Model:
 def _need_dataset(value, where: str) -> Dataset:
     if not isinstance(value, Dataset):
         _fail(f"{where} expects a दत्तसमूह, got {type_name(value)}")
+    return value
+
+
+def _need_ui(value, where: str) -> UIBuilder:
+    if not isinstance(value, UIBuilder):
+        _fail(f"{where} expects a दृश्यरचना, got {type_name(value)}")
+    return value
+
+
+def _need_scene(value, where: str) -> Scene3D:
+    if not isinstance(value, Scene3D):
+        _fail(f"{where} expects a त्रिअयामदृश्य, got {type_name(value)}")
+    return value
+
+
+def _need_agent(value, where: str) -> Agent:
+    if not isinstance(value, Agent):
+        _fail(f"{where} expects an अभिकर्तृप्रकार, got {type_name(value)}")
     return value
 
 
@@ -362,6 +390,21 @@ def _colour_palette(ctx, args):
     count = _need_int(args[0], "palette count")
     seed = _need_int(args[1], "palette seed")
     return _wrap_engine_errors(palette, count, seed)
+
+
+def _colour_mix_many(ctx, args):
+    colors = [_need_color(value, "colour.mix_many colours") for value in _need_list(args[0], "colour.mix_many colours")]
+    weights = [_need_float(value, "colour.mix_many weights") for value in _need_list(args[1], "colour.mix_many weights")]
+    space = internalise_enum(_need_str(args[2], "colour.mix_many space"))
+    return _wrap_engine_errors(mix_weighted, colors, weights, space)
+
+
+def _colour_delta_e(ctx, args):
+    return delta_e_2000(_need_color(args[0], "colour.delta_e a"), _need_color(args[1], "colour.delta_e b"))
+
+
+def _colour_gamut_map(ctx, args):
+    return map_gamut(_need_color(args[0], "colour.gamut_map"))
 
 
 # -- graphics ---------------------------------------------------------------
@@ -676,6 +719,222 @@ def _text_split_lines(ctx, args):
     return _need_str(args[0], "text.split_lines").splitlines()
 
 
+# -- Sanskrit grammar --------------------------------------------------------
+def _grammar_sutra(ctx, args):
+    return _wrap_engine_errors(lambda: get_sutra(_need_str(args[0], "vyakarana.sutra id")).display())
+
+
+def _grammar_count(ctx, args):
+    return EXPECTED_SUTRAS
+
+
+def _grammar_search(ctx, args):
+    query = _need_str(args[0], "vyakarana.search query")
+    limit = _need_int(args[1], "vyakarana.search limit")
+    return _wrap_engine_errors(lambda: [sutra.display() for sutra in search_sutras(query, limit)])
+
+
+def _grammar_pratyahara(ctx, args):
+    return _wrap_engine_errors(lambda: list(expand_pratyahara(_need_str(args[0], "vyakarana.pratyahara"))))
+
+
+def _grammar_sandhi(ctx, args):
+    left, right = _need_str(args[0], "sandhi left"), _need_str(args[1], "sandhi right")
+    return _wrap_engine_errors(lambda: sandhi_join(left, right).text)
+
+
+def _grammar_sandhi_rule(ctx, args):
+    left, right = _need_str(args[0], "sandhi left"), _need_str(args[1], "sandhi right")
+    return _wrap_engine_errors(lambda: sandhi_join(left, right).rule_id)
+
+
+def _grammar_anuvritti(ctx, args):
+    return _wrap_engine_errors(lambda: [ref.display() for ref in get_sutra(_need_str(args[0], "anuvritti id")).anuvritti])
+
+
+def _grammar_adhikara(ctx, args):
+    return _wrap_engine_errors(lambda: [ref.display() for ref in get_sutra(_need_str(args[0], "adhikara id")).adhikara])
+
+
+def _grammar_literature(ctx, args):
+    return list(grammar_literature())
+
+
+def _grammar_coverage(ctx, args):
+    return len(EXECUTABLE_RULE_IDS)
+
+
+# -- native UI builder --------------------------------------------------------
+def _ui_create(ctx, args):
+    return _wrap_engine_errors(UIBuilder, _need_str(args[0], "ui title"), _need_int(args[1], "ui width"), _need_int(args[2], "ui height"), _need_color(args[3], "ui background"))
+
+
+def _ui_panel(ctx, args):
+    ui = _need_ui(args[0], "ui.panel")
+    values = [_need_float(args[index], "ui.panel bounds") for index in range(2, 6)]
+    return _wrap_engine_errors(ui.panel, _need_int(args[1], "ui parent"), *values, _need_color(args[6], "panel background"))
+
+
+def _ui_text(ctx, args):
+    ui = _need_ui(args[0], "ui.text")
+    return _wrap_engine_errors(
+        ui.text, _need_int(args[1], "ui parent"), _need_str(args[2], "ui text"),
+        *[_need_float(args[index], "ui.text bounds") for index in range(3, 7)],
+        _need_color(args[7], "text foreground"), _need_float(args[8], "text size"),
+    )
+
+
+def _ui_button(ctx, args):
+    ui = _need_ui(args[0], "ui.button")
+    return _wrap_engine_errors(
+        ui.button, _need_int(args[1], "ui parent"), _need_str(args[2], "button label"),
+        *[_need_float(args[index], "ui.button bounds") for index in range(3, 7)],
+        _need_color(args[7], "button background"), _need_color(args[8], "button foreground"),
+    )
+
+
+def _ui_link(ctx, args):
+    ui = _need_ui(args[0], "ui.link")
+    return _wrap_engine_errors(
+        ui.link, _need_int(args[1], "ui parent"), _need_str(args[2], "link label"),
+        _need_str(args[3], "link target"),
+        *[_need_float(args[index], "ui.link bounds") for index in range(4, 8)],
+        _need_color(args[8], "link foreground"), _need_float(args[9], "link size"),
+    )
+
+
+def _ui_flow(ctx, args):
+    ui = _need_ui(args[0], "ui.flow")
+    direction = internalise_enum(_need_str(args[2], "flow direction"))
+    _wrap_engine_errors(ui.flow, _need_int(args[1], "ui parent"), direction, _need_float(args[3], "flow gap"), _need_float(args[4], "flow padding"))
+    return UNIT
+
+
+def _ui_grid(ctx, args):
+    ui = _need_ui(args[0], "ui.grid")
+    _wrap_engine_errors(ui.grid, _need_int(args[1], "ui parent"), _need_int(args[2], "grid columns"), _need_float(args[3], "grid gap"), _need_float(args[4], "grid padding"))
+    return UNIT
+
+
+def _ui_bounds(ctx, args):
+    ui = _need_ui(args[0], "ui.bounds")
+    return _wrap_engine_errors(lambda: list(ui.bounds(_need_int(args[1], "ui node"))))
+
+
+def _ui_hit_test(ctx, args):
+    ui = _need_ui(args[0], "ui.hit_test")
+    return _wrap_engine_errors(ui.hit_test, _need_float(args[1], "hit x"), _need_float(args[2], "hit y"))
+
+
+def _ui_audit(ctx, args):
+    return _need_ui(args[0], "ui.audit").audit()
+
+
+def _ui_html(ctx, args):
+    return _need_ui(args[0], "ui.to_html").to_html()
+
+
+def _ui_save(ctx, args):
+    ui = _need_ui(args[0], "ui.save")
+    path = _need_str(args[1], "ui.save path")
+    ctx.host.write_bytes(path, ui.to_html().encode("utf-8"))
+    return UNIT
+
+
+def _ui_node_count(ctx, args):
+    return len(_need_ui(args[0], "ui.node_count").nodes)
+
+
+# -- software 3-D -------------------------------------------------------------
+def _scene_create(ctx, args):
+    return Scene3D()
+
+
+def _scene_cube(ctx, args):
+    scene = _need_scene(args[0], "scene3d.cube")
+    return _wrap_engine_errors(scene.cube, *[_need_float(args[index], "cube") for index in range(1, 5)], _need_color(args[5], "cube colour"))
+
+
+def _scene_sphere(ctx, args):
+    scene = _need_scene(args[0], "scene3d.sphere")
+    return _wrap_engine_errors(
+        scene.sphere, *[_need_float(args[index], "sphere") for index in range(1, 5)],
+        _need_color(args[5], "sphere colour"), _need_int(args[6], "sphere segments"), _need_int(args[7], "sphere rings"),
+    )
+
+
+def _scene_light(ctx, args):
+    scene = _need_scene(args[0], "scene3d.light")
+    _wrap_engine_errors(scene.light, *[_need_float(args[index], "light") for index in range(1, 4)], _need_color(args[4], "light colour"), _need_float(args[5], "light intensity"))
+    return UNIT
+
+
+def _scene_rotate(ctx, args):
+    scene = _need_scene(args[0], "scene3d.rotate")
+    _wrap_engine_errors(scene.rotate, _need_int(args[1], "scene object"), *[_need_float(args[index], "rotation") for index in range(2, 5)])
+    return UNIT
+
+
+def _scene_render(ctx, args):
+    scene = _need_scene(args[0], "scene3d.render")
+    canvas = _need_canvas(args[1], "scene3d.render canvas")
+    _wrap_engine_errors(scene.render, canvas, *[_need_float(args[index], "camera") for index in range(2, 6)])
+    return UNIT
+
+
+def _scene_triangle_count(ctx, args):
+    return _need_scene(args[0], "scene3d.triangle_count").triangle_count
+
+
+# -- bounded native agents ----------------------------------------------------
+def _agent_create(ctx, args):
+    return _wrap_engine_errors(Agent, _need_str(args[0], "agent goal key"), _need_str(args[1], "agent goal value"), _need_int(args[2], "agent max steps"))
+
+
+def _agent_fact(ctx, args):
+    agent = _need_agent(args[0], "agent.fact")
+    _wrap_engine_errors(agent.fact, _need_str(args[1], "fact key"), _need_str(args[2], "fact value"))
+    return UNIT
+
+
+def _agent_rule(ctx, args):
+    agent = _need_agent(args[0], "agent.rule")
+    return _wrap_engine_errors(
+        agent.rule, *[_need_str(args[index], "agent rule") for index in range(1, 6)],
+        _need_float(args[6], "rule priority"), _need_float(args[7], "rule cost"),
+    )
+
+
+def _agent_plan(ctx, args):
+    agent = _need_agent(args[0], "agent.plan")
+    actions = _wrap_engine_errors(agent.plan)
+    if actions is None:
+        agent.status = "stalled"
+        return []
+    return actions
+
+
+def _agent_run(ctx, args):
+    return _wrap_engine_errors(_need_agent(args[0], "agent.run").run)
+
+
+def _agent_get(ctx, args):
+    agent = _need_agent(args[0], "agent.get")
+    return _wrap_engine_errors(agent.get, _need_str(args[1], "agent key"))
+
+
+def _agent_status(ctx, args):
+    return surface_enum(_need_agent(args[0], "agent.status").status)
+
+
+def _agent_trace(ctx, args):
+    return _need_agent(args[0], "agent.trace").trace()
+
+
+def _agent_facts(ctx, args):
+    return _need_agent(args[0], "agent.facts").fact_lines()
+
+
 # -- motion -----------------------------------------------------------------
 def _motion_spring_steps(ctx, args):
     start = _need_float(args[0], "spring start")
@@ -916,6 +1175,9 @@ _IMPLS = {
     "colour.luminance": _colour_luminance,
     "colour.contrast": _colour_contrast,
     "colour.palette": _colour_palette,
+    "colour.mix_many": _colour_mix_many,
+    "colour.delta_e": _colour_delta_e,
+    "colour.gamut_map": _colour_gamut_map,
     "graphics.canvas": _graphics_canvas,
     "graphics.clear": _graphics_clear,
     "graphics.fill": _graphics_fill,
@@ -940,6 +1202,45 @@ _IMPLS = {
     "fs.read_text": _fs_read_text,
     "fs.write_text": _fs_write_text,
     "fs.create_dir": _fs_create_dir,
+    "vyakarana.sutra": _grammar_sutra,
+    "vyakarana.sutra_count": _grammar_count,
+    "vyakarana.search": _grammar_search,
+    "vyakarana.pratyahara": _grammar_pratyahara,
+    "vyakarana.sandhi": _grammar_sandhi,
+    "vyakarana.sandhi_rule": _grammar_sandhi_rule,
+    "vyakarana.anuvritti": _grammar_anuvritti,
+    "vyakarana.adhikara_info": _grammar_adhikara,
+    "vyakarana.literature": _grammar_literature,
+    "vyakarana.coverage": _grammar_coverage,
+    "ui.create": _ui_create,
+    "ui.panel": _ui_panel,
+    "ui.text": _ui_text,
+    "ui.button": _ui_button,
+    "ui.link": _ui_link,
+    "ui.flow": _ui_flow,
+    "ui.grid": _ui_grid,
+    "ui.bounds": _ui_bounds,
+    "ui.hit_test": _ui_hit_test,
+    "ui.audit": _ui_audit,
+    "ui.to_html": _ui_html,
+    "ui.save": _ui_save,
+    "ui.node_count": _ui_node_count,
+    "scene3d.create": _scene_create,
+    "scene3d.cube": _scene_cube,
+    "scene3d.sphere": _scene_sphere,
+    "scene3d.light": _scene_light,
+    "scene3d.rotate": _scene_rotate,
+    "scene3d.render": _scene_render,
+    "scene3d.triangle_count": _scene_triangle_count,
+    "agent.create": _agent_create,
+    "agent.fact": _agent_fact,
+    "agent.rule": _agent_rule,
+    "agent.plan": _agent_plan,
+    "agent.run": _agent_run,
+    "agent.get": _agent_get,
+    "agent.status": _agent_status,
+    "agent.trace": _agent_trace,
+    "agent.facts": _agent_facts,
     "nn.parameter": _nn_parameter,
     "nn.max_abs_diff": _nn_max_abs_diff,
     "nn.mse": _nn_mse,

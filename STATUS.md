@@ -12,22 +12,23 @@ accepted.
 
 ```bash
 ./bin/peacock test
-# Ran 511 tests in 44.960s — OK (v0.2.0, 2026-10-22)
+# Ran 559 tests in 40.359s — OK (v0.3.0, 2026-10-22)
 ```
 
 This run is from the current uncommitted Arena working tree and includes the
-Sanskrit lexical/Unicode, semantic-shadow, filesystem capability, documentation, and PEACOCK-authored website regressions.
+Sanskrit lexical/Unicode, native grammar/agent/UI/3-D/colour, semantic-shadow,
+filesystem capability, documentation and PEACOCK-authored website regressions.
 
 | Suite | Tests | Result |
 |---|---:|---|
 | `tests/compiler` | 227 | OK |
-| `tests/ai` | 81 | OK |
-| `tests/frontend` | 74 | OK |
+| `tests/ai` | 88 | OK |
+| `tests/frontend` | 94 | OK |
 | `tests/security` | 37 | OK |
-| `tests/integration` | 65 | OK |
-| `tests/unit` | 21 | OK |
+| `tests/integration` | 73 | OK |
+| `tests/unit` | 34 | OK |
 | `tests/benchmarks` | 6 | OK |
-| **Total** | **511** | **OK** |
+| **Total** | **559** | **OK** |
 
 ```bash
 ./bin/peacock fuzz --iterations 1000 --seed 1
@@ -51,6 +52,12 @@ All commands were run from the repository root on the reference machine.
 | `./bin/peacock run examples/xor.सूत्र --grant गणना` | 400 epochs, final loss `0.0013468142908857894`, accuracy `1.0` |
 | `./bin/peacock run examples/spiral.सूत्र --grant गणना` | 48 samples, 250 epochs, final loss `0.06998025545183473`, accuracy `1.0` |
 | `./bin/peacock run examples/tensors.सूत्र --grant गणना` | autodiff and closed-form MSE gradients agree, `max abs difference: 0.0` |
+| `./bin/peacock run examples/vyakarana.सूत्र` | prints 3,983 sūtra texts / 4 executable sandhi rules, pratyāhāra membership, anuvṛtti and `रामेन्द्रः`, `नद्यत्र`, `महर्षिः` |
+| `./bin/peacock व्याकरण संधि राम इन्द्रः` | `रामेन्द्रः — 6.1.87 आद्गुणः` |
+| `./bin/peacock run examples/agents.सूत्र --grant गणना` | minimum-cost plan reaches `सिद्ध` with two trace entries; omission of `गणना` is denied |
+| `./bin/peacock run examples/colour_lab.सूत्र` | weighted Oklab, subtractive and gamut examples print `rgb(81 71 210)`, `rgb(0 0 0)`, `rgb(255 101 81)` |
+| `./bin/peacock run examples/ui_builder.सूत्र --grant सञ्चय --root .` | exports accessible, responsive, script-free Sanskrit `examples/out/ui.html`; hit test and audit assertions pass |
+| `./bin/peacock run examples/scene3d.सूत्र --grant सञ्चय --root .` | renders 588 triangles and writes a valid, lit/depth-buffered 320×200 `examples/out/scene3d.png` |
 | `./bin/peacock run examples/aurora.सूत्र --grant सञ्चय` | writes `examples/out/aurora.png` (960×540, 162,337 bytes, valid PNG) |
 | `./bin/peacock run selfhost/tokenizer.सूत्र --grant सञ्चय -- examples/tour.सूत्र` | prints `367`, equal to the bootstrap lexer's token count minus EOF |
 | `./bin/peacock run selfhost/parser.सूत्र --grant सञ्चय --root . --max-steps 300000000 -- examples/xor.सूत्र` | AST digest identical to the bootstrap on the 14-file corpus; parses its own 1,131-line source with identical digest |
@@ -59,7 +66,8 @@ All commands were run from the repository root on the reference machine.
 | `./bin/peacock run examples/present.सूत्र --grant दृश्य --present out/preview` | prints `presented 4 frames`; manifest lists 4 × 320×180 frames; `latest.png` decodes to 230,400 RGBA bytes |
 | `./bin/peacock run examples/present.सूत्र --grant दृश्य` (no backend) | PE4006, exit 3; the host, not the program, decides where frames go |
 | `./bin/peacock run examples/present.सूत्र --grant दृश्य --serve 8099 --linger 2` | `/manifest.json` reports 4 frames and a 320×180 latest frame; `/frame.png` decodes; `/` serves script-free HTML; the port closes after exit |
-| `./bin/peacock build examples/hello.सूत्र -o /tmp/hello.बीज` | 615-byte verified artifact; language 0.2, format 1, SHA-256 `67655b3d266dc095e88ce24af7ee8d16452032c3bd7cbfc6437f737782a6a646` |
+| `./bin/peacock build examples/hello.सूत्र -o /tmp/hello.बीज` | 615-byte verified artifact; language 0.3, format 1, SHA-256 `d176f5220259691dd8036af4e0fa242e09a86cb7ee659d906b90f1f95f5853b3` |
+| `python -m pip wheel . --no-deps --no-build-isolation` | 0.3.0 wheel contains native engines, corpus/literature/provenance; temporary installed copy passes version, 3,983/4 coverage and sandhi smoke tests |
 | `./bin/peacock check website/site.सूत्र` | PEACOCK source checks; 32 functions, 4,574 instructions |
 | `./bin/peacock run website/site.सूत्र --grant सञ्चय --root . --max-steps 10000000 -- website/dist` | Generates 12 HTML routes, responsive CSS and the project SVG through the real CLI/compiler/VM; no JS bundle |
 | `python -m unittest tests.integration.test_website -v` | 4 website export/audit tests pass |
@@ -92,7 +100,18 @@ capability-denial exit code.
 * Dense/Sequential models, XOR and spiral datasets, SGD/Adam, cross-entropy/MSE,
   training reports, evaluation metrics, `.ज्ञान` save/load, int8 quantisation
   helpers;
-* sRGB/XYZ/CIELAB/Oklab/Oklch colour, WCAG contrast, palettes, gradients;
+* sRGB/XYZ/CIELAB/Oklab/Oklch colour, WCAG contrast, CIEDE2000, weighted linear/
+  perceptual/polar/approximate-subtractive mixing, gamut mapping, palettes and
+  gradients;
+* bounded production-rule agents with positive-cost Dijkstra planning,
+  cumulative-salience tie-breaking, execution and inspectable traces;
+* attributed offline corpus of 3,983 Aṣṭādhyāyī sūtra texts, reference/anuvṛtti
+  lookup, generic Māheśvara pratyāhāra expansion and four traced vowel-sandhi
+  implementations;
+* retained Sanskrit UI documents, flow/grid layout, hit testing, accessibility
+  audits and escaped responsive HTML export through the filesystem sandbox;
+* CPU 3-D cube/UV-sphere meshes, Euler transforms, perspective, back-face
+  culling, depth buffering and coloured point lights;
 * premultiplied RGBA canvas, 4×4 AA shapes, glow, aurora, PNG encode/decode with
   CRC checks and HDR tone mapping;
 * easing, cubic Bézier, springs, timelines, flex layout, 2-D AABB physics;
@@ -101,7 +120,7 @@ capability-denial exit code.
   contract; `--present DIR` drives `WebBackend` from a real program; backend
   failures are wrapped as PE5003 and never leak host exceptions into the VM;
 * CLI (`version`, `check`, `run`, `build`, `disasm`, `audit`, `tokens`, `ast`,
-  `bench`, `fuzz`, `test`) with JSON modes and exit codes;
+  `व्याकरण`, `bench`, `fuzz`, `test`) with JSON modes and exit codes;
 * deterministic fuzzers for lexer/parser/artifact/model loaders;
 * PEACOCK-written tokenizer with bootstrap token parity;
 * PEACOCK-written full-grammar parser (stage 2a) with canonical AST-digest parity
@@ -119,7 +138,7 @@ capability-denial exit code.
   architecture, roadmap and status are checked in and cross-linked;
 * research programme: 178-entry bibliography, Sanskrit/Pāṇinian literature and
   verified arXiv metadata, literature review, 18 open
-  questions, 22 ADRs and benchmark methodology;
+  questions, 23 ADRs and benchmark methodology;
 * Linguist package prepared (language entry, TextMate grammar, six compiled
   samples, logo); **not submitted and not recognised by GitHub**;
 * VS Code package prepared (grammar + language configuration); **not published**;
@@ -131,16 +150,26 @@ capability-denial exit code.
 
 * **Language:** no user modules, generics, closures, enums/match, traits,
   concurrency, operator definitions, or first-class functions.
-* **Frontend:** a twelve-route static site is now authored in `.सूत्र` and exported
-  by the actual toolchain; it is not a general UI toolkit. No general widget
-  library, text shaping, native accessibility APIs, 3D, or GPU rasterisation.
+* **Frontend:** the retained UI builder covers static component trees, layout,
+  hit testing, audits and HTML export; the twelve-route site is a separate real
+  `.सूत्र` application. There is no UI event runtime, native text shaping,
+  native accessibility API or window shell. 3-D is CPU mesh/flat-triangle
+  rendering, without GPU rasterisation, smooth normals or textures.
   Motion/physics have no frame scheduler integration.
+* **Grammar:** all 3,983 sūtra texts are available offline, but only generic
+  pratyāhāra expansion, reference inheritance and four vowel-sandhi rules are
+  executable. Declension, conjugation, samāsa, kāraka and complete ordered rule
+  interaction are not implemented; connected literature is a catalogue, not a
+  bundled library of full texts.
 * **Platforms:** the `--present` static frame viewer and `--serve` HTTP frame host
   are reachable from `.सूत्र`; separately, `website/site.सूत्र` produces static
   application pages. There is no input, frame clock or vsync, and the HTTP frame
   host is a development boundary, not a hardened server. No desktop window
   shell, Android, iOS or WASM target.
 * **Models:** one input/output, Dense only, SGD/Adam, small synthetic datasets.
+* **Agents:** deterministic symbolic rules and string state only; no LLM,
+  arbitrary host-tool execution, persistent memory service, network swarm or
+  AGI claim.
 * **Self-hosting:** the PEACOCK tokenizer and full-grammar parser have the
   existing parity evidence; `selfhost/type_model.सूत्र` now provides a broader
   experimental type/expression/scope kernel. The opt-in compiler/CLI shadow
@@ -159,7 +188,10 @@ capability-denial exit code.
 
 * native code generation, typed tensor buffers, GPU kernels;
 * convolution/attention/sequence layers, data pipeline, mixed precision;
-* UI toolkit, text, 3D, image codecs beyond PNG;
+* UI event dispatch, native text shaping/windows/accessibility, GPU 3-D,
+  textures/smooth normals, image codecs beyond PNG;
+* a complete executable Pāṇinian derivation engine and full connected-literature
+  corpus;
 * desktop/Android/iOS/WASM hosts;
 * package manager, formatter, linter, LSP, debugger;
 * AGI research tooling beyond reproducibility and evaluation infrastructure.
@@ -226,12 +258,13 @@ and methodology. See `research/benchmark-methodology.md`.
 
 ## 6. External dependencies
 
-Runtime and tests use only Python 3.11 standard-library modules (`zlib`,
-`hashlib`, `struct`, `unittest`, `http.server`, `urllib`, `json`, `base64`,
-`threading`, `tempfile`, `pathlib`, `math`, `random`). There are no third-party
-packages, no network services, no cloud APIs and no downloaded datasets. The
-spiral dataset is generated locally. PEACOCK source files are UTF-8; `.बीज` and
-`.ज्ञान` artifacts are binary.
+Runtime and tests use only Python 3.11 standard-library modules (including
+`zlib`, `hashlib`, `struct`, `unittest`, `http.server`, `urllib`, `json`,
+`base64`, `threading`, `tempfile`, `pathlib`, `math`, `random`, `heapq`, `html`
+and `unicodedata`). There are no third-party runtime packages, network services
+or cloud APIs. The spiral training dataset is generated locally; the attributed
+Aṣṭādhyāyī text corpus is vendored as package data and used offline. PEACOCK
+source files are UTF-8; `.बीज` and `.ज्ञान` artifacts are binary.
 
 ## 7. Known deviations and limitations
 

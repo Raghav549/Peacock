@@ -1,4 +1,4 @@
-"""Recursive-descent parser for PEACOCK 0.2.
+"""Recursive-descent parser for PEACOCK 0.3.
 
 The grammar implemented here is exactly the grammar in ``SPECIFICATION.md`` §4.
 Features that are reserved for later phases produce targeted diagnostics rather
@@ -56,16 +56,16 @@ from .diagnostics import DiagnosticBag, ParseError, Span
 from .tokens import RESERVED_FUTURE, Token, TokenKind
 
 _FUTURE_MESSAGES = {
-    TokenKind.ENUM: "सूचीभेद declarations are reserved for a future version; 0.2 supports संघटन only",
+    TokenKind.ENUM: "सूचीभेद declarations are reserved for a future version; 0.3 supports संघटन only",
     TokenKind.MATCH: "मिलान expressions are reserved for a future version",
     TokenKind.IMPL: "कार्यान्वयन blocks are reserved for a future version",
-    TokenKind.PUB: "सार्वजनिक visibility modifiers are reserved; all 0.2 declarations are module-local",
+    TokenKind.PUB: "सार्वजनिक visibility modifiers are reserved; all 0.3 declarations are module-local",
     TokenKind.CONST: "स्थिर declarations are reserved for a future version; use 'स्थापय'",
-    TokenKind.IMPORT: "आयात statements are reserved; 0.2 has no file imports",
-    TokenKind.ASYNC: "असामकालिक functions are reserved; 0.2 is single-threaded",
-    TokenKind.AWAIT: "प्रतीक्षा is reserved; 0.2 is single-threaded",
-    TokenKind.SPAWN: "जनय is reserved; concurrency is not implemented in 0.2",
-    TokenKind.YIELD: "उत्पादय is reserved; generators are not implemented in 0.2",
+    TokenKind.IMPORT: "आयात statements are reserved; 0.3 has no file imports",
+    TokenKind.ASYNC: "असामकालिक functions are reserved; 0.3 is single-threaded",
+    TokenKind.AWAIT: "प्रतीक्षा is reserved; 0.3 is single-threaded",
+    TokenKind.SPAWN: "जनय is reserved; concurrency is not implemented in 0.3",
+    TokenKind.YIELD: "उत्पादय is reserved; generators are not implemented in 0.3",
 }
 
 _ITEM_STARTERS = {
@@ -156,7 +156,7 @@ class Parser:
         while not self.at(TokenKind.EOF):
             fut = _FUTURE_MESSAGES.get(self.current.kind)
             if fut is not None:
-                self.diag.error("PE2001", fut, self.current.span, hint="see SPECIFICATION.md §4 for the 0.2 subset")
+                self.diag.error("PE2001", fut, self.current.span, hint="see SPECIFICATION.md §4 for the 0.3 subset")
                 self._advance_any()
                 continue
             try:
@@ -235,7 +235,7 @@ class Parser:
         if self.at(TokenKind.AS):
             self.error(
                 "PE2005",
-                "module aliases ('रूपेण') are not implemented in 0.2",
+                "module aliases ('रूपेण') are not implemented in 0.3",
                 self.current.span,
                 hint="use the canonical namespace name, e.g. 'उपयोग तन्त्रजाल;'",
             )
@@ -309,7 +309,7 @@ class Parser:
                     "PE2010",
                     "expected 'input', 'output' or 'stack' in model body",
                     self.current.span,
-                    hint="model bodies contain only निवेश, निर्गम and क्रम sections in 0.2",
+                    hint="model bodies contain only निवेश, निर्गम and क्रम sections in 0.3",
                 )
         self.expect(TokenKind.RBRACE, "to close model body")
         if not inputs or not outputs:

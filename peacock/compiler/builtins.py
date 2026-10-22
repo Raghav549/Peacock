@@ -52,6 +52,9 @@ CANVAS = T.CanvasType
 MODEL = T.ModelType
 DATASET = T.DatasetType
 RANGE = T.RangeType
+UI = T.UIType
+SCENE3D = T.Scene3DType
+AGENT = T.AgentType
 TENSOR = T.TensorType("Float32", None)
 TENSOR_ANY = T.TensorType("Float32", None)
 
@@ -128,6 +131,11 @@ NATIVES: dict[str, tuple[NativeSignature, ...]] = {
     "colour.luminance": (NativeSignature((_p("color", COLOR),), F),),
     "colour.contrast": (NativeSignature((_p("a", COLOR), _p("b", COLOR)), F),),
     "colour.palette": (NativeSignature((_p("count", I), _p("seed", I)), T.ListType(COLOR)),),
+    "colour.mix_many": (
+        NativeSignature((_p("colors", T.ListType(COLOR)), _p("weights", T.ListType(F)), _p("space", S, "oklab")), COLOR),
+    ),
+    "colour.delta_e": (NativeSignature((_p("a", COLOR), _p("b", COLOR)), F),),
+    "colour.gamut_map": (NativeSignature((_p("color", COLOR),), COLOR),),
     # -- graphics --------------------------------------------------------
     "graphics.canvas": (NativeSignature((_p("width", I), _p("height", I)), CANVAS),),
     "graphics.clear": (NativeSignature((_p("canvas", CANVAS), _p("color", COLOR)), U),),
@@ -266,6 +274,73 @@ NATIVES: dict[str, tuple[NativeSignature, ...]] = {
     "text.ord": (NativeSignature((_p("value", S),), I),),
     "text.chr": (NativeSignature((_p("code", I),), S),),
     "text.split_lines": (NativeSignature((_p("value", S),), T.ListType(S)),),
+    # -- Sanskrit grammar -------------------------------------------------
+    "vyakarana.sutra": (NativeSignature((_p("id", S),), S),),
+    "vyakarana.sutra_count": (NativeSignature((), I),),
+    "vyakarana.search": (NativeSignature((_p("query", S), _p("limit", I, 50)), T.ListType(S)),),
+    "vyakarana.pratyahara": (NativeSignature((_p("name", S),), T.ListType(S)),),
+    "vyakarana.sandhi": (NativeSignature((_p("left", S), _p("right", S)), S),),
+    "vyakarana.sandhi_rule": (NativeSignature((_p("left", S), _p("right", S)), S),),
+    "vyakarana.anuvritti": (NativeSignature((_p("id", S),), T.ListType(S)),),
+    "vyakarana.adhikara_info": (NativeSignature((_p("id", S),), T.ListType(S)),),
+    "vyakarana.literature": (NativeSignature((), T.ListType(S)),),
+    "vyakarana.coverage": (NativeSignature((), I),),
+    # -- native UI builder ------------------------------------------------
+    "ui.create": (NativeSignature((_p("title", S), _p("width", I), _p("height", I), _p("background", COLOR)), UI),),
+    "ui.panel": (
+        NativeSignature((_p("ui", UI), _p("parent", I), _p("x", F), _p("y", F), _p("width", F), _p("height", F), _p("background", COLOR)), I),
+    ),
+    "ui.text": (
+        NativeSignature((_p("ui", UI), _p("parent", I), _p("text", S), _p("x", F), _p("y", F), _p("width", F), _p("height", F), _p("foreground", COLOR), _p("size", F, 18.0)), I),
+    ),
+    "ui.button": (
+        NativeSignature((_p("ui", UI), _p("parent", I), _p("label", S), _p("x", F), _p("y", F), _p("width", F), _p("height", F), _p("background", COLOR), _p("foreground", COLOR)), I),
+    ),
+    "ui.link": (
+        NativeSignature((_p("ui", UI), _p("parent", I), _p("label", S), _p("href", S), _p("x", F), _p("y", F), _p("width", F), _p("height", F), _p("foreground", COLOR), _p("size", F, 18.0)), I),
+    ),
+    "ui.flow": (
+        NativeSignature((_p("ui", UI), _p("parent", I), _p("direction", S, "column"), _p("gap", F, 0.0), _p("padding", F, 0.0)), U),
+    ),
+    "ui.grid": (
+        NativeSignature((_p("ui", UI), _p("parent", I), _p("columns", I, 2), _p("gap", F, 0.0), _p("padding", F, 0.0)), U),
+    ),
+    "ui.bounds": (NativeSignature((_p("ui", UI), _p("node", I)), T.ListType(F)),),
+    "ui.hit_test": (NativeSignature((_p("ui", UI), _p("x", F), _p("y", F)), I),),
+    "ui.audit": (NativeSignature((_p("ui", UI),), T.ListType(S)),),
+    "ui.to_html": (NativeSignature((_p("ui", UI),), S),),
+    "ui.save": (NativeSignature((_p("ui", UI), _p("path", S)), U, capability="fs"),),
+    "ui.node_count": (NativeSignature((_p("ui", UI),), I),),
+    # -- software 3-D -----------------------------------------------------
+    "scene3d.create": (NativeSignature((), SCENE3D),),
+    "scene3d.cube": (
+        NativeSignature((_p("scene", SCENE3D), _p("x", F), _p("y", F), _p("z", F), _p("size", F), _p("color", COLOR)), I),
+    ),
+    "scene3d.sphere": (
+        NativeSignature((_p("scene", SCENE3D), _p("x", F), _p("y", F), _p("z", F), _p("radius", F), _p("color", COLOR), _p("segments", I, 16), _p("rings", I, 8)), I),
+    ),
+    "scene3d.light": (
+        NativeSignature((_p("scene", SCENE3D), _p("x", F), _p("y", F), _p("z", F), _p("color", COLOR), _p("intensity", F, 1.0)), U),
+    ),
+    "scene3d.rotate": (
+        NativeSignature((_p("scene", SCENE3D), _p("node", I), _p("x", F), _p("y", F), _p("z", F)), U),
+    ),
+    "scene3d.render": (
+        NativeSignature((_p("scene", SCENE3D), _p("canvas", CANVAS), _p("yaw", F, 25.0), _p("pitch", F, 15.0), _p("distance", F, 6.0), _p("fov", F, 50.0)), U),
+    ),
+    "scene3d.triangle_count": (NativeSignature((_p("scene", SCENE3D),), I),),
+    # -- bounded native agents --------------------------------------------
+    "agent.create": (NativeSignature((_p("goal_key", S), _p("goal_value", S), _p("max_steps", I, 64)), AGENT),),
+    "agent.fact": (NativeSignature((_p("agent", AGENT), _p("key", S), _p("value", S)), U),),
+    "agent.rule": (
+        NativeSignature((_p("agent", AGENT), _p("when_key", S), _p("when_value", S), _p("action", S), _p("set_key", S), _p("set_value", S), _p("priority", F, 0.0), _p("cost", F, 1.0)), I),
+    ),
+    "agent.plan": (NativeSignature((_p("agent", AGENT),), T.ListType(S), capability="compute"),),
+    "agent.run": (NativeSignature((_p("agent", AGENT),), T.ListType(S), capability="compute"),),
+    "agent.get": (NativeSignature((_p("agent", AGENT), _p("key", S)), S),),
+    "agent.status": (NativeSignature((_p("agent", AGENT),), S),),
+    "agent.trace": (NativeSignature((_p("agent", AGENT),), T.ListType(S)),),
+    "agent.facts": (NativeSignature((_p("agent", AGENT),), T.ListType(S)),),
     # -- motion ----------------------------------------------------------
     "motion.spring_steps": (
         NativeSignature(
@@ -348,6 +423,53 @@ NATIVE_DOCS: dict[str, str] = {
     "math.min": "Smaller of two Floats.",
     "math.max": "Larger of two Floats.",
     "math.clamp": "Clamp x into [low, high].",
+    # advanced colour
+    "colour.mix_many": "Mix weighted colours in Oklab, Oklch, linear sRGB, encoded sRGB or approximate subtractive mode.",
+    "colour.delta_e": "CIEDE2000 perceptual colour difference in CIELAB/D65.",
+    "colour.gamut_map": "Reduce Oklch chroma until a colour fits sRGB.",
+    # Sanskrit grammar
+    "vyakarana.sutra": "Return one of all 3,983 attributed Aṣṭādhyāyī sūtra texts by numeric ID.",
+    "vyakarana.sutra_count": "Number of sūtra texts in the local complete text corpus (3,983).",
+    "vyakarana.search": "Search sūtra IDs, Devanagari text and labels with a bounded result limit.",
+    "vyakarana.pratyahara": "Expand a Māheśvara pratyāhāra into Devanagari sounds.",
+    "vyakarana.sandhi": "Apply the tested deterministic vowel-boundary sandhi rules to two words.",
+    "vyakarana.sandhi_rule": "Return the exact sūtra ID used by the vowel-sandhi engine.",
+    "vyakarana.anuvritti": "Return inherited anuvṛtti terms and source sūtra references.",
+    "vyakarana.adhikara_info": "Return adhikāra terms and source sūtra references.",
+    "vyakarana.literature": "List connected literature and whether it is local text or catalogue-only.",
+    "vyakarana.coverage": "Number of explicitly executable sandhi rule IDs; separate from text coverage.",
+    # native UI
+    "ui.create": "Create a retained-mode Sanskrit-capable UI document.",
+    "ui.panel": "Add a panel/container and return its integer node ID.",
+    "ui.text": "Add a Unicode text node with explicit bounds and style.",
+    "ui.button": "Add a semantic button preview node and return its ID.",
+    "ui.link": "Add a safe relative/http/https/mailto link node.",
+    "ui.flow": "Lay out children in a Sanskrit-named row or column flow.",
+    "ui.grid": "Lay out children in a bounded equal-column grid.",
+    "ui.bounds": "Return absolute x, y, width and height for a UI node.",
+    "ui.hit_test": "Return the topmost node at a point, or -1.",
+    "ui.audit": "Audit overflow, empty labels, WCAG contrast and 44px touch targets.",
+    "ui.to_html": "Export a responsive accessible script-free HTML document.",
+    "ui.save": "Write the exported UI HTML inside the fs sandbox.",
+    "ui.node_count": "Number of UI nodes including the document root.",
+    # 3-D
+    "scene3d.create": "Create an empty software-rendered 3-D scene.",
+    "scene3d.cube": "Add a cube mesh with position, size and linear colour material.",
+    "scene3d.sphere": "Add a bounded UV-sphere mesh.",
+    "scene3d.light": "Add one of at most 16 coloured point lights.",
+    "scene3d.rotate": "Set object Euler rotation in the documented X/Y/Z order.",
+    "scene3d.render": "Perspective-render a scene into a canvas with a depth buffer.",
+    "scene3d.triangle_count": "Total mesh triangle count before camera culling.",
+    # agents
+    "agent.create": "Create a bounded string-blackboard production-rule agent with a goal.",
+    "agent.fact": "Set an inspectable agent blackboard fact.",
+    "agent.rule": "Add a condition/action/effect rule with salience and positive planning cost.",
+    "agent.plan": "Find a minimum-cost bounded action plan with Dijkstra search. Requires compute.",
+    "agent.run": "Plan and execute actions, recording an inspectable trace. Requires compute.",
+    "agent.get": "Read one blackboard fact; missing facts are errors.",
+    "agent.status": "Return सज्ज, सिद्ध or स्थगित; never an AGI claim.",
+    "agent.trace": "Return detailed executed action/effect records.",
+    "agent.facts": "Return sorted key=value blackboard entries.",
     # motion
     "motion.ease": "Evaluate a named easing curve at t in [0, 1].",
     "motion.spring_steps": "Simulate a damped spring and return step samples.",

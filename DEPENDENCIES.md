@@ -1,6 +1,6 @@
 # Dependencies and bootstrap boundary
 
-Status audited 2026-10-17. This file distinguishes dependencies needed to build
+Status audited 2026-10-22. This file distinguishes dependencies needed to build
 or run the current implementation from tools required only for optional
 platform work. No external service or paid compute is required for the current
 core workflow.
@@ -9,13 +9,15 @@ core workflow.
 
 | Dependency | Required? | Purpose / policy |
 |---|---|---|
-| Python 3.11+ | Yes, current toolchain | Temporary bootstrap compiler, CLI, VM, standard library natives, tensor engine, frontend and tests. This is a genuine language implementation written in Python, not `.सूत्र` source. |
+| Python 3.11+ | Yes, current toolchain | Temporary bootstrap compiler, CLI, VM, standard library natives, tensor/agent engines, grammar library, frontend and tests. This is a genuine language implementation written in Python, not `.सूत्र` source. |
 | Python standard library | Yes | `argparse`, `json`, `hashlib`, `struct`, `zlib`, `http.server`, `unittest`, `math`, `random`, `pathlib`, and related modules. No third-party runtime package is declared. |
 | setuptools >= 61 | Build backend | `pyproject.toml` build-system requirement, used when installing a Python package. Running `./bin/peacock` itself uses Python directly. |
 | pytest | No | Not declared; the test suite uses `unittest`. The audit environment did not have pytest installed. |
 
 `pyproject.toml` has `dependencies = []`. No NumPy, PyTorch, TensorFlow, LLVM,
-React, Flutter or downloaded model/dataset is required by the current core.
+React, Flutter, downloaded model or external training dataset is required by the
+current core. The attributed Aṣṭādhyāyī sūtra corpus is vendored package data,
+not a runtime download; its provenance is recorded under `peacock/vyakarana/data/`.
 
 ## Current migration state
 
@@ -42,7 +44,8 @@ implementations:
 - semantic analysis, name resolution and the production type model;
 - IR construction, verification, optimization, bytecode emission and artifact handling;
 - VM, host policy, native dispatch and standard-library implementation;
-- tensor/autodiff/training/serialization and frontend/platform libraries;
+- tensor/autodiff/training/serialization, bounded-agent and grammar libraries;
+- colour, 2-D/CPU-3-D, retained-UI and platform libraries;
 - CLI, packaging and test runner.
 
 Migration policy: add a `.सूत्र` implementation behind a stable contract, build a
@@ -71,12 +74,16 @@ conditional and must be separately documented and version-pinned before use:
 ## Installation and reproducibility
 
 Current direct run: Python 3.11+ and `./bin/peacock <command>`. For package
-installation, use `python -m pip install .` in an isolated environment; this
-installation path has not been validated in the audit and is not yet a released
-binary distribution. No lockfile is applicable while runtime dependencies are
-empty. Platform-specific dependencies must not be added to the core requirement
-set unless the implementation genuinely imports them and has tests/build
-coverage.
+installation, use `python -m pip install .` in an isolated environment. On
+2026-10-22, `pip wheel . --no-deps --no-build-isolation` produced
+`peacock_ai-0.3.0-py3-none-any.whl` (287,956 bytes); its 66 members included the
+native engines, 1,321,310-byte sūtra corpus, literature catalogue and provenance.
+A temporary `--target` installation outside the checkout passed `version`,
+3,983/4 coverage and `रामेन्द्रः` sandhi smoke tests. This validates the local
+wheel path, not a published release or every platform. No lockfile is applicable
+while runtime dependencies are empty. Platform-specific dependencies must not be
+added to the core requirement set unless the implementation genuinely imports
+them and has tests/build coverage.
 
 ## Dependency reduction milestones
 

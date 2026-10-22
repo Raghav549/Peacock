@@ -23,7 +23,7 @@ Three layers, all required:
 ./bin/peacock run app.सूत्र --grant सञ्चय   # host grants authority
 ```
 
-Capabilities in 0.2: `गणना`, `सञ्चय`, `दृश्य`.
+Capabilities in 0.3: `गणना`, `सञ्चय`, `दृश्य`.
 
 ```bash
 ./bin/peacock run app.सूत्र --grant दृश्य --present out/preview   # frames on disk

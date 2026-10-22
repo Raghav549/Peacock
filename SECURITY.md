@@ -5,7 +5,7 @@ document states what is enforced, what is not, and how to report a problem.
 
 ## Supported version
 
-Security fixes target the current `0.2.x` reference implementation. There is no
+Security fixes target the current `0.3.x` reference implementation. There is no
 long-term-support branch yet.
 
 ## Reporting a vulnerability
@@ -26,13 +26,13 @@ coordinate disclosure.
 
 ### Capabilities
 
-Three capabilities exist in v0.2:
+Three capabilities exist in v0.3:
 
 | Capability | Authority |
 |---|---|
 | `गणना` | create trainable tensors, autodiff, model init/train/predict, save/load |
 | `सञ्चय` | read/write files and create directories inside the host sandbox root |
-| `दृश्य` | hand rendered frames to a host-attached presentation backend |
+| `दृश्य` | hand rendered 2D/3D frames to a host-attached presentation backend |
 
 A program must **declare** a capability in each function that performs a
 protected operation. The host must **independently grant** it. Declaration is not
@@ -82,7 +82,11 @@ The host enforces:
 Steps, depth, output, tensor, dataset and epoch limits raise `PE4003` and are not
 catchable. Some library-level limits (canvas dimensions/pixels) raise faults
 inside natives and are catchable; they do not allow allocating beyond the stated
-limits.
+limits. Agent rules, state size and planning expansions are bounded and require
+`गणना`; UI node counts, grid columns and text/HTML sizes are bounded; 3-D mesh
+resolution, light counts, triangle work and canvas dimensions are bounded. These
+are implementation guards, not a complete host-memory quota. Grammar corpus,
+search and pratyāhāra operations are offline and need no capability.
 
 ### Artifacts and models
 
@@ -101,7 +105,7 @@ not a formally verified parser.
 
 Integer arithmetic is checked; overflow is a fault, not wraparound. Division and
 remainder by zero are faults. Bounds are checked. Uninitialised locals are
-faults. There is **no language-level garbage collector** in 0.2; the Python host
+faults. There is **no language-level garbage collector** in 0.3; the Python host
 owns memory and cycles are not collected. A program can still consume host
 memory within the tensor/canvas limits; step and element budgets are the primary
 mitigations.
@@ -122,8 +126,12 @@ mitigations.
   authentication, TLS or multi-tenant isolation, binds to `127.0.0.1` by default,
   and should be placed behind a hardened proxy if exposed. `--linger -1` keeps it
   running after the program ends, so it must be stopped deliberately.
-* The web viewer is static HTML with no JavaScript; it does not execute program
-  code in the browser.
+* The web viewer and `दृश्य` UI export are static HTML with no JavaScript. UI
+  text/attributes are escaped and link schemes are restricted; exported HTML is
+  still data for the browser, not a native accessibility or windowing sandbox.
+* `दृश्य.रक्ष` and 3-D output through `चित्र.रक्ष` use the same `सञ्चय`-gated
+  `HostPolicy.write_bytes` sandbox as other file writes; they do not open paths
+  directly.
 
 ## Out of scope / not guaranteed
 

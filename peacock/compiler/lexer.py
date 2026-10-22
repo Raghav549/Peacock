@@ -138,7 +138,7 @@ class Lexer:
             if ch in "&|":
                 self.diag.error(
                     "PE1003",
-                    f"bitwise/logical operator {ch!r} is not part of PEACOCK 0.2",
+                    f"bitwise/logical operator {ch!r} is not part of PEACOCK 0.3",
                     self._span_from(start, line, col),
                     hint="use the keywords 'तथा' and 'वा' for boolean logic",
                 )
@@ -151,14 +151,14 @@ class Lexer:
             elif ch == "=" and self._peek(1) == ">":
                 self.diag.error(
                     "PE1005",
-                    "match arms ('=>') are reserved but match expressions are not implemented in 0.2",
+                    "match arms ('=>') are reserved but match expressions are not implemented in 0.3",
                     self._span_from(start, line, col),
                 )
                 self._advance()
                 self._advance()
                 continue
             elif ch == "@":
-                self.diag.error("PE1006", "decorators ('@') are not part of PEACOCK 0.2", self._span_from(start, line, col))
+                self.diag.error("PE1006", "decorators ('@') are not part of PEACOCK 0.3", self._span_from(start, line, col))
             else:
                 self.diag.error(
                     "PE1002",
@@ -214,7 +214,7 @@ class Lexer:
                 "PE1007",
                 f"English source word '{normalised}' is not accepted; use Sanskrit '{legacy_replacement}'",
                 span,
-                hint="PEACOCK 0.2 has one native Sanskrit source language, not an English compatibility dialect",
+                hint="PEACOCK has one native Sanskrit source language, not an English compatibility dialect",
             )
         # Standard Sanskrit names canonicalise to stable internal identifiers;
         # all user-defined Unicode names retain their NFC spelling.

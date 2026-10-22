@@ -1,0 +1,19 @@
+[
+  {"name":"अष्टाध्यायी","path":"sutraani","local":"complete sūtra text corpus"},
+  {"name":"काशिका","path":"sutraani/kashika.txt","local":"catalogue only"},
+  {"name":"महाभाष्य","path":"mahabhashyam","local":"catalogue only"},
+  {"name":"सिद्धान्तकौमुदी","path":"sutraani/kaumudi.txt","local":"catalogue only"},
+  {"name":"लघुसिद्धान्तकौमुदी","path":"sutraani/laghukaumudi.txt","local":"catalogue only"},
+  {"name":"बालमनोरमा","path":"sutraani/balamanorama.txt","local":"catalogue only"},
+  {"name":"तत्त्वबोधिनी","path":"sutraani/tattvabodhini.txt","local":"catalogue only"},
+  {"name":"न्यास","path":"sutraani/nyaas.txt","local":"catalogue only"},
+  {"name":"पदमञ्जरी","path":"sutraani/padamanjari.txt","local":"catalogue only"},
+  {"name":"परिभाषेन्दुशेखर","path":"paribhashendushekhar","local":"catalogue only"},
+  {"name":"वाक्यपदीय","path":"vakyapadeeyam","local":"catalogue only"},
+  {"name":"धातुपाठ","path":"dhatu","local":"catalogue only"},
+  {"name":"गणपाठ","path":"ganapath","local":"catalogue only"},
+  {"name":"उणादिसूत्र","path":"unaadi","local":"catalogue only"},
+  {"name":"लिङ्गानुशासन","path":"linganushasanam","local":"catalogue only"},
+  {"name":"शिक्षा","path":"shiksha","local":"catalogue only"},
+  {"name":"तर्कसङ्ग्रह","path":"tarkasangraha","local":"catalogue only"}
+]

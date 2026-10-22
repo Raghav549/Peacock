@@ -1,6 +1,6 @@
 # Sanskrit-native grammar and literary foundations
 
-This document explains the linguistic design of PEACOCK 0.2. The
+This document explains the linguistic design of PEACOCK 0.3. The
 [normative specification](../../SPECIFICATION.md) remains the complete authority
 for EBNF, types, evaluation, capabilities, diagnostics, and runtime limits. This
 document supplies the vocabulary rationale, the relationship to Sanskrit
@@ -126,7 +126,10 @@ Algorithm values are native words too: activations include `रैखिक`,
 
 These are deliberately finite lexical rules. They do not invoke sandhi,
 lemmatisation, morphology, or an AI model, so compilation remains deterministic
-and works offline.
+and works offline. A separate native `व्याकरण` library now provides offline
+corpus lookup, pratyāhāra expansion and four explicit two-boundary vowel-sandhi
+rules; it is not part of tokenisation and does not make the compiler a general
+Sanskrit NLP system. See [vyakarana.md](vyakarana.md).
 
 ## 4. Pāṇinian design principles, with exact limits
 
@@ -278,10 +281,11 @@ The compiler is **not yet self-hosting**, and the Python bootstrap is still an
 external development dependency.
 
 The native AI substrate includes dense tensors, broadcasting, reverse-mode
-autodiff, model/training declarations, seeded optimisation, evaluation, and
-versioned model serialisation. Sanskrit `kāraka`-inspired agent structures,
-transformer architectures, tool-using agents, Sanskrit NLP integration, and AGI
-are research directions unless separately implemented and tested. In
+autodiff, model/training declarations, seeded optimisation, evaluation,
+versioned model serialisation, and bounded symbolic agents with explicit rules,
+plans and traces. Sanskrit `kāraka`-inspired semantic structures, transformer
+architectures, LLM/tool-using agents, broader Sanskrit NLP integration, and AGI
+remain research directions unless separately implemented and tested. In
 particular, none of the grammatical sources or papers above establishes an AGI
 capability, and PEACOCK does not claim one.
 

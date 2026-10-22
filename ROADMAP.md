@@ -73,7 +73,10 @@ memory accounting and collection, deterministic scheduling.
 
 Deliverables: tensor engine with broadcasting and reverse-mode autodiff, Dense
 layers, SGD/Adam, cross-entropy/MSE, XOR and spiral datasets, training reports,
-evaluation metrics, `.ज्ञान` serialisation and int8 quantisation.
+evaluation metrics, `.ज्ञान` serialisation and int8 quantisation. Phase 4 also
+has a bounded symbolic-agent library: string blackboards, condition/action/
+effect rules, positive-cost Dijkstra planning, salience tie-breaking, execution
+and traces, gated by `गणना`. It has no hidden host tools or network access.
 
 Acceptance criteria:
 
@@ -84,26 +87,31 @@ Acceptance criteria:
 
 Planned: convolution/attention layers, embedding/sequence APIs, data loading,
 mixed precision, larger models, CPU performance work, GPU backends (blocked on
-interface design and hardware availability).
+interface design and hardware availability). Agent follow-up requires explicit
+capability-audited tool interfaces, persistent blackboards, plan monitoring and
+evaluation; none of that is an AGI claim.
 
 ## Phase 5 — Frontend, colour and UI — **partial**
 
 Delivered: perceptual colour pipeline (sRGB/XYZ/CIELAB/Oklab/Oklch, WCAG,
-palettes, mixing), software RGBA canvas with anti-aliasing, gradients, glow,
-aurora, PNG encode/decode and flex layout. A separate app-specific static
-website (`website/site.सूत्र`) now defines twelve routes/components and exports
-semantic HTML, responsive CSS and SVG through the actual CLI/compiler/VM; it is
-covered by route/link/structure/source/CSS integration checks. It is not a
-reusable UI toolkit or the frame `WebBackend`.
+CIEDE2000, weighted/perceptual/polar/approximate-subtractive mixing, gamut
+mapping), software RGBA canvas, PNG, flex layout, and a reusable retained UI
+library with panels/text/buttons/links, flow/grid layout, hit testing,
+accessibility audits and escaped responsive HTML. A separate app-specific static
+website still exports twelve routes through the real toolchain. Phase 5 also
+includes CPU 3-D cube/UV-sphere meshes, Euler transforms, perspective,
+back-face culling, reciprocal-depth buffering and coloured point lights.
 
-Acceptance criteria met: colour reference values, palette determinism, PNG
-round-trip and CRC rejection, canvas size limits, layout arithmetic, and the
-website export's tested static routes and structural properties.
+Acceptance criteria met: colour reference values, CIEDE2000 vectors, mixing and
+gamut tests, UI layout/hit-test/audit/HTML tests, 3-D geometry/depth/light tests,
+real `.सूत्र` UI/3-D exports, PNG round-trip/CRC rejection and website routes.
 
-Still required before "UI toolkit": a reusable general-purpose widget system,
-text measurement/shaping, interactive input/event routing, integration with
-native accessibility APIs, theming and image decoding beyond our PNG. Browser
-layout uses HTML/CSS; there is no general PEACOCK browser event/runtime.
+Still required before a complete interactive UI/3-D platform: text measurement
+and shaping, input/event routing, native accessibility/window integration,
+theming, image decoding beyond PNG, smooth mesh normals, textures and GPU
+backends. Browser layout uses HTML/CSS; there is no general PEACOCK browser
+event/runtime. The subtractive colour mode is an approximation, not spectral
+paint simulation.
 
 ## Phase 6 — Motion and physics — **partial**
 
@@ -166,7 +174,7 @@ path.
 ## Phase 9 — Self-hosting — **partial**
 
 Delivered: `selfhost/tokenizer.सूत्र` with token parity, and
-`selfhost/parser.सूत्र` (1,131 lines) covering the full 0.2 grammar, including
+`selfhost/parser.सूत्र` (1,132 lines) covering the full 0.3 grammar, including
 model/training declarations. The parser produces a canonical AST digest that is
 byte-identical to the bootstrap parser on its 14-file core corpus (seven
 examples, six Linguist samples and a syntax fixture), plus self-parse. This
@@ -217,6 +225,29 @@ Acceptance criteria:
 * every experiment records seeds, data provenance, code revision and environment;
 * no benchmark or capability claim is made without a reproducible artifact.
 
+## Phase 11 — Sanskrit grammar and connected literature — **partial**
+
+Delivered: an attributed, offline package of all 3,983 Aṣṭādhyāyī sūtra texts;
+validated lookup/search, inheritance references and anuvṛtti display; generic
+Māheśvara pratyāhāra expansion; four executable vowel-sandhi rules with rule
+IDs; coverage reporting; native `.सूत्र` calls and a Sanskrit CLI. Provenance and
+the distinction between textual and executable coverage are recorded in
+`peacock/vyakarana/data/` and `docs/language/vyakarana.md`.
+
+Still required: a rule representation for environments, transformations and
+anuvṛtti; ordered interaction and conflict resolution; derivation traces;
+declension, conjugation, samāsa and kāraka; broader sandhi including consonants
+and visarga; segmentation with explicit ambiguity; and independently licensed,
+validated connected-literature corpora. Catalogue entries for the Mahābhāṣya,
+Kāśikāvṛtti, Dhātupāṭha, Gaṇapāṭha, Vākyapadīya and related works are not full
+texts or executable semantics.
+
+Acceptance criteria for broader coverage: each rule family cites its source,
+has positive and negative derivation tests, reports ambiguity rather than
+inventing certainty, and has a published coverage denominator. “Complete
+Pāṇini” requires the whole ordered rule system and regression corpus—not merely
+3,983 searchable strings.
+
 ---
 
 ## Cross-cutting dependencies
@@ -232,17 +263,27 @@ Phase 0 ─► Phase 1 ─► Phase 2 ─► Phase 3 ─┬─► Phase 4 ─►
 Phase 9 depends on a stable language and bytecode format (Phases 1–3). Phase 8
 can proceed in parallel with Phase 9 but must not fork semantics. Phase 10 waits
 for the packaging and experiment infrastructure that Phases 3–4 make possible.
+Phase 11 builds on the stable Sanskrit lexer and native-call/capability boundary
+from Phases 1–3; it does not wait for self-hosting or native code generation.
 
-## Next three priorities
+## Next priorities
 
-1. **Complete parser-stage parity**: error recovery, bootstrap `PE2xxx`
+1. **Deepen executable grammar coverage**: design cited rule environments,
+   transformations, inheritance and ordered interaction; keep textual and
+   executable coverage metrics separate and add derivation regressions first.
+2. **Make the UI runtime interactive**: define capability-safe input/events,
+   text measurement/shaping and native host accessibility contracts without
+   weakening the static HTML builder.
+3. **Add audited agent tools**: explicit typed tool descriptions, host grants,
+   timeouts, traces and evaluation; no implicit network or shell authority.
+4. **Complete parser-stage parity**: error recovery, bootstrap `PE2xxx`
    diagnostic/span parity on a fixed negative corpus, and a typed AST
    representation; keep the existing parser oracle tests intact.
-2. **Close the semantic shadow gap incrementally**: broaden differential edge
+5. **Close the semantic shadow gap incrementally**: broaden differential edge
    cases and diagnostics while Python remains authoritative, then port the next
    supported semantic domains only behind measured parity gates. Do not promote
    the shadow kernel to production.
-3. **Specify the next compiler representation** (AST → typed IR → bytecode) and
+6. **Specify the next compiler representation** (AST → typed IR → bytecode) and
    define deterministic differential fixtures before implementing stage 4; the
    existing VM/platform presentation path already works, and native/WASM targets
    remain planned rather than claimed.

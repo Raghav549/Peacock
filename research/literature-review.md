@@ -54,7 +54,7 @@ than an inferred one with unclear failure modes.
 **Garbage collection.** The runtime currently relies on the host's memory
 management. The literature on tracing, generational and real-time collectors
 [wilson1992gc], [ungar1984generation], [jones2011gc], [bacon2004unified] defines
-what a native runtime will need. There is no PEACOCK GC in 0.2; cycles are not
+what a native runtime will need. There is no PEACOCK GC in 0.3; cycles are not
 collected, and memory is bounded by host limits and tensor/canvas budgets.
 
 **Self-hosting.** The staged plan (tokenizer → parser → semantic analyser → IR
@@ -142,7 +142,7 @@ residual networks [he2016deep], recurrent networks and LSTM [elman1990finding],
 [hochreiter1997lstm], attention and transformers [bahdanau2014neural],
 [vaswani2017attention], generative models [kingma2014auto],
 [goodfellow2014generative], [ho2020denoising] — informs the roadmap. **None of
-these architectures is implemented in v0.2.** The engine supports Dense layers
+these architectures is implemented in v0.3.** The engine supports Dense layers
 with linear/ReLU/sigmoid/tanh/softmax activations, MSE and cross-entropy, SGD
 with momentum and Adam. Claiming "AI-native" does not mean claiming a transformer
 implementation.
@@ -180,21 +180,30 @@ interpolation conventions. Poynton [poynton2012digital] supplies the video/trans
 background; ITU-R BT.709 [itu709] defines the primaries used by sRGB.
 
 Implemented: sRGB↔linear, XYZ (D65), Lab, Oklab, Oklch, WCAG relative luminance
-and contrast, Oklab mixing, lighten/darken, hue rotation, palettes, LUT
-gradients, gamut checks and clipping. Not implemented: ICC profiles, chromatic
-adaptation beyond D65, spectral rendering, colour appearance models such as
-CIECAM02, or display calibration. Documented reference values and tolerances are
-in the tests.
+and contrast, CIEDE2000, weighted linear/Oklab/Oklch/sRGB mixing, circular hue
+means, approximate three-channel subtractive mixing, Oklch chroma-reduction
+gamut mapping, palettes and LUT gradients. Not implemented: ICC profiles,
+chromatic adaptation beyond D65, spectral rendering, measured paint/Kubelka–Munk
+mixing, colour appearance models such as CIECAM02, or display calibration.
+Documented reference values and tolerances are in the tests.
 
 ## 7. Raster graphics and imaging
 
 Compositing follows Porter–Duff [porter1984compositing]; anti-aliasing follows
 the classical coverage/supersampling discussion [crow1977aliasing]; physically
-based rendering [pharr2023pbr] informs the linear-light pipeline, though PEACOCK
-implements only 2-D source-over. The rasteriser uses 4×4 coverage samples for
-rectangles, circles and lines; gradients are evaluated in Oklab. PNG encoding is
+based rendering [pharr2023pbr] informs the linear-light pipeline, though the
+2-D compositor implements only source-over and the 3-D renderer uses simple
+point-light shading rather than a physical BSDF. The rasteriser uses 4×4
+coverage samples for rectangles, circles and lines; gradients are evaluated in
+Oklab. PNG encoding is
 implemented against the W3C specification [pngspec] using zlib [rfc1950],
 [rfc1951], with a validating decoder.
+
+The independent CPU 3-D path implements cube/UV-sphere meshes, Euler transforms,
+perspective projection, back-face culling, reciprocal-depth buffering and coloured
+point lights. It is deterministic and tested with geometry, occlusion, lighting
+and real PNG-export cases; it does not claim a GPU, path tracer or physically
+based material system.
 
 Procedural aurora imagery uses fBm built from value noise inspired by Perlin
 [perlin1985image], [perlin2002improving]; it is explicitly artistic, not a
@@ -202,8 +211,9 @@ physical model of atmospheric emission. Tone mapping uses a documented ACES
 approximation [narkowicz2016aces] or clipping; the photographic operator
 [reinhard2002photographic] is background, not implemented.
 
-There is no path tracer, no 3-D pipeline, no GPU, no text shaping, no vector
-path rasteriser, no colour management and no image formats other than RGBA8 PNG.
+There is no path tracer, GPU backend, smooth-normal/texture pipeline, text
+shaping, vector path rasteriser, colour management or image format other than
+RGBA8 PNG.
 The performance numbers in `benchmarks/reference-machine.json` reflect a Python
 loop, not a graphics engine.
 
@@ -221,9 +231,11 @@ game-physics literature [eberly2010game], [catto2009modeling], [box2d]; there ar
 no rotations, joints, continuous collision detection, broadphase or constraints.
 
 Layout implements one-pass row/column stacks with grow factors, gaps, padding and
-overflow reporting. CSS Flexbox [cssflexbox] is the reference point, but this is
-not a CSS implementation; Cassowary-style constraint solving [badros2001cassowary]
-is not used.
+overflow reporting. The retained UI library adds flow/equal-column grid layout,
+absolute hit testing, accessibility audits and escaped responsive HTML export.
+CSS Flexbox [cssflexbox] is a reference point, but this is not a CSS implementation;
+Cassowary-style constraint solving [badros2001cassowary], browser event dispatch
+and native text shaping are not used.
 
 ## 9. Benchmarking and empirical method
 
@@ -244,7 +256,7 @@ model loaders, but no coverage-guided fuzzer and no mutation score.
 
 ## 10. Sanskrit grammar, native vocabulary, and language technology
 
-PEACOCK 0.2 uses Sanskrit as its actual reserved source vocabulary rather than
+PEACOCK 0.3 uses Sanskrit as its actual reserved source vocabulary rather than
 as a file-extension label. The linguistic design is documented with the original
 sūtra numbers in [`../docs/language/sanskrit.md`](../docs/language/sanskrit.md).
 The strongest transferable ideas are exact technical designation (`saṃjñā`),
@@ -279,7 +291,12 @@ rather than automatic borrowing of English computing vocabulary
 
 The implementation consequence is deliberately strict: Unicode NFC identifiers,
 explicit combining-mark handling, Unicode decimal digits, one auditable Sanskrit
-lexicon, and no probabilistic tokenisation or automatic sandhi splitting.
+lexicon, and no probabilistic tokenisation or automatic sandhi splitting. The
+native `व्याकरण` package now adds all 3,983 attributed sūtra texts, reference/
+anuvṛtti lookup, generic Māheśvara pratyāhāra expansion and four traced vowel-
+sandhi implementations. These are working deterministic operations, not an
+implementation of the neural segmentation systems or the complete ordered
+Pāṇinian rule/interaction model described above.
 
 ## 11. AGI research tooling and safety
 
@@ -293,13 +310,14 @@ Evaluation design draws on the measurement-of-intelligence debate
 ReAct [yao2022react], tool use [schick2023toolformer], retrieval [lewis2020retrieval])
 is roadmap material.
 
-**What exists in v0.2:** deterministic datasets, seeded training, evaluation
-metrics, training reports with provenance, and model save/load. That is a
-reproducible experiment substrate for small models. It is not an AGI system, an
-agent framework, a reward-model trainer, an interpretability toolkit or an
-alignment benchmark. The project should not use the phrase "AGI research tooling"
-in the present tense until the phase-10 acceptance criteria in
-[`../ROADMAP.md`](../ROADMAP.md) are met.
+**What exists in v0.3:** deterministic datasets, seeded training, evaluation
+metrics, training reports with provenance, model save/load, and a bounded
+production-rule agent planner/executor with explicit traces. That is a
+reproducible experiment substrate for small models and symbolic plans. It is not
+an AGI system, an LLM/ReAct agent, an arbitrary tool-use framework, a reward-model
+trainer, an interpretability toolkit or an alignment benchmark. The project
+should not use the phrase "AGI research tooling" in the present tense until the
+phase-10 acceptance criteria in [`../ROADMAP.md`](../ROADMAP.md) are met.
 
 Self-improvement ideas such as Gödel machines [schmidhuber2006godel] and universal
 intelligence [hutter2005universal] are background for framing; no implementation

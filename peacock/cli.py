@@ -535,8 +535,54 @@ def cmd_ast(argv: list[str]) -> int:
     return EXIT_OK
 
 
+def cmd_vyakarana(argv: list[str]) -> int:
+    """Use the native Sanskrit corpus and executable grammar tools."""
+
+    from peacock.vyakarana import (
+        EXPECTED_SUTRAS, EXECUTABLE_RULE_IDS, CorpusError, PratyaharaError,
+        SandhiError, expand, get_sutra, join, literature, search,
+    )
+
+    parser = argparse.ArgumentParser(prog="peacock व्याकरण")
+    operations = parser.add_subparsers(dest="operation", required=True)
+    sutra = operations.add_parser("सूत्र")
+    sutra.add_argument("id")
+    lookup = operations.add_parser("अन्वेषय")
+    lookup.add_argument("query")
+    lookup.add_argument("--अवधि", type=int, default=50)
+    pratyahara = operations.add_parser("प्रत्याहार")
+    pratyahara.add_argument("name")
+    sandhi = operations.add_parser("संधि")
+    sandhi.add_argument("left")
+    sandhi.add_argument("right")
+    operations.add_parser("साहित्य")
+    operations.add_parser("आच्छादन")
+    args = parser.parse_args(argv)
+    try:
+        if args.operation == "सूत्र":
+            print(get_sutra(args.id).display())
+        elif args.operation == "अन्वेषय":
+            for result in search(args.query, args.अवधि):
+                print(result.display())
+        elif args.operation == "प्रत्याहार":
+            print(" ".join(expand(args.name)))
+        elif args.operation == "संधि":
+            result = join(args.left, args.right)
+            print(f"{result.text} — {result.rule_id} {result.rule_name}")
+        elif args.operation == "साहित्य":
+            for row in literature():
+                print(row)
+        elif args.operation == "आच्छादन":
+            print(f"sūtra texts: {EXPECTED_SUTRAS}")
+            print(f"executable sandhi rules: {len(EXECUTABLE_RULE_IDS)} ({', '.join(sorted(EXECUTABLE_RULE_IDS))})")
+    except (CorpusError, PratyaharaError, SandhiError) as exc:
+        raise CLIError(str(exc), EXIT_DIAGNOSTICS) from exc
+    return EXIT_OK
+
+
 COMMANDS = {
     "version": cmd_version,
+    "व्याकरण": cmd_vyakarana,
     "check": cmd_check,
     "run": cmd_run,
     "build": cmd_build,
@@ -559,6 +605,7 @@ commands:
   build <file.सूत्र>          write a .बीज bytecode artifact
   disasm <file>             disassemble a source file or artifact
   audit <file.सूत्र>          static capability audit
+  व्याकरण <operation>        sūtra lookup, search, pratyāhāra and sandhi
   tokens <file.सूत्र>         dump the token stream (debugging)
   ast <file.सूत्र>            dump the syntax tree (debugging)
   bench                     run the reproducible benchmark suite
@@ -566,9 +613,9 @@ commands:
   test                      run the unit/integration test suite
   version                   print versions and status
 
-Run options: --grant fs,compute,ui  --root DIR  --max-steps N  --json  --report FILE
+Run options: --grant सञ्चय,गणना,दृश्य  --root DIR  --max-steps N  --json  --report FILE
              --present DIR | --serve PORT [--serve-host ADDR] [--linger SECONDS]
-Program arguments: peacock run app.सूत्र --grant fs -- arg1 arg2
+Program arguments: peacock run app.सूत्र --grant सञ्चय -- arg1 arg2
 """
 
 
