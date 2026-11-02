@@ -1,0 +1,774 @@
+// PEACOCK-native IR kernel (migration stage 4).
+//
+// This file is executed by PEACOCK itself. It implements the flat,
+// typed, three-address PEACOCK Intermediate Representation (PIR) that
+// the Python bootstrap defines in `peacock/compiler/ir.py`.
+//
+// PIR uses numbered slots for named locals and virtual registers for
+// expression temporaries (reg = slot_count .. next_reg-1). Control flow
+// is expressed with chihna_samooha, conditional branches and jumps. Values that
+// must cross a join are kept in slots.
+//
+// This kernel does not parse source. `compile_source(..., semantic_mode=\"ir_shadow\")`
+// (future: implemented in `peacock/compiler/selfhost_ir.py`) translates a
+// TypedProgram into a sequence of builder calls executed here, and the
+// resulting IR digest is compared with the Python oracle. This file is
+// therefore an executable specification of the IR instruction set and
+// builder, not a replacement compiler.
+
+प्रकरण selfhost_ir
+
+// ---------------------------------------------------------------------------
+// IR model
+// ---------------------------------------------------------------------------
+
+संघटन IRInstr {
+    op: अक्षरमाला,
+    dest: पूर्णाङ्क,
+    arg0: अक्षरमाला,
+    arg1: अक्षरमाला,
+    arg2: अक्षरमाला,
+    dest_type_key: अक्षरमाला,
+    chihna: अक्षरमाला
+}
+
+संघटन IRFunction {
+    नाम: अक्षरमाला,
+    slot_count: पूर्णाङ्क,
+    return_type_key: अक्षरमाला,
+    instrs: सूची<IRInstr>
+}
+
+संघटन IRModule {
+    नाम: अक्षरमाला,
+    functions: सूची<IRFunction>,
+    uses: सूची<अक्षरमाला>,
+    struct_descs: सूची<अक्षरमाला>
+}
+
+संघटन IRBuilder {
+    नाम: अक्षरमाला,
+    slot_count: पूर्णाङ्क,
+    return_type_key: अक्षरमाला,
+    next_reg: पूर्णाङ्क,
+    label_counter: पूर्णाङ्क,
+    instrs: सूची<IRInstr>,
+    break_targets: सूची<अक्षरमाला>,
+    continue_targets: सूची<अक्षरमाला>
+}
+
+// ---------------------------------------------------------------------------
+// Constructors
+// ---------------------------------------------------------------------------
+
+कार्य new_module(नाम: अक्षरमाला) -> IRModule {
+    प्रत्यानय IRModule(नाम, [], [], []);
+}
+
+कार्य module_add_function(mod: IRModule, kary: IRFunction) {
+    mod.functions.योजय(kary);
+}
+
+कार्य module_add_use(mod: IRModule, cap: अक्षरमाला) {
+    mod.uses.योजय(cap);
+}
+
+कार्य module_add_struct(mod: IRModule, struct_desc: अक्षरमाला) {
+    mod.struct_descs.योजय(struct_desc);
+}
+
+कार्य new_builder(नाम: अक्षरमाला, slot_count: पूर्णाङ्क, return_type_key: अक्षरमाला) -> IRBuilder {
+    प्रत्यानय IRBuilder(नाम, slot_count, return_type_key, slot_count, ०, [], [], []);
+}
+
+कार्य builder_finish(builder: IRBuilder) -> IRFunction {
+    // Mirror Python's `build()`: if the last instruction is not already a
+    // terminal (return/throw/jump) emit an implicit void return. The builder
+    // itself is also responsible for the `return` that the Python builder
+    // always appends; callers that have emitted an explicit return therefore
+    // see a single terminal, matching Python behaviour on the shadow corpus.
+    यदि दैर्घ्य(builder.instrs) == ० {
+        builder.instrs.योजय(IRInstr("return", -१, "null", "", "", "", ""));
+    } अन्यथा {
+        स्थापय last = builder.instrs.प्राप्नु(दैर्घ्य(builder.instrs) - १);
+        यदि last.op != "return" तथा last.op != "throw" तथा last.op != "jump" {
+            builder.instrs.योजय(IRInstr("return", -१, "null", "", "", "", ""));
+        }
+    }
+    प्रत्यानय IRFunction(builder.नाम, builder.next_reg, builder.return_type_key, builder.instrs);
+}
+
+// ---------------------------------------------------------------------------
+// Allocation helpers
+// ---------------------------------------------------------------------------
+
+कार्य new_reg(builder: IRBuilder) -> पूर्णाङ्क {
+    स्थापय r = builder.next_reg;
+    builder.next_reg += १;
+    प्रत्यानय r;
+}
+
+कार्य new_label(builder: IRBuilder, prefix: अक्षरमाला) -> अक्षरमाला {
+    builder.label_counter += १;
+    प्रत्यानय prefix + पाठ्यीकरण(builder.label_counter);
+}
+
+// ---------------------------------------------------------------------------
+// Low-level emit (single place that materialises an IRInstr)
+// ---------------------------------------------------------------------------
+
+कार्य emit_raw(builder: IRBuilder, op: अक्षरमाला, dest: पूर्णाङ्क, arg0: अक्षरमाला, arg1: अक्षरमाला, arg2: अक्षरमाला, dest_type_key: अक्षरमाला, chihna: अक्षरमाला) -> पूर्णाङ्क {
+    यदि dest >= ० तथा dest >= builder.next_reg {
+        builder.next_reg = dest + १;
+    }
+    builder.instrs.योजय(IRInstr(op, dest, arg0, arg1, arg2, dest_type_key, chihna));
+    प्रत्यानय dest;
+}
+
+कार्य emit_const(builder: IRBuilder, dest: पूर्णाङ्क, value_repr: अक्षरमाला, type_key: अक्षरमाला) -> पूर्णाङ्क {
+    प्रत्यानय emit_raw(builder, "const", dest, value_repr, "", "", type_key, "");
+}
+
+कार्य emit_move(builder: IRBuilder, dest: पूर्णाङ्क, src: पूर्णाङ्क, type_key: अक्षरमाला) -> पूर्णाङ्क {
+    प्रत्यानय emit_raw(builder, "move", dest, पाठ्यीकरण(src), "", "", type_key, "");
+}
+
+कार्य emit_slot_get(builder: IRBuilder, dest: पूर्णाङ्क, slot: पूर्णाङ्क, type_key: अक्षरमाला) -> पूर्णाङ्क {
+    प्रत्यानय emit_raw(builder, "slot_get", dest, पाठ्यीकरण(slot), "", "", type_key, "");
+}
+
+कार्य emit_slot_set(builder: IRBuilder, slot: पूर्णाङ्क, src: पूर्णाङ्क) -> पूर्णाङ्क {
+    प्रत्यानय emit_raw(builder, "slot_set", -१, पाठ्यीकरण(slot), पाठ्यीकरण(src), "", "", "");
+}
+
+कार्य emit_binop(builder: IRBuilder, dest: पूर्णाङ्क, op: अक्षरमाला, left: पूर्णाङ्क, right: पूर्णाङ्क, type_key: अक्षरमाला) -> पूर्णाङ्क {
+    प्रत्यानय emit_raw(builder, "binop", dest, op, पाठ्यीकरण(left), पाठ्यीकरण(right), type_key, "");
+}
+
+कार्य emit_unop(builder: IRBuilder, dest: पूर्णाङ्क, op: अक्षरमाला, operand: पूर्णाङ्क, type_key: अक्षरमाला) -> पूर्णाङ्क {
+    प्रत्यानय emit_raw(builder, "unop", dest, op, पाठ्यीकरण(operand), "", type_key, "");
+}
+
+कार्य emit_call(builder: IRBuilder, dest: पूर्णाङ्क, callee: अक्षरमाला, arg_regs: सूची<पूर्णाङ्क>, type_key: अक्षरमाला) -> पूर्णाङ्क {
+    स्थापय परिवर्तनीय joined = "";
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < दैर्घ्य(arg_regs) {
+        यदि i > ० {
+            joined = joined + ",";
+        }
+        joined = joined + पाठ्यीकरण(arg_regs.प्राप्नु(i));
+        i += १;
+    }
+    प्रत्यानय emit_raw(builder, "call", dest, callee, joined, "", type_key, "");
+}
+
+कार्य emit_call_native(builder: IRBuilder, dest: पूर्णाङ्क, callee: अक्षरमाला, arg_regs: सूची<पूर्णाङ्क>, type_key: अक्षरमाला) -> पूर्णाङ्क {
+    स्थापय परिवर्तनीय joined = "";
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < दैर्घ्य(arg_regs) {
+        यदि i > ० {
+            joined = joined + ",";
+        }
+        joined = joined + पाठ्यीकरण(arg_regs.प्राप्नु(i));
+        i += १;
+    }
+    प्रत्यानय emit_raw(builder, "call_native", dest, callee, joined, "", type_key, "");
+}
+
+कार्य emit_branch(builder: IRBuilder, cond: पूर्णाङ्क, then_label: अक्षरमाला, else_label: अक्षरमाला) {
+    emit_raw(builder, "branch", -१, पाठ्यीकरण(cond), then_label, else_label, "", "");
+}
+
+कार्य emit_jump(builder: IRBuilder, lakshya: अक्षरमाला) {
+    emit_raw(builder, "jump", -१, lakshya, "", "", "", "");
+}
+
+कार्य emit_label(builder: IRBuilder, abhidha: अक्षरमाला) {
+    emit_raw(builder, "label", -१, abhidha, "", "", "", "");
+}
+
+कार्य emit_return(builder: IRBuilder, mulya: पूर्णाङ्क) {
+    यदि mulya < ० {
+        emit_raw(builder, "return", -१, "null", "", "", "", "");
+    } अन्यथा {
+        emit_raw(builder, "return", -१, पाठ्यीकरण(mulya), "", "", "", "");
+    }
+}
+
+कार्य emit_throw(builder: IRBuilder, mulya: पूर्णाङ्क) {
+    emit_raw(builder, "throw", -१, पाठ्यीकरण(mulya), "", "", "", "");
+}
+
+कार्य emit_make_list(builder: IRBuilder, dest: पूर्णाङ्क, elements: सूची<पूर्णाङ्क>, type_key: अक्षरमाला) -> पूर्णाङ्क {
+    स्थापय परिवर्तनीय joined = "";
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < दैर्घ्य(elements) {
+        यदि i > ० {
+            joined = joined + ",";
+        }
+        joined = joined + पाठ्यीकरण(elements.प्राप्नु(i));
+        i += १;
+    }
+    प्रत्यानय emit_raw(builder, "make_list", dest, joined, "", "", type_key, "");
+}
+
+कार्य emit_make_range(builder: IRBuilder, dest: पूर्णाङ्क, aarambha: पूर्णाङ्क, samapti: पूर्णाङ्क, type_key: अक्षरमाला) -> पूर्णाङ्क {
+    प्रत्यानय emit_raw(builder, "make_range", dest, पाठ्यीकरण(aarambha), पाठ्यीकरण(samapti), "", type_key, "");
+}
+
+कार्य emit_index_get(builder: IRBuilder, dest: पूर्णाङ्क, aadhaara: पूर्णाङ्क, soochaka: पूर्णाङ्क, type_key: अक्षरमाला) -> पूर्णाङ्क {
+    प्रत्यानय emit_raw(builder, "index_get", dest, पाठ्यीकरण(aadhaara), पाठ्यीकरण(soochaka), "", type_key, "");
+}
+
+कार्य emit_index_set(builder: IRBuilder, aadhaara: पूर्णाङ्क, soochaka: पूर्णाङ्क, mulya: पूर्णाङ्क) {
+    emit_raw(builder, "index_set", -१, पाठ्यीकरण(aadhaara), पाठ्यीकरण(soochaka), पाठ्यीकरण(mulya), "", "");
+}
+
+कार्य emit_field_get(builder: IRBuilder, dest: पूर्णाङ्क, aadhaara: पूर्णाङ्क, field_name: अक्षरमाला, type_key: अक्षरमाला) -> पूर्णाङ्क {
+    प्रत्यानय emit_raw(builder, "field_get", dest, पाठ्यीकरण(aadhaara), field_name, "", type_key, "");
+}
+
+कार्य emit_field_set(builder: IRBuilder, aadhaara: पूर्णाङ्क, field_name: अक्षरमाला, mulya: पूर्णाङ्क) {
+    emit_raw(builder, "field_set", -१, पाठ्यीकरण(aadhaara), field_name, पाठ्यीकरण(mulya), "", "");
+}
+
+कार्य emit_len(builder: IRBuilder, dest: पूर्णाङ्क, operand: पूर्णाङ्क, type_key: अक्षरमाला) -> पूर्णाङ्क {
+    प्रत्यानय emit_raw(builder, "len", dest, पाठ्यीकरण(operand), "", "", type_key, "");
+}
+
+कार्य emit_assert(builder: IRBuilder, cond: पूर्णाङ्क, msg: पूर्णाङ्क) {
+    यदि msg < ० {
+        emit_raw(builder, "assert", -१, पाठ्यीकरण(cond), "null", "", "", "");
+    } अन्यथा {
+        emit_raw(builder, "assert", -१, पाठ्यीकरण(cond), पाठ्यीकरण(msg), "", "", "");
+    }
+}
+
+कार्य emit_struct_new(builder: IRBuilder, dest: पूर्णाङ्क, struct_name: अक्षरमाला, arg_regs: सूची<पूर्णाङ्क>, type_key: अक्षरमाला) -> पूर्णाङ्क {
+    स्थापय परिवर्तनीय joined = "";
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < दैर्घ्य(arg_regs) {
+        यदि i > ० {
+            joined = joined + ",";
+        }
+        joined = joined + पाठ्यीकरण(arg_regs.प्राप्नु(i));
+        i += १;
+    }
+    प्रत्यानय emit_raw(builder, "struct_new", dest, struct_name, joined, "", type_key, "");
+}
+
+कार्य emit_method(builder: IRBuilder, dest: पूर्णाङ्क, method_name: अक्षरमाला, receiver: पूर्णाङ्क, arg_regs: सूची<पूर्णाङ्क>, type_key: अक्षरमाला) -> पूर्णाङ्क {
+    स्थापय परिवर्तनीय joined = "";
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < दैर्घ्य(arg_regs) {
+        यदि i > ० {
+            joined = joined + ",";
+        }
+        joined = joined + पाठ्यीकरण(arg_regs.प्राप्नु(i));
+        i += १;
+    }
+    प्रत्यानय emit_raw(builder, "method", dest, method_name, पाठ्यीकरण(receiver), joined, type_key, "");
+}
+
+कार्य emit_try_begin(builder: IRBuilder, catch_chihna: अक्षरमाला) {
+    emit_raw(builder, "try_begin", -१, catch_chihna, "", "", "", "");
+}
+
+कार्य emit_try_end(builder: IRBuilder) {
+    emit_raw(builder, "try_end", -१, "", "", "", "", "");
+}
+
+कार्य emit_catch(builder: IRBuilder, dest: पूर्णाङ्क, type_key: अक्षरमाला) -> पूर्णाङ्क {
+    प्रत्यानय emit_raw(builder, "catch", dest, "", "", "", type_key, "");
+}
+
+कार्य emit_finally_begin(builder: IRBuilder, finally_chihna: अक्षरमाला) {
+    emit_raw(builder, "finally_begin", -१, finally_chihna, "", "", "", "");
+}
+
+कार्य emit_finally_end(builder: IRBuilder, end_chihna: अक्षरमाला) {
+    emit_raw(builder, "finally_end", -१, end_chihna, "", "", "", "");
+}
+
+कार्य emit_finally_resume(builder: IRBuilder) {
+    emit_raw(builder, "finally_resume", -१, "", "", "", "", "");
+}
+
+कार्य emit_model_init(builder: IRBuilder, dest: पूर्णाङ्क, model_name: अक्षरमाला, arg_regs: सूची<पूर्णाङ्क>, type_key: अक्षरमाला) -> पूर्णाङ्क {
+    स्थापय परिवर्तनीय joined = "";
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < दैर्घ्य(arg_regs) {
+        यदि i > ० {
+            joined = joined + ",";
+        }
+        joined = joined + पाठ्यीकरण(arg_regs.प्राप्नु(i));
+        i += १;
+    }
+    प्रत्यानय emit_raw(builder, "model_init", dest, model_name, joined, "", type_key, "");
+}
+
+कार्य emit_training_method(builder: IRBuilder, dest: पूर्णाङ्क, training_name: अक्षरमाला, method_name: अक्षरमाला, arg_regs: सूची<पूर्णाङ्क>, type_key: अक्षरमाला) -> पूर्णाङ्क {
+    स्थापय परिवर्तनीय joined = "";
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < दैर्घ्य(arg_regs) {
+        यदि i > ० {
+            joined = joined + ",";
+        }
+        joined = joined + पाठ्यीकरण(arg_regs.प्राप्नु(i));
+        i += १;
+    }
+    प्रत्यानय emit_raw(builder, "training_method", dest, training_name, method_name, joined, type_key, "");
+}
+
+// ---------------------------------------------------------------------------
+// Loop stack helpers
+// ---------------------------------------------------------------------------
+
+कार्य push_break(builder: IRBuilder, chihna: अक्षरमाला) {
+    builder.break_targets.योजय(chihna);
+}
+
+कार्य pop_break(builder: IRBuilder) {
+    builder.break_targets.निष्कासय();
+}
+
+कार्य push_continue(builder: IRBuilder, chihna: अक्षरमाला) {
+    builder.continue_targets.योजय(chihna);
+}
+
+कार्य pop_continue(builder: IRBuilder) {
+    builder.continue_targets.निष्कासय();
+}
+
+कार्य current_break(builder: IRBuilder) -> अक्षरमाला {
+    यदि दैर्घ्य(builder.break_targets) == ० {
+        प्रत्यानय "";
+    }
+    प्रत्यानय builder.break_targets.प्राप्नु(दैर्घ्य(builder.break_targets) - १);
+}
+
+कार्य current_continue(builder: IRBuilder) -> अक्षरमाला {
+    यदि दैर्घ्य(builder.continue_targets) == ० {
+        प्रत्यानय "";
+    }
+    प्रत्यानय builder.continue_targets.प्राप्नु(दैर्घ्य(builder.continue_targets) - १);
+}
+
+// Helper to escape string for digest (mirrors Python _quote)
+कार्य escape_for_digest(s: अक्षरमाला) -> अक्षरमाला {
+    स्थापय परिवर्तनीय t = s.प्रतिस्थापय("\\", "\\\\");
+    t = t.प्रतिस्थापय("\"", "\\\"");
+    t = t.प्रतिस्थापय("\n", "\\n");
+    t = t.प्रतिस्थापय("\r", "\\r");
+    t = t.प्रतिस्थापय("\t", "\\t");
+    प्रत्यानय t;
+}
+
+// ---------------------------------------------------------------------------
+// Digest helpers (canonical text form used for differential testing)
+// ---------------------------------------------------------------------------
+
+कार्य instr_digest(instr: IRInstr) -> अक्षरमाला {
+    स्थापय परिवर्तनीय dest_part = "";
+    यदि instr.dest >= ० {
+        dest_part = " %" + पाठ्यीकरण(instr.dest);
+    }
+    स्थापय परिवर्तनीय args_part = "";
+    यदि instr.op == "label" {
+        args_part = " " + instr.arg0;
+    } अन्यथा यदि instr.op == "jump" {
+        args_part = " " + instr.arg0;
+    } अन्यथा यदि instr.op == "branch" {
+        args_part = " " + instr.arg0 + " " + instr.arg1 + " " + instr.arg2;
+    } अन्यथा यदि instr.op == "return" {
+        यदि instr.arg0 != "null" {
+            args_part = " " + instr.arg0;
+        }
+    } अन्यथा यदि instr.op == "throw" {
+        args_part = " " + instr.arg0;
+    } अन्यथा यदि instr.op == "const" {
+        यदि instr.dest_type_key == "अक्षरमाला" {
+            args_part = " \"" + escape_for_digest(instr.arg0) + "\"";
+        } अन्यथा {
+            args_part = " " + instr.arg0;
+        }
+        यदि instr.dest_type_key != "" {
+            args_part = args_part + " :" + instr.dest_type_key;
+        }
+    } अन्यथा यदि instr.op == "slot_set" {
+        args_part = " " + instr.arg0 + " " + instr.arg1;
+    } अन्यथा यदि instr.op == "slot_get" {
+        args_part = " " + instr.arg0;
+        यदि instr.dest_type_key != "" {
+            args_part = args_part + " :" + instr.dest_type_key;
+        }
+    } अन्यथा यदि instr.op == "move" {
+        args_part = " " + instr.arg0;
+        यदि instr.dest_type_key != "" {
+            args_part = args_part + " :" + instr.dest_type_key;
+        }
+    } अन्यथा यदि instr.op == "binop" {
+        args_part = " " + instr.arg0 + " " + instr.arg1 + " " + instr.arg2;
+        यदि instr.dest_type_key != "" {
+            args_part = args_part + " :" + instr.dest_type_key;
+        }
+    } अन्यथा यदि instr.op == "unop" {
+        args_part = " " + instr.arg0 + " " + instr.arg1;
+        यदि instr.dest_type_key != "" {
+            args_part = args_part + " :" + instr.dest_type_key;
+        }
+    } अन्यथा यदि instr.op == "call" वा instr.op == "call_native" {
+        args_part = " " + instr.arg0;
+        यदि instr.arg1 != "" {
+            args_part = args_part + " [" + instr.arg1 + "]";
+        }
+        यदि instr.dest_type_key != "" {
+            args_part = args_part + " :" + instr.dest_type_key;
+        }
+    } अन्यथा यदि instr.op == "make_list" {
+        यदि instr.arg0 != "" {
+            args_part = " [" + instr.arg0 + "]";
+        }
+        यदि instr.dest_type_key != "" {
+            args_part = args_part + " :" + instr.dest_type_key;
+        }
+    } अन्यथा यदि instr.op == "make_range" {
+        args_part = " " + instr.arg0 + " " + instr.arg1;
+        यदि instr.dest_type_key != "" {
+            args_part = args_part + " :" + instr.dest_type_key;
+        }
+    } अन्यथा यदि instr.op == "index_get" {
+        args_part = " " + instr.arg0 + " " + instr.arg1;
+        यदि instr.dest_type_key != "" {
+            args_part = args_part + " :" + instr.dest_type_key;
+        }
+    } अन्यथा यदि instr.op == "index_set" {
+        args_part = " " + instr.arg0 + " " + instr.arg1 + " " + instr.arg2;
+    } अन्यथा यदि instr.op == "field_get" {
+        args_part = " " + instr.arg0 + " " + instr.arg1;
+        यदि instr.dest_type_key != "" {
+            args_part = args_part + " :" + instr.dest_type_key;
+        }
+    } अन्यथा यदि instr.op == "field_set" {
+        args_part = " " + instr.arg0 + " " + instr.arg1 + " " + instr.arg2;
+    } अन्यथा यदि instr.op == "len" {
+        args_part = " " + instr.arg0;
+        यदि instr.dest_type_key != "" {
+            args_part = args_part + " :" + instr.dest_type_key;
+        }
+    } अन्यथा यदि instr.op == "assert" {
+        args_part = " " + instr.arg0;
+        यदि instr.arg1 != "null" तथा instr.arg1 != "" {
+            args_part = args_part + " " + instr.arg1;
+        }
+    } अन्यथा यदि instr.op == "struct_new" {
+        args_part = " " + instr.arg0;
+        यदि instr.arg1 != "" {
+            args_part = args_part + " [" + instr.arg1 + "]";
+        }
+        यदि instr.dest_type_key != "" {
+            args_part = args_part + " :" + instr.dest_type_key;
+        }
+    } अन्यथा यदि instr.op == "method" {
+        args_part = " " + instr.arg0 + " " + instr.arg1;
+        यदि instr.arg2 != "" {
+            args_part = args_part + " [" + instr.arg2 + "]";
+        }
+        यदि instr.dest_type_key != "" {
+            args_part = args_part + " :" + instr.dest_type_key;
+        }
+    } अन्यथा यदि instr.op == "try_begin" वा instr.op == "finally_begin" वा instr.op == "finally_end" {
+        यदि instr.arg0 != "" {
+            args_part = " " + instr.arg0;
+        }
+    } अन्यथा यदि instr.op == "catch" {
+        यदि instr.dest_type_key != "" {
+            args_part = " :" + instr.dest_type_key;
+        }
+    } अन्यथा यदि instr.op == "try_end" वा instr.op == "finally_resume" {
+        args_part = "";
+    } अन्यथा यदि instr.op == "model_init" {
+        args_part = " " + instr.arg0;
+        यदि instr.arg1 != "" {
+            args_part = args_part + " [" + instr.arg1 + "]";
+        }
+        यदि instr.dest_type_key != "" {
+            args_part = args_part + " :" + instr.dest_type_key;
+        }
+    } अन्यथा यदि instr.op == "training_method" {
+        args_part = " " + instr.arg0 + " " + instr.arg1;
+        यदि instr.arg2 != "" {
+            args_part = args_part + " [" + instr.arg2 + "]";
+        }
+        यदि instr.dest_type_key != "" {
+            args_part = args_part + " :" + instr.dest_type_key;
+        }
+    } अन्यथा {
+        // generic: include whatever args are non-empty
+        यदि instr.arg0 != "" {
+            args_part = args_part + " " + instr.arg0;
+        }
+        यदि instr.arg1 != "" {
+            args_part = args_part + " " + instr.arg1;
+        }
+        यदि instr.arg2 != "" {
+            args_part = args_part + " " + instr.arg2;
+        }
+    }
+    प्रत्यानय "(" + instr.op + dest_part + args_part + ")";
+}
+
+कार्य function_digest(kary: IRFunction) -> अक्षरमाला {
+    स्थापय परिवर्तनीय out = "(fn " + kary.नाम + " slots=" + पाठ्यीकरण(kary.slot_count) + " ret=" + kary.return_type_key;
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < दैर्घ्य(kary.instrs) {
+        out = out + "\n  " + instr_digest(kary.instrs.प्राप्नु(i));
+        i += १;
+    }
+    प्रत्यानय out + "\n)";
+}
+
+कार्य module_digest(mod: IRModule) -> अक्षरमाला {
+    स्थापय परिवर्तनीय out = "(module " + mod.नाम;
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < दैर्घ्य(mod.uses) {
+        out = out + " (use " + mod.uses.प्राप्नु(i) + ")";
+        i += १;
+    }
+    out = out + ")";
+    स्थापय परिवर्तनीय j = ०;
+    यावत् j < दैर्घ्य(mod.functions) {
+        out = out + "\n" + function_digest(mod.functions.प्राप्नु(j));
+        j += १;
+    }
+    स्थापय परिवर्तनीय k = ०;
+    यावत् k < दैर्घ्य(mod.struct_descs) {
+        out = out + "\n" + mod.struct_descs.प्राप्नु(k);
+        k += १;
+    }
+    प्रत्यानय out;
+}
+
+// ---------------------------------------------------------------------------
+// Verification (structural, mirrors Python verifier checks that are
+// portable without type dominance analysis)
+// ---------------------------------------------------------------------------
+
+कार्य verify_function(kary: IRFunction) -> अक्षरमाला {
+    // Collect known chihna_samooha
+    स्थापय chihna_samooha: सूची<अक्षरमाला> = [];
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < दैर्घ्य(kary.instrs) {
+        स्थापय instr = kary.instrs.प्राप्नु(i);
+        यदि instr.op == "label" {
+            स्थापय परिवर्तनीय found = असत्य;
+            स्थापय परिवर्तनीय k = ०;
+            यावत् k < दैर्घ्य(chihna_samooha) {
+                यदि chihna_samooha.प्राप्नु(k) == instr.arg0 {
+                    found = सत्य;
+                }
+                k += १;
+            }
+            यदि found {
+                प्रत्यानय "duplicate chihna '" + instr.arg0 + "'";
+            }
+            chihna_samooha.योजय(instr.arg0);
+        }
+        i += १;
+    }
+    // Check jump/branch targets exist and register bounds
+    स्थापय परिवर्तनीय j = ०;
+    यावत् j < दैर्घ्य(kary.instrs) {
+        स्थापय instr = kary.instrs.प्राप्नु(j);
+        यदि instr.op == "jump" {
+            स्थापय lakshya = instr.arg0;
+            स्थापय परिवर्तनीय found = असत्य;
+            स्थापय परिवर्तनीय k = ०;
+            यावत् k < दैर्घ्य(chihna_samooha) {
+                यदि chihna_samooha.प्राप्नु(k) == lakshya {
+                    found = सत्य;
+                }
+                k += १;
+            }
+            यदि न found {
+                प्रत्यानय "jump to unknown chihna '" + lakshya + "'";
+            }
+        }
+        यदि instr.op == "branch" {
+            स्थापय then_lb = instr.arg1;
+            स्थापय else_lb = instr.arg2;
+            स्थापय परिवर्तनीय found_then = असत्य;
+            स्थापय परिवर्तनीय found_else = असत्य;
+            स्थापय परिवर्तनीय k = ०;
+            यावत् k < दैर्घ्य(chihna_samooha) {
+                यदि chihna_samooha.प्राप्नु(k) == then_lb {
+                    found_then = सत्य;
+                }
+                यदि chihna_samooha.प्राप्नु(k) == else_lb {
+                    found_else = सत्य;
+                }
+                k += १;
+            }
+            यदि न found_then {
+                प्रत्यानय "branch to unknown chihna '" + then_lb + "'";
+            }
+            यदि न found_else {
+                प्रत्यानय "branch to unknown chihna '" + else_lb + "'";
+            }
+        }
+        यदि instr.dest >= ० तथा instr.dest >= kary.slot_count {
+            निश्चिनु(सत्य);
+        } अन्यथा यदि instr.dest >= ० तथा instr.dest < ० {
+            प्रत्यानय "bad dest register";
+        }
+        // dest must be < slot_count (slot_count is actually reg-count after lowering;
+        // it equals final next_reg). Check only that dest < slot_count.
+        यदि instr.dest >= ० तथा instr.dest >= kary.slot_count {
+            प्रत्यानय "dest " + पाठ्यीकरण(instr.dest) + " out of range (slot_count=" + पाठ्यीकरण(kary.slot_count) + ")";
+        }
+        j += १;
+    }
+    प्रत्यानय "";
+}
+
+// ---------------------------------------------------------------------------
+// Built-in self-checks (run as `peacock run selfhost/ir.सूत्र`)
+// ---------------------------------------------------------------------------
+
+कार्य run_builtin_checks() -> पूर्णाङ्क {
+    स्थापय परिवर्तनीय cases = ०;
+
+    // 1) simple const + return
+    स्थापय b1 = new_builder("alpha", १, "पूर्णाङ्क");
+    स्थापय r1 = new_reg(b1);
+    emit_const(b1, r1, "42", "पूर्णाङ्क");
+    emit_return(b1, r1);
+    स्थापय fn1 = builder_finish(b1);
+    निश्चिनु(दैर्घ्य(fn1.instrs) == २);
+    निश्चिनु(fn1.instrs.प्राप्नु(०).op == "const");
+    निश्चिनु(fn1.instrs.प्राप्नु(१).op == "return");
+    निश्चिनु(verify_function(fn1) == "");
+    cases += १;
+
+    // 2) slot_get / binop / slot_set / return (covers assign compound pattern)
+    स्थापय b2 = new_builder("beta", २, "पूर्णाङ्क");
+    स्थापय getter = new_reg(b2);
+    emit_slot_get(b2, getter, ०, "पूर्णाङ्क");
+    स्थापय rhs = new_reg(b2);
+    emit_const(b2, rhs, "1", "पूर्णाङ्क");
+    स्थापय res = new_reg(b2);
+    emit_binop(b2, res, "+", getter, rhs, "पूर्णाङ्क");
+    emit_slot_set(b2, ०, res);
+    emit_return(b2, res);
+    स्थापय fn2 = builder_finish(b2);
+    निश्चिनु(दैर्घ्य(fn2.instrs) == ५);
+    निश्चिनु(fn2.instrs.प्राप्नु(२).op == "binop");
+    निश्चिनु(verify_function(fn2) == "");
+    cases += १;
+
+    // 3) if/else/begin: branch + three chihna_samooha + jumps
+    स्थापय b3 = new_builder("branchy", ०, "पूर्णाङ्क");
+    स्थापय cond = new_reg(b3);
+    emit_const(b3, cond, "true", "सत्यता");
+    स्थापय then_lb = new_label(b3, "then");
+    स्थापय else_lb = new_label(b3, "else");
+    स्थापय join_lb = new_label(b3, "endif");
+    emit_branch(b3, cond, then_lb, else_lb);
+    emit_label(b3, then_lb);
+    स्थापय tval = new_reg(b3);
+    emit_const(b3, tval, "1", "पूर्णाङ्क");
+    emit_jump(b3, join_lb);
+    emit_label(b3, else_lb);
+    स्थापय fval = new_reg(b3);
+    emit_const(b3, fval, "2", "पूर्णाङ्क");
+    emit_jump(b3, join_lb);
+    emit_label(b3, join_lb);
+    emit_return(b3, tval);
+    स्थापय fn3 = builder_finish(b3);
+    निश्चिनु(दैर्घ्य(fn3.instrs) == १०);
+    निश्चिनु(verify_function(fn3) == "");
+    cases += १;
+
+    // 4) while: head/body/exit with break_targets
+    स्थापय b4 = new_builder("looper", १, "एकक");
+    स्थापय head = new_label(b4, "while");
+    स्थापय body = new_label(b4, "do");
+    स्थापय exit_lb = new_label(b4, "endwhile");
+    emit_jump(b4, head);
+    emit_label(b4, head);
+    स्थापय c = new_reg(b4);
+    emit_const(b4, c, "true", "सत्यता");
+    emit_branch(b4, c, body, exit_lb);
+    emit_label(b4, body);
+    push_break(b4, exit_lb);
+    push_continue(b4, head);
+    स्थापय v = new_reg(b4);
+    emit_const(b4, v, "7", "पूर्णाङ्क");
+    emit_jump(b4, head);
+    pop_break(b4);
+    pop_continue(b4);
+    emit_label(b4, exit_lb);
+    emit_return(b4, -१);
+    स्थापय fn4 = builder_finish(b4);
+    निश्चिनु(verify_function(fn4) == "");
+    cases += १;
+
+    // 5) call / make_list / field / soochaka / len / assert
+    स्थापय b5 = new_builder("misc", ०, "एकक");
+    स्थापय a = new_reg(b5);
+    emit_const(b5, a, "1", "पूर्णाङ्क");
+    स्थापय bval = new_reg(b5);
+    emit_const(b5, bval, "2", "पूर्णाङ्क");
+    स्थापय lst: सूची<पूर्णाङ्क> = [];
+    lst.योजय(a);
+    lst.योजय(bval);
+    स्थापय l = new_reg(b5);
+    emit_make_list(b5, l, lst, "सूची<पूर्णाङ्क>");
+    स्थापय len_r = new_reg(b5);
+    emit_len(b5, len_r, l, "पूर्णाङ्क");
+    emit_assert(b5, len_r, -१);
+    स्थापय call_args: सूची<पूर्णाङ्क> = [];
+    call_args.योजय(len_r);
+    स्थापय cr = new_reg(b5);
+    emit_call(b5, cr, "मुद्रय", call_args, "एकक");
+    emit_return(b5, -१);
+    स्थापय fn5 = builder_finish(b5);
+    निश्चिनु(verify_function(fn5) == "");
+    cases += १;
+
+    // 6) struct_new + return void
+    स्थापय b6 = new_builder("structs", ०, "एकक");
+    स्थापय x = new_reg(b6);
+    emit_const(b6, x, "3", "पूर्णाङ्क");
+    स्थापय args2: सूची<पूर्णाङ्क> = [];
+    args2.योजय(x);
+    स्थापय s = new_reg(b6);
+    emit_struct_new(b6, s, "बिन्दु", args2, "बिन्दु");
+    emit_return(b6, -१);
+    स्थापय fn6 = builder_finish(b6);
+    निश्चिनु(verify_function(fn6) == "");
+    cases += १;
+
+    // 7) verify failure modes
+    स्थापय bad_builder = new_builder("bad", १, "एकक");
+    emit_jump(bad_builder, "nowhere");
+    स्थापय bad_fn = builder_finish(bad_builder);
+    निश्चिनु(verify_function(bad_fn) != "");
+    cases += १;
+
+    // 8) mod digest includes uses
+    स्थापय mod = new_module("demo");
+    module_add_use(mod, "गणना");
+    module_add_function(mod, fn1);
+    module_add_function(mod, fn2);
+    स्थापय d = module_digest(mod);
+    निश्चिनु(d != "");
+    cases += १;
+
+    प्रत्यानय cases;
+}
+
+कार्य मुख्य() -> एकक {
+    स्थापय checks = run_builtin_checks();
+    मुद्रय("PEACOCK ir checks passed (" + पाठ्यीकरण(checks) + " assertions)");
+}

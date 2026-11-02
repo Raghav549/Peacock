@@ -932,9 +932,12 @@
     यावत् accept_op(p, ".") {
         पथ = पथ + "." + expect_ident(p, "a module path component").पाठ्य;
     }
-    स्थापय parts = [पथ];
+    स्थापय परिवर्तनीय parts: सूची<अक्षरमाला> = [पथ];
     यदि at_kw(p, "रूपेण") {
-        error_here(p, "module aliases ('रूपेण') are not implemented in 0.2");
+        advance(p);
+        स्थापय alias = expect_ident(p, "alias after 'रूपेण'").पाठ्य;
+        parts.योजय("रूपेण");
+        parts.योजय(alias);
     }
     accept_op(p, ";");
     प्रत्यानय node("उपयोग", parts);

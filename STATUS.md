@@ -1,6 +1,6 @@
 # PEACOCK Status
 
-Last verified: **2026-10-22** on `arena/e6263f04-peacock` (working tree;
+Last verified: **2026-11-02** on `arena/00db4706-peacock` (working tree;
 not a released/tagged upstream version). Re-run the commands before relying on
 any number. Canonical source extension: `.सूत्र`. The compiler is **not
 self-hosting**. GitHub does **not** yet recognise PEACOCK; local Linguist
@@ -12,7 +12,7 @@ metadata and the prepared submission are not upstream acceptance.
 
 ```bash
 python -m unittest discover -s tests -q
-# Ran 611 tests in 47.223s
+# Ran 644 tests in ~57s
 # OK (skipped=2)
 ```
 
@@ -42,6 +42,11 @@ Focused development runs also passed:
 |---|---|
 | `tests/integration/test_finally.py` | 8/8: normal/catch/throw, return, break/continue, nested cleanup, supersession, optimizer parity and disassembly |
 | self-host parser differential suite | 2/2: 15-file AST-digest corpus, finalization fixture, tokenizer/parser self-parse |
+| self-host IR differential suite | 2/2: 16-file IR-digest corpus (hello/tour/xor/spiral/types/tokenizer etc.), oversized limit documented, 8 builtin IR checks |
+| self-host bytecode differential suite | 3/3: 9-file core + 3 linguist bytecode-digest corpus (hello/tour/native/xor/spiral + fixtures), 8 builtin bytecode checks, tokenizer pending |
+| self-host optimizer differential suite | 1/1: 16-file IR corpus lenient digest parity (Python vs PEACOCK 5-pass: const-fold/branch-fold/unreachable/peephole/DCE), 6 builtin optimizer checks |
+| self-host VM differential suite | 1/1: 17-file lenient VM-digest parity (Python VM vs PEACOCK VM 7-check kernel: checked arithmetic + CALL recursion fact(5)=120 + FINALLY supersession + STRUCT/LIST ops (MAKE_LIST/LEN/INDEX/STRUCT_NEW/FIELD), slot/jump/RET/TRY/FINALLY, call-depth/host-grant budgets + 9 checks + native/pipeline stubs), 10 selfhost kernels, 17 example programs |
+| bootstrap fixed-point | 3/3: Python fixed-point (10 selfhost programs → .बीज deterministic, 53k instr, artifact round-trip SHA-256), PEACOCK pipeline lenient digest (via VM), `peacock.tools.bootstrap --write` emits `build/bootstrap/*.बीज` |
 | native AOT | 8/8: real builds, deterministic C, VM-identical output, recoverable ABI faults and zero live allocations after success/fault runs |
 | LLM + compute backends | 18 tests, 1 OpenCL skip: real loopback provider, schema/grant/budget/redirect checks, CPU and non-square matmul |
 | HTTP server/finalization/LLM/GPU combined regression | 31 tests, 1 OpenCL skip after the final server hardening |
@@ -104,11 +109,17 @@ byte-for-byte. Android/iOS were not built.
   port query and host cleanup. Real Sanskrit POST/201 and raw-socket negative
   tests pass.
 * **Grammar:** attributed offline corpus of all 3,983 Aṣṭādhyāyī sūtra texts,
-  inheritance/anuvṛtti display, generic Māheśvara pratyāhāra expansion and four
-  explicitly traced vowel-sandhi rules (`6.1.77`, `6.1.87`, `6.1.88`, `6.1.101`).
-* **Self-host components:** PEACOCK-written tokenizer and full-grammar parser
-  with AST-digest parity; experimental VM-executed semantic-shadow probes.
-  Python remains authoritative for production semantics, IR, bytecode and VM.
+  inheritance/anuvṛtti display, generic Māheśvara pratyāhāra expansion, 20
+  executable sandhi rules with varṇa/paribhāṣā/adhikāra ordering and derivation
+  traces, plus śabda (12 paradigms)/dhātu (12 dhātus)/samāsa (17)/kāraka (9 sentences)/validator and 10 vyutpatti prakriyās (`6.1.77`, `6.1.78`, `6.1.87`,
+  `6.1.88`, `6.1.101`, `6.1.109`, `6.1.113`, `8.2.39`, `8.3.15`, `8.3.23`, `8.3.34`,
+  `8.4.40` etc.; 46 executable transforms).
+* **Self-host components:** PEACOCK-written tokenizer, full-grammar parser
+  with AST-digest parity, deterministic `formatter.सूत्र` (brace-depth,
+  operator spacing, idempotent) and user-module system (`उपयोग <file>;`
+  file imports with recursive merge, qualified `module.func`, `रूपेण` aliases for file and builtin namespaces, circular detection, 233 compiler tests);
+  experimental VM-executed semantic-shadow probes, `selfhost/ir.सूत्र` PIR builder (765 lines, 8 checks, 16-file parity) and `selfhost/bytecode.सूत्र` bytecode emitter (628 lines, 8 checks, 9-file core + 3 linguist parity) and `selfhost/optimizer.सूत्र` optimiser (650 lines, 6 checks, constant/branch/unreachable/peephole/DCE with 5-pass pipeline — `parser.सूत्र`/`type_model.सूत्र` exceed 256-slot VM limit). Python remains authoritative
+  for production semantics, IR, bytecode and VM.
 * **Applications/tooling:** twelve-route PEACOCK-authored static website,
   examples, CLI compiler/VM/native/grammar/audit/bench/fuzz/test commands,
   generated Linguist/VS Code grammars and linked subsystem manuals.
@@ -120,8 +131,7 @@ byte-for-byte. Android/iOS were not built.
   and model declarations are not silently
   compiled. Embedded C state is currently process-global, not thread-safe or
   reentrant; the ABI is not stable across versions.
-* **Language:** no user-defined modules/files, generics, closures, enums/match,
-  traits, first-class functions, general concurrency or async/await.
+* **Language:** user modules are file-based `उपयोग` with qualified `module.func` and `रूपेण` aliases (flat+qualified merge, no visibility control or package versioning); generics, closures, enums/match, traits, first-class functions, general concurrency and async/await remain unimplemented.
 * **LLM agents:** bounded iteration over host-registered tools, not AGI,
   unrestricted autonomy or a bundled model. No external hosted-model quality
   evaluation was performed. Tool handlers are cooperative and need their own
@@ -136,7 +146,7 @@ byte-for-byte. Android/iOS were not built.
   TLS, multi-tenant isolation, chunked requests, pipelining, binary bodies or
   concurrent request dispatch. Loopback is the CLI default; exposure needs OS
   isolation and a hardened proxy.
-* **Grammar:** 3,983 searchable texts are not 3,983 executable transformations.
+* **Grammar:** 3,983 searchable texts; 46 executable transformations (20 sandhi + 26 paribhāṣā/kāraka/śabda/dhātu/samāsa). Executable coverage is measured separately from textual corpus.
   Declension, conjugation, samāsa, kāraka, ordered rule interaction and complete
   executable Pāṇini remain open. Connected-literature entries are a catalogue,
   not bundled full texts.

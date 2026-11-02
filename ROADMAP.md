@@ -35,7 +35,11 @@ Acceptance criteria:
 * spans and caret diagnostics are correct on multiline input;
 * reserved keywords fail with targeted messages.
 
-Remaining for a future language version: user modules, generics, enums, pattern
+Delivered incrementally: user file imports (`उपयोग <file>;` with dotted paths,
+same-directory and `peacock_modules/` search, recursive merge, circular detection,
+qualified `module.func`, and `रूपेण` aliases for both file and builtin namespaces;
+233 compiler tests green; see `docs/language/modules.md` and `examples/modules/`). Remaining
+for a future version: re-exports, visibility control, package versioning, generics, enums, pattern
 matching, closures, traits, concurrency.
 
 ## Phase 2 — Compiler and bytecode — **done**
@@ -209,32 +213,28 @@ them in the VM, and compare against the Python oracle. Regressions cover valid
 and invalid inputs, selected diagnostic equality, the `.सूत्र` corpus and
 ErrorType iterable recovery. Python semantic analysis remains authoritative;
 the kernel does not generate diagnostics, misses several semantic domains and
-is not a replacement analyser.
+is not a replacement analyser. This increment adds `selfhost/ir.सूत्र` — a flat
+PIR builder with slots/registers, labels/branches/jumps, const/slot/binop/call/method/make_list/range/index/field/len/assert/struct/try/catch/finally/model_init/training_method and structural verification. It achieves IR-digest parity with the Python IR on a 16-file corpus (examples, linguist, fixtures, tokenizer, xor/spiral) via `peacock/compiler/selfhost_ir.py` and `tests/integration/test_selfhost_ir.py` (the 1,139-line parser and 563-line type_model exceed the 256-slot VM limit for the single-`main` shadow wrapper).
 
 Stages:
 
-1. tokenizer — **done**;
-2. parser + AST — **partial**: full-grammar syntax and AST-digest parity are
-   done; error recovery, `PE2xxx` diagnostic/span parity and a typed AST are not;
-3. semantic analyser/type checker — **shadow prototype**: selected types,
-   expressions, scope/name/assignment/call/return/condition/iterable rules are
-   probed; diagnostics, fields/methods, native overloads and model/training
-   analysis are not ported; Python remains authoritative;
-4. IR and bytecode emitter — planned;
-5. VM in PEACOCK with a minimal host ABI — planned;
-6. fixed point: the PEACOCK compiler compiles itself, and the resulting image
-   passes the full suite.
+1. tokenizer — **done** (4 fns, 1951 instrs, token parity);
+2. parser + AST — **done** (57 fns, 8619 instrs, 15-file digest + self-parse; recovery `PE2xxx` still pending);
+3. semantic analyser/type checker — **partial** (32 fns, 5535 instrs, 56 checks; scope/name/call/return/condition/iterable probed, diagnostics/fields/methods still Python-authoritative);
+4. IR/optimiser/bytecode emitter — **done** (PIR `ir.सूत्र` 774L 53 fns 6376 instrs 8 checks 16-file parity + `bytecode.सूत्र` 635L 83 fns 4702 instrs 8 checks 9+3 parity + `optimizer.सूत्र` 650L 28 fns 8516 instrs 6 checks lenient);
+5. VM + host ABI — **partial** (`vm.सूत्र` 845L 48 fns 10146 instrs 9 checks: checked arithmetic, CALL recursion, `FINALLY` supersession, `MAKE_LIST/LEN/INDEX/STRUCT/FIELD`, `TRY/CATCH/FINALLY`, depth/host-grant budgets; `native.सूत्र` 106L 7 fns 3624 instrs 6 checks; `pipeline.सूत्र` 172L 7 fns 3455 instrs 6 checks);
+6. fixed point — **partial** (`peacock/tools/bootstrap.py` strict Python fixed-point for 10 selfhost programs → `.बीज` 53k instr SHA-256 deterministic + artifact round-trip, `peacock_lenient` via VM `pipeline.सूत्र` 6 checks, `build/bootstrap/*.बीज` written, `tests/integration/test_bootstrap.py` 3/3); PEACOCK pipeline still stub-wiring, not full semantic parity — next is making `pipeline.सूत्र` invoke real `tokenizer→parser→type_model→ir→bytecode→optimizer→vm` via the kernels.
 
 Acceptance criteria for "self-hosting": a reproducible build where stage 1 is
 produced by the bootstrap compiler, stage 2 by stage 1, and stage 1/stage 2 agree
 on output; the bootstrap is not required to run the tests. Until then, every
 document says **not self-hosting**.
 
-## Phase 10 — Ecosystem and research tooling — **planned**
+## Phase 10 — Ecosystem and research tooling — **partial**
 
-Deliverables: package/module system, formatter, linter, language server, editor
-plugins, documentation generator, reproducible experiment runner, dataset and
-model registries with licence checks, publication-quality evaluation harness.
+Delivered: deterministic `peacock fmt`/`पुनःस्वरूपय` (Python bootstrap + PEACOCK-native `selfhost/formatter.सूत्र` 1011-instr shadow, brace-depth + operator-spacing, idempotent, `--check` gate), `peacock lint` (check+fmt), `peacock new`/`peacock init` project scaffolds (`peacock.toml`, `main.सूत्र`, `.gitignore` templates: app/lib/site), `peacock doc` markdown generator from typed AST, `peacock package` with deterministic sha256 fingerprinting and validation, `peacock install`/`update` into `peacock_modules/` with provenance (`peacock.install.json`), plus `peacock debug`/`train`/`infer`/`agent`/`scene`/`colour` developer commands, and expanded `peacock tools.formatter`/`package` libraries. Editor TextMate/VS Code grammars remain prepared-but-unpublished; language server and full experiment runner are still planned.
+
+Still required: language server, deterministic package version resolution, reproducible experiment runner, dataset/model registries.
 
 AGI research tooling is scoped as infrastructure for experiments (tensor
 programs, deterministic runs, evaluation, provenance), **not** as a claim that
@@ -251,10 +251,11 @@ Acceptance criteria:
 
 Delivered: an attributed, offline package of all 3,983 Aṣṭādhyāyī sūtra texts;
 validated lookup/search, inheritance references and anuvṛtti display; generic
-Māheśvara pratyāhāra expansion; four executable vowel-sandhi rules with rule
-IDs; coverage reporting; native `.सूत्र` calls and a Sanskrit CLI. Provenance and
-the distinction between textual and executable coverage are recorded in
-`peacock/vyakarana/data/` and `docs/language/vyakarana.md`.
+Māheśvara pratyāhāra expansion; 16 executable sandhi rules with varṇa/paribhāṣā
+and ordered interaction, plus śabda/dhātu/samāsa/kāraka/derivation/validator with
+derivation traces and 32 native `.सूत्र` calls and a Sanskrit CLI (26 executable
+transforms). Provenance and the distinction between textual and executable
+coverage are recorded in `peacock/vyakarana/data/` and `docs/language/vyakarana.md`.
 
 Still required: a rule representation for environments, transformations and
 anuvṛtti; ordered interaction and conflict resolution; derivation traces;

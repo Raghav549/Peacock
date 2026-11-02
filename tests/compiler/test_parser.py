@@ -185,9 +185,11 @@ class ParserDiagnosticTests(unittest.TestCase):
         _, errors = parse_errors('कार्य मुख्य() -> एकक { }\nप्रकरण late')
         self.assertTrue(any(e.code == "PE2003" for e in errors))
 
-    def test_alias_is_rejected_with_targeted_message(self):
-        _, errors = parse_errors('उपयोग तन्त्रजाल रूपेण network;\nकार्य मुख्य() -> एकक { }')
-        self.assertTrue(any(e.code == "PE2005" for e in errors))
+    def test_alias_is_accepted(self):
+        mod, errors = parse_errors('उपयोग तन्त्रजाल रूपेण network;\nकार्य मुख्य() -> एकक { }')
+        self.assertEqual(len(errors), 0)
+        self.assertEqual(mod.uses[0].path, ["nn"])
+        self.assertEqual(mod.uses[0].alias, "network")
 
     def test_recovery_reports_multiple_items(self):
         _, errors = parse_errors(

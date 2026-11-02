@@ -1,0 +1,650 @@
+// PEACOCK-native optimiser (migration stage 4c).
+// Mirrors `peacock/compiler/optimizer.py`: constant folding, branch folding,
+// unreachable elimination, jump-to-next-label peephole and dead-temp elimination.
+// Operates on the PIR structures defined in `selfhost/ir.सूत्र`.
+// Differential oracle: peacock/compiler/selfhost_optimizer.py
+प्रकरण selfhost_optimizer
+उपयोग पाठ्य;
+
+// ---------------------------------------------------------------------------
+// Reuse IR model (duplicated for standalone kernel; must match ir.सूत्र)
+// ---------------------------------------------------------------------------
+संघटन IRInstr {
+    op: अक्षरमाला,
+    dest: पूर्णाङ्क,
+    arg0: अक्षरमाला,
+    arg1: अक्षरमाला,
+    arg2: अक्षरमाला,
+    dest_type_key: अक्षरमाला,
+    chihna: अक्षरमाला
+}
+संघटन IRFunction {
+    नाम: अक्षरमाला,
+    slot_count: पूर्णाङ्क,
+    return_type_key: अक्षरमाला,
+    instrs: सूची<IRInstr>
+}
+संघटन IRModule {
+    नाम: अक्षरमाला,
+    functions: सूची<IRFunction>,
+    uses: सूची<अक्षरमाला>,
+    struct_descs: सूची<अक्षरमाला>
+}
+संघटन OptStats {
+    constants_folded: पूर्णाङ्क,
+    branches_folded: पूर्णाङ्क,
+    unreachable_removed: पूर्णाङ्क,
+    jumps_removed: पूर्णाङ्क,
+    labels_removed: पूर्णाङ्क,
+    dead_temps_removed: पूर्णाङ्क
+}
+
+// ---------------------------------------------------------------------------
+// Helpers for literal handling
+// ---------------------------------------------------------------------------
+कार्य is_digit_string(s: अक्षरमाला) -> सत्यता {
+    यदि दैर्घ्य(s) == ० { प्रत्यानय असत्य; }
+    स्थापय परिवर्तनीय i = ०;
+    यदि पाठ्य.अक्षरम्(s, ०) == "-" { i = १; यदि दैर्घ्य(s) == १ { प्रत्यानय असत्य; } }
+    यावत् i < दैर्घ्य(s) {
+        यदि न पाठ्य.अङ्कः(पाठ्य.अक्षरम्(s, i)) { प्रत्यानय असत्य; }
+        i += १;
+    }
+    प्रत्यानय सत्य;
+}
+कार्य is_bool_repr(s: अक्षरमाला) -> सत्यता { प्रत्यानय s == "true" वा s == "false" वा s == "सत्य" वा s == "असत्य"; }
+कार्य parse_bool(s: अक्षरमाला) -> सत्यता { प्रत्यानय s == "true" वा s == "सत्य"; }
+कार्य bool_repr(b: सत्यता) -> अक्षरमाला { यदि b { प्रत्यानय "true"; } प्रत्यानय "false"; }
+
+कार्य string_to_int(s: अक्षरमाला) -> पूर्णाङ्क {
+    // assumes is_digit_string true, handles leading -
+    स्थापय परिवर्तनीय neg = असत्य;
+    स्थापय परिवर्तनीय आरम्भ = ०;
+    यदि पाठ्य.अक्षरम्(s, ०) == "-" { neg = सत्य; आरम्भ = १; }
+    स्थापय परिवर्तनीय v = ०;
+    स्थापय परिवर्तनीय i = आरम्भ;
+    यावत् i < दैर्घ्य(s) {
+        स्थापय d = पाठ्य.अक्षरसङ्ख्या(पाठ्य.अक्षरम्(s, i)) - पाठ्य.अक्षरसङ्ख्या("0");
+        v = v * १० + d;
+        i += १;
+    }
+    यदि neg { v = -v; }
+    प्रत्यानय v;
+}
+कार्य int_ok(v: पूर्णाङ्क) -> सत्यता {
+    // INT64 bounds check: -(2^63) .. 2^63-1
+    // Compute bounds via incremental to avoid literal overflow in PEACOCK int?
+    // Use known constants: -9223372036854775808 .. 9223372036854775807
+    // PEACOCK पूर्णाङ्क is 64-bit; literal fits.
+    // Use max = 9223372036854775807, min = -max -1
+    स्थापय परिवर्तनीय maxv = ९२२३३७२०३६८५४७७५८०७;
+    यदि v > maxv { प्रत्यानय असत्य; }
+    यदि v < -maxv - १ { प्रत्यानय असत्य; }
+    प्रत्यानय सत्य;
+}
+कार्य fold_binop(op: अक्षरमाला, a_repr: अक्षरमाला, b_repr: अक्षरमाला, a_is_int: सत्यता, b_is_int: सत्यता) -> अक्षरमाला {
+    // Returns folded repr or "" if not foldable. Handles int ops and string + and comparisons.
+    // For int case, both must be digit strings.
+    यदि op == "+" तथा a_is_int तथा b_is_int {
+        स्थापय av = string_to_int(a_repr);
+        स्थापय bv = string_to_int(b_repr);
+        स्थापय परिवर्तनीय rv = av + bv;
+        यदि न int_ok(rv) { प्रत्यानय ""; }
+        प्रत्यानय पाठ्यीकरण(rv);
+    }
+    यदि op == "-" तथा a_is_int तथा b_is_int {
+        स्थापय av = string_to_int(a_repr);
+        स्थापय bv = string_to_int(b_repr);
+        स्थापय परिवर्तनीय rv = av - bv;
+        यदि न int_ok(rv) { प्रत्यानय ""; }
+        प्रत्यानय पाठ्यीकरण(rv);
+    }
+    यदि op == "*" तथा a_is_int तथा b_is_int {
+        स्थापय av = string_to_int(a_repr);
+        स्थापय bv = string_to_int(b_repr);
+        स्थापय परिवर्तनीय rv = av * bv;
+        यदि न int_ok(rv) { प्रत्यानय ""; }
+        प्रत्यानय पाठ्यीकरण(rv);
+    }
+    यदि op == "/" तथा a_is_int तथा b_is_int {
+        स्थापय av = string_to_int(a_repr);
+        स्थापय bv = string_to_int(b_repr);
+        यदि bv == ० { प्रत्यानय ""; }
+        स्थापय परिवर्तनीय q = ०;
+        // abs division trunc toward zero
+        स्थापय परिवर्तनीय abs_a = av; यदि abs_a < ० { abs_a = -abs_a; }
+        स्थापय परिवर्तनीय abs_b = bv; यदि abs_b < ० { abs_b = -abs_b; }
+        q = abs_a / abs_b;
+        // integer division for positive; PEACOCK / on ints is trunc
+        यदि (av < ०) != (bv < ०) { q = -q; }
+        यदि न int_ok(q) { प्रत्यानय ""; }
+        प्रत्यानय पाठ्यीकरण(q);
+    }
+    यदि op == "%" तथा a_is_int तथा b_is_int {
+        स्थापय av = string_to_int(a_repr);
+        स्थापय bv = string_to_int(b_repr);
+        यदि bv == ० { प्रत्यानय ""; }
+        स्थापय परिवर्तनीय abs_a = av; यदि abs_a < ० { abs_a = -abs_a; }
+        स्थापय परिवर्तनीय abs_b = bv; यदि abs_b < ० { abs_b = -abs_b; }
+        स्थापय परिवर्तनीय q = abs_a / abs_b;
+        यदि (av < ०) != (bv < ०) { q = -q; }
+        स्थापय परिवर्तनीय rv = av - q * bv;
+        यदि न int_ok(rv) { प्रत्यानय ""; }
+        प्रत्यानय पाठ्यीकरण(rv);
+    }
+    यदि op == "**" तथा a_is_int तथा b_is_int {
+        स्थापय av = string_to_int(a_repr);
+        स्थापय bv = string_to_int(b_repr);
+        यदि bv < ० वा bv > ६३ { प्रत्यानय ""; }
+        स्थापय परिवर्तनीय rv = १;
+        स्थापय परिवर्तनीय i = ०;
+        यावत् i < bv {
+            rv = rv * av;
+            यदि न int_ok(rv) { प्रत्यानय ""; }
+            i += १;
+        }
+        प्रत्यानय पाठ्यीकरण(rv);
+    }
+    यदि op == "+" {
+        प्रत्यानय a_repr + b_repr;
+    }
+    // comparisons for ints / bools / strings (exact type same handled by caller)
+    प्रत्यानय "";
+}
+
+// ---------------------------------------------------------------------------
+// Module helpers
+// ---------------------------------------------------------------------------
+कार्य new_module(नाम: अक्षरमाला) -> IRModule { प्रत्यानय IRModule(नाम, [], [], []); }
+कार्य module_add_function(mod: IRModule, kary: IRFunction) { mod.functions.योजय(kary); }
+कार्य module_add_use(mod: IRModule, cap: अक्षरमाला) { mod.uses.योजय(cap); }
+कार्य module_add_struct(mod: IRModule, desc: अक्षरमाला) { mod.struct_descs.योजय(desc); }
+कार्य new_builder(नाम: अक्षरमाला, slot_count: पूर्णाङ्क, return_type_key: अक्षरमाला) -> IRFunction {
+    // For optimizer kernel we construct functions directly; builder not needed but keep for tests.
+    प्रत्यानय IRFunction(नाम, slot_count, return_type_key, []);
+}
+
+// ---------------------------------------------------------------------------
+// Escape / digest (reuse from ir.सूत्र)
+// ---------------------------------------------------------------------------
+कार्य escape_for_digest(s: अक्षरमाला) -> अक्षरमाला {
+    स्थापय परिवर्तनीय t = s.प्रतिस्थापय("\\", "\\\\");
+    t = t.प्रतिस्थापय("\"", "\\\"");
+    t = t.प्रतिस्थापय("\n", "\\n");
+    t = t.प्रतिस्थापय("\r", "\\r");
+    t = t.प्रतिस्थापय("\t", "\\t");
+    प्रत्यानय t;
+}
+कार्य instr_digest(instr: IRInstr) -> अक्षरमाला {
+    स्थापय परिवर्तनीय dest_part = "";
+    यदि instr.dest >= ० { dest_part = " %" + पाठ्यीकरण(instr.dest); }
+    स्थापय परिवर्तनीय args_part = "";
+    यदि instr.op == "label" { args_part = " " + instr.arg0; }
+    अन्यथा यदि instr.op == "jump" { args_part = " " + instr.arg0; }
+    अन्यथा यदि instr.op == "branch" { args_part = " " + instr.arg0 + " " + instr.arg1 + " " + instr.arg2; }
+    अन्यथा यदि instr.op == "return" { यदि instr.arg0 != "null" { args_part = " " + instr.arg0; } }
+    अन्यथा यदि instr.op == "throw" { args_part = " " + instr.arg0; }
+    अन्यथा यदि instr.op == "const" {
+        यदि instr.dest_type_key == "अक्षरमाला" { args_part = " \"" + escape_for_digest(instr.arg0) + "\""; }
+        अन्यथा { args_part = " " + instr.arg0; }
+        यदि instr.dest_type_key != "" { args_part = args_part + " :" + instr.dest_type_key; }
+    } अन्यथा यदि instr.op == "slot_set" { args_part = " " + instr.arg0 + " " + instr.arg1; }
+    अन्यथा यदि instr.op == "slot_get" { args_part = " " + instr.arg0; यदि instr.dest_type_key != "" { args_part = args_part + " :" + instr.dest_type_key; } }
+    अन्यथा यदि instr.op == "move" { args_part = " " + instr.arg0; यदि instr.dest_type_key != "" { args_part = args_part + " :" + instr.dest_type_key; } }
+    अन्यथा यदि instr.op == "binop" { args_part = " " + instr.arg0 + " " + instr.arg1 + " " + instr.arg2; यदि instr.dest_type_key != "" { args_part = args_part + " :" + instr.dest_type_key; } }
+    अन्यथा यदि instr.op == "unop" { args_part = " " + instr.arg0 + " " + instr.arg1; यदि instr.dest_type_key != "" { args_part = args_part + " :" + instr.dest_type_key; } }
+    अन्यथा यदि instr.op == "call" वा instr.op == "call_native" { args_part = " " + instr.arg0; यदि instr.arg1 != "" { args_part = args_part + " [" + instr.arg1 + "]"; } यदि instr.dest_type_key != "" { args_part = args_part + " :" + instr.dest_type_key; } }
+    अन्यथा यदि instr.op == "make_list" { यदि instr.arg0 != "" { args_part = " [" + instr.arg0 + "]"; } यदि instr.dest_type_key != "" { args_part = args_part + " :" + instr.dest_type_key; } }
+    अन्यथा यदि instr.op == "make_range" { args_part = " " + instr.arg0 + " " + instr.arg1; यदि instr.dest_type_key != "" { args_part = args_part + " :" + instr.dest_type_key; } }
+    अन्यथा यदि instr.op == "index_get" { args_part = " " + instr.arg0 + " " + instr.arg1; यदि instr.dest_type_key != "" { args_part = args_part + " :" + instr.dest_type_key; } }
+    अन्यथा यदि instr.op == "index_set" { args_part = " " + instr.arg0 + " " + instr.arg1 + " " + instr.arg2; }
+    अन्यथा यदि instr.op == "field_get" { args_part = " " + instr.arg0 + " " + instr.arg1; यदि instr.dest_type_key != "" { args_part = args_part + " :" + instr.dest_type_key; } }
+    अन्यथा यदि instr.op == "field_set" { args_part = " " + instr.arg0 + " " + instr.arg1 + " " + instr.arg2; }
+    अन्यथा यदि instr.op == "len" { args_part = " " + instr.arg0; यदि instr.dest_type_key != "" { args_part = args_part + " :" + instr.dest_type_key; } }
+    अन्यथा यदि instr.op == "assert" { args_part = " " + instr.arg0; यदि instr.arg1 != "null" तथा instr.arg1 != "" { args_part = args_part + " " + instr.arg1; } }
+    अन्यथा यदि instr.op == "struct_new" { args_part = " " + instr.arg0; यदि instr.arg1 != "" { args_part = args_part + " [" + instr.arg1 + "]"; } यदि instr.dest_type_key != "" { args_part = args_part + " :" + instr.dest_type_key; } }
+    अन्यथा यदि instr.op == "method" { args_part = " " + instr.arg0 + " " + instr.arg1; यदि instr.arg2 != "" { args_part = args_part + " [" + instr.arg2 + "]"; } यदि instr.dest_type_key != "" { args_part = args_part + " :" + instr.dest_type_key; } }
+    अन्यथा यदि instr.op == "try_begin" वा instr.op == "finally_begin" वा instr.op == "finally_end" { यदि instr.arg0 != "" { args_part = " " + instr.arg0; } }
+    अन्यथा यदि instr.op == "catch" { यदि instr.dest_type_key != "" { args_part = " :" + instr.dest_type_key; } }
+    अन्यथा यदि instr.op == "try_end" वा instr.op == "finally_resume" { args_part = ""; }
+    अन्यथा {
+        यदि instr.arg0 != "" { args_part = args_part + " " + instr.arg0; }
+        यदि instr.arg1 != "" { args_part = args_part + " " + instr.arg1; }
+        यदि instr.arg2 != "" { args_part = args_part + " " + instr.arg2; }
+    }
+    प्रत्यानय "(" + instr.op + dest_part + args_part + ")";
+}
+कार्य function_digest(kary: IRFunction) -> अक्षरमाला {
+    स्थापय परिवर्तनीय out = "(fn " + kary.नाम + " slots=" + पाठ्यीकरण(kary.slot_count) + " ret=" + kary.return_type_key;
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < दैर्घ्य(kary.instrs) {
+        out = out + "\n  " + instr_digest(kary.instrs.प्राप्नु(i));
+        i += १;
+    }
+    प्रत्यानय out + "\n)";
+}
+कार्य module_digest(mod: IRModule) -> अक्षरमाला {
+    स्थापय परिवर्तनीय out = "(module " + mod.नाम;
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < दैर्घ्य(mod.uses) {
+        out = out + " (use " + mod.uses.प्राप्नु(i) + ")";
+        i += १;
+    }
+    out = out + ")";
+    स्थापय परिवर्तनीय j = ०;
+    यावत् j < दैर्घ्य(mod.functions) {
+        out = out + "\n" + function_digest(mod.functions.प्राप्नु(j));
+        j += १;
+    }
+    स्थापय परिवर्तनीय k = ०;
+    यावत् k < दैर्घ्य(mod.struct_descs) {
+        out = out + "\n" + mod.struct_descs.प्राप्नु(k);
+        k += १;
+    }
+    प्रत्यानय out;
+}
+
+// ---------------------------------------------------------------------------
+// Optimiser passes (PEACOCK-native, conservative)
+// ---------------------------------------------------------------------------
+कार्य is_boundary_op(op: अक्षरमाला) -> सत्यता {
+    प्रत्यानय op == "label" वा op == "jump" वा op == "try_begin" वा op == "try_end" वा op == "catch" वा op == "finally_begin" वा op == "finally_end" वा op == "finally_resume";
+}
+
+कार्य fold_constants(kary: IRFunction, stats: OptStats) -> IRFunction {
+    // Map slot -> const repr and is_int
+    स्थापय परिवर्तनीय const_keys: सूची<पूर्णाङ्क> = [];
+    स्थापय परिवर्तनीय const_vals: सूची<अक्षरमाला> = [];
+    स्थापय परिवर्तनीय const_is_int: सूची<सत्यता> = [];
+    स्थापय परिवर्तनीय out_instrs: सूची<IRInstr> = [];
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < दैर्घ्य(kary.instrs) {
+        स्थापय instr = kary.instrs.प्राप्नु(i);
+        यदि is_boundary_op(instr.op) {
+            // clear map
+            const_keys = [];
+            const_vals = [];
+            const_is_int = [];
+        }
+        यदि instr.op == "const" तथा instr.dest >= ० {
+            स्थापय is_int = is_digit_string(instr.arg0);
+            // add to map (replace existing)
+            स्थापय परिवर्तनीय found = असत्य;
+            स्थापय परिवर्तनीय k = ०;
+            यावत् k < दैर्घ्य(const_keys) {
+                यदि const_keys.प्राप्नु(k) == instr.dest {
+                    found = सत्य;
+                }
+                k += १;
+            }
+            यदि न found { const_keys.योजय(instr.dest); const_vals.योजय(instr.arg0); const_is_int.योजय(is_int); }
+            out_instrs.योजय(instr);
+        } अन्यथा यदि instr.op == "binop" {
+            // find a,b in map
+            स्थापय _a_reg = ०; // will parse arg1 as int
+            स्थापय _b_reg = ०;
+            // args: op, a, b (arg0=op, arg1=a, arg2=b)
+            // Use helper to parse slot numbers
+            स्थापय परिवर्तनीय a_slot = ०; स्थापय परिवर्तनीय b_slot = ०;
+            // arg1, arg2 are slot numbers as strings
+            // quick parse via manual
+            // We can use string_to_int if is_digit_string
+            यदि is_digit_string(instr.arg1) { a_slot = string_to_int(instr.arg1); } अन्यथा { a_slot = -१; }
+            यदि is_digit_string(instr.arg2) { b_slot = string_to_int(instr.arg2); } अन्यथा { b_slot = -१; }
+            स्थापय परिवर्तनीय a_idx = -१; स्थापय परिवर्तनीय b_idx = -१;
+            स्थापय परिवर्तनीय k2 = ०;
+            यावत् k2 < दैर्घ्य(const_keys) {
+                यदि const_keys.प्राप्नु(k2) == a_slot { a_idx = k2; }
+                यदि const_keys.प्राप्नु(k2) == b_slot { b_idx = k2; }
+                k2 += १;
+            }
+            यदि a_idx >= ० तथा b_idx >= ० {
+                स्थापय a_repr = const_vals.प्राप्नु(a_idx);
+                स्थापय b_repr = const_vals.प्राप्नु(b_idx);
+                स्थापय folded = fold_binop(instr.arg0, a_repr, b_repr, const_is_int.प्राप्नु(a_idx), const_is_int.प्राप्नु(b_idx));
+                यदि folded != "" {
+                    // emit const instead
+                    स्थापय new_instr = IRInstr("const", instr.dest, folded, "", "", instr.dest_type_key, "");
+                    out_instrs.योजय(new_instr);
+                    // update map
+                    स्थापय is_int = is_digit_string(folded);
+                    स्थापय परिवर्तनीय found2 = असत्य;
+                    स्थापय परिवर्तनीय kk = ०;
+                    यावत् kk < दैर्घ्य(const_keys) {
+                        यदि const_keys.प्राप्नु(kk) == instr.dest { found2 = सत्य; }
+                        kk += १;
+                    }
+                    यदि न found2 { const_keys.योजय(instr.dest); const_vals.योजय(folded); const_is_int.योजय(is_int); }
+                    stats.constants_folded += १;
+                } अन्यथा {
+                    // not foldable: kill dest
+                    स्थापय परिवर्तनीय kk2 = ०;
+                    स्थापय परिवर्तनीय new_keys: सूची<पूर्णाङ्क> = [];
+                    स्थापय परिवर्तनीय new_vals: सूची<अक्षरमाला> = [];
+                    स्थापय परिवर्तनीय new_is: सूची<सत्यता> = [];
+                    यावत् kk2 < दैर्घ्य(const_keys) {
+                        यदि const_keys.प्राप्नु(kk2) != instr.dest { new_keys.योजय(const_keys.प्राप्नु(kk2)); new_vals.योजय(const_vals.प्राप्नु(kk2)); new_is.योजय(const_is_int.प्राप्नु(kk2)); }
+                        kk2 += १;
+                    }
+                    const_keys = new_keys; const_vals = new_vals; const_is_int = new_is;
+                    out_instrs.योजय(instr);
+                }
+            } अन्यथा {
+                // kill dest
+                स्थापय परिवर्तनीय kk3 = ०;
+                स्थापय परिवर्तनीय nk: सूची<पूर्णाङ्क> = [];
+                स्थापय परिवर्तनीय nv: सूची<अक्षरमाला> = [];
+                स्थापय परिवर्तनीय ni: सूची<सत्यता> = [];
+                यावत् kk3 < दैर्घ्य(const_keys) {
+                    यदि const_keys.प्राप्नु(kk3) != instr.dest { nk.योजय(const_keys.प्राप्नु(kk3)); nv.योजय(const_vals.प्राप्नु(kk3)); ni.योजय(const_is_int.प्राप्नु(kk3)); }
+                    kk3 += १;
+                }
+                const_keys = nk; const_vals = nv; const_is_int = ni;
+                out_instrs.योजय(instr);
+            }
+        } अन्यथा यदि instr.op == "branch" {
+            // check cond is const bool
+            स्थापय परिवर्तनीय cond_slot = -१;
+            यदि is_digit_string(instr.arg0) { cond_slot = string_to_int(instr.arg0); }
+            स्थापय परिवर्तनीय c_idx = -१;
+            स्थापय परिवर्तनीय k3 = ०;
+            यावत् k3 < दैर्घ्य(const_keys) {
+                यदि const_keys.प्राप्नु(k3) == cond_slot { c_idx = k3; }
+                k3 += १;
+            }
+            यदि c_idx >= ० तथा is_bool_repr(const_vals.प्राप्नु(c_idx)) {
+                स्थापय bval = parse_bool(const_vals.प्राप्नु(c_idx));
+                स्थापय परिवर्तनीय लक्ष्य = "";
+                यदि bval { लक्ष्य = instr.arg1; } अन्यथा { लक्ष्य = instr.arg2; }
+                स्थापय new_jump = IRInstr("jump", -१, लक्ष्य, "", "", "", "");
+                out_instrs.योजय(new_jump);
+                stats.branches_folded += १;
+                const_keys = []; const_vals = []; const_is_int = [];
+            } अन्यथा {
+                // kill dest if any (branch has dest -1)
+                out_instrs.योजय(instr);
+            }
+        } अन्यथा {
+            यदि instr.dest >= ० {
+                स्थापय परिवर्तनीय kk4 = ०;
+                स्थापय परिवर्तनीय nk2: सूची<पूर्णाङ्क> = [];
+                स्थापय परिवर्तनीय nv2: सूची<अक्षरमाला> = [];
+                स्थापय परिवर्तनीय ni2: सूची<सत्यता> = [];
+                यावत् kk4 < दैर्घ्य(const_keys) {
+                    यदि const_keys.प्राप्नु(kk4) != instr.dest { nk2.योजय(const_keys.प्राप्नु(kk4)); nv2.योजय(const_vals.प्राप्नु(kk4)); ni2.योजय(const_is_int.प्राप्नु(kk4)); }
+                    kk4 += १;
+                }
+                const_keys = nk2; const_vals = nv2; const_is_int = ni2;
+            }
+            out_instrs.योजय(instr);
+        }
+        i += १;
+    }
+    kary.instrs = out_instrs;
+    प्रत्यानय kary;
+}
+
+कार्य peephole(kary: IRFunction, stats: OptStats) -> IRFunction {
+    स्थापय परिवर्तनीय out: सूची<IRInstr> = [];
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < दैर्घ्य(kary.instrs) {
+        स्थापय instr = kary.instrs.प्राप्नु(i);
+        यदि instr.op == "jump" तथा i + १ < दैर्घ्य(kary.instrs) {
+            स्थापय nxt = kary.instrs.प्राप्नु(i+१);
+            यदि nxt.op == "label" तथा nxt.arg0 == instr.arg0 {
+                stats.jumps_removed += १;
+                i += १;
+                अनुवर्तय;
+            }
+        }
+        out.योजय(instr);
+        i += १;
+    }
+    // remove labels not referenced
+    स्थापय used_chihna: सूची<अक्षरमाला> = [];
+    स्थापय परिवर्तनीय pi2 = ०;
+    यावत् pi2 < दैर्घ्य(out) {
+        स्थापय uinstr = out.प्राप्नु(pi2);
+        यदि uinstr.op == "jump" वा uinstr.op == "try_begin" वा uinstr.op == "finally_begin" वा uinstr.op == "finally_end" {
+            स्थापय परिवर्तनीय found = असत्य;
+            स्थापय परिवर्तनीय vi = ०;
+            यावत् vi < दैर्घ्य(used_chihna) { यदि used_chihna.प्राप्नु(vi) == uinstr.arg0 { found = सत्य; } vi += १; }
+            यदि न found { used_chihna.योजय(uinstr.arg0); }
+        } अन्यथा यदि uinstr.op == "branch" {
+            स्थापय परिवर्तनीय f1 = असत्य; स्थापय परिवर्तनीय f2 = असत्य;
+            स्थापय परिवर्तनीय vi2 = ०; यावत् vi2 < दैर्घ्य(used_chihna) { यदि used_chihna.प्राप्नु(vi2) == uinstr.arg1 { f1 = सत्य; } यदि used_chihna.प्राप्नु(vi2) == uinstr.arg2 { f2 = सत्य; } vi2 += १; }
+            यदि न f1 { used_chihna.योजय(uinstr.arg1); } यदि न f2 { used_chihna.योजय(uinstr.arg2); }
+        }
+        pi2 += १;
+    }
+    स्थापय filtered: सूची<IRInstr> = [];
+    स्थापय परिवर्तनीय fi = ०;
+    यावत् fi < दैर्घ्य(out) {
+        स्थापय finstr = out.प्राप्नु(fi);
+        यदि finstr.op == "label" {
+            स्थापय परिवर्तनीय is_used = असत्य;
+            स्थापय परिवर्तनीय vi3 = ०; यावत् vi3 < दैर्घ्य(used_chihna) { यदि used_chihna.प्राप्नु(vi3) == finstr.arg0 { is_used = सत्य; } vi3 += १; }
+            यदि न is_used { stats.labels_removed += १; fi += १; अनुवर्तय; }
+        }
+        filtered.योजय(finstr);
+        fi += १;
+    }
+    kary.instrs = filtered;
+    प्रत्यानय kary;
+}
+
+
+कार्य is_pure_op(op: अक्षरमाला) -> सत्यता {
+    प्रत्यानय op == "const" वा op == "move" वा op == "make_range" वा op == "nop";
+}
+कार्य find_label_index(kary: IRFunction, abhidha: अक्षरमाला) -> पूर्णाङ्क {
+    स्थापय परिवर्तनीय idx = ०;
+    यावत् idx < दैर्घ्य(kary.instrs) {
+        स्थापय instr = kary.instrs.प्राप्नु(idx);
+        यदि instr.op == "label" तथा instr.arg0 == abhidha { प्रत्यानय idx; }
+        idx += १;
+    }
+    प्रत्यानय -१;
+}
+कार्य contains_int(arr: सूची<पूर्णाङ्क>, v: पूर्णाङ्क) -> सत्यता {
+    स्थापय परिवर्तनीय ci = ०; यावत् ci < दैर्घ्य(arr) { यदि arr.प्राप्नु(ci) == v { प्रत्यानय सत्य; } ci += १; } प्रत्यानय असत्य;
+}
+कार्य remove_unreachable(kary: IRFunction, stats: OptStats) -> IRFunction {
+    यदि दैर्घ्य(kary.instrs) == ० { प्रत्यानय kary; }
+    स्थापय परिवर्तनीय reachable: सूची<पूर्णाङ्क> = [];
+    स्थापय work: सूची<पूर्णाङ्क> = [];
+    work.योजय(०);
+    यावत् दैर्घ्य(work) > ० {
+        स्थापय cur = work.प्राप्नु(दैर्घ्य(work)-१);
+        work.निष्कासय();
+        यदि cur < ० वा cur >= दैर्घ्य(kary.instrs) { अनुवर्तय; }
+        यदि contains_int(reachable, cur) { अनुवर्तय; }
+        reachable.योजय(cur);
+        स्थापय instr = kary.instrs.प्राप्नु(cur);
+        यदि instr.op == "jump" {
+            स्थापय tgt = find_label_index(kary, instr.arg0);
+            यदि tgt >= ० { work.योजय(tgt); }
+        } अन्यथा यदि instr.op == "branch" {
+            स्थापय t1 = find_label_index(kary, instr.arg1);
+            स्थापय t2 = find_label_index(kary, instr.arg2);
+            यदि t1 >= ० { work.योजय(t1); } यदि t2 >= ० { work.योजय(t2); }
+        } अन्यथा यदि instr.op == "return" वा instr.op == "throw" {
+        } अन्यथा यदि instr.op == "try_begin" वा instr.op == "finally_begin" {
+            स्थापय tgt = find_label_index(kary, instr.arg0);
+            यदि tgt >= ० { work.योजय(tgt); }
+            work.योजय(cur + १);
+        } अन्यथा यदि instr.op == "finally_end" {
+            स्थापय tgt = find_label_index(kary, instr.arg0);
+            यदि tgt >= ० { work.योजय(tgt); }
+            work.योजय(cur + १);
+        } अन्यथा यदि instr.op == "finally_resume" {
+            work.योजय(cur + १);
+        } अन्यथा {
+            work.योजय(cur + १);
+        }
+    }
+    यदि दैर्घ्य(reachable) == दैर्घ्य(kary.instrs) { प्रत्यानय kary; }
+    stats.unreachable_removed += दैर्घ्य(kary.instrs) - दैर्घ्य(reachable);
+    स्थापय filtered: सूची<IRInstr> = [];
+    स्थापय परिवर्तनीय ri = ०;
+    यावत् ri < दैर्घ्य(kary.instrs) {
+        यदि contains_int(reachable, ri) { filtered.योजय(kary.instrs.प्राप्नु(ri)); }
+        ri += १;
+    }
+    kary.instrs = filtered;
+    प्रत्यानय kary;
+}
+कार्य dead_temps(kary: IRFunction, stats: OptStats) -> IRFunction {
+    स्थापय used: सूची<पूर्णाङ्क> = [];
+    स्थापय परिवर्तनीय ui2 = ०;
+    यावत् ui2 < दैर्घ्य(kary.instrs) {
+        स्थापय instr = kary.instrs.प्राप्नु(ui2);
+        // conservative: any arg that looks like slot number is considered used
+        यदि is_digit_string(instr.arg0) {
+            स्थापय v = string_to_int(instr.arg0);
+            यदि न contains_int(used, v) { used.योजय(v); }
+        }
+        यदि is_digit_string(instr.arg1) {
+            स्थापय v = string_to_int(instr.arg1);
+            यदि न contains_int(used, v) { used.योजय(v); }
+        }
+        यदि is_digit_string(instr.arg2) {
+            स्थापय v2 = string_to_int(instr.arg2);
+            यदि न contains_int(used, v2) { used.योजय(v2); }
+        }
+        ui2 += १;
+    }
+    स्थापय परिवर्तनीय changed = सत्य;
+    यावत् changed {
+        changed = असत्य;
+        स्थापय kept: सूची<IRInstr> = [];
+        स्थापय परिवर्तनीय ki = ०;
+        यावत् ki < दैर्घ्य(kary.instrs) {
+            स्थापय instr = kary.instrs.प्राप्नु(ki);
+            यदि is_pure_op(instr.op) तथा instr.dest >= ० तथा न contains_int(used, instr.dest) {
+                stats.dead_temps_removed += १;
+                changed = सत्य;
+            } अन्यथा {
+                kept.योजय(instr);
+            }
+            ki += १;
+        }
+        kary.instrs = kept;
+    }
+    प्रत्यानय kary;
+}
+कार्य optimize_function(kary: IRFunction, stats: OptStats) -> IRFunction {
+    स्थापय परिवर्तनीय cur = kary;
+    cur = fold_constants(cur, stats);
+    cur = remove_unreachable(cur, stats);
+    cur = peephole(cur, stats);
+    cur = dead_temps(cur, stats);
+    cur = peephole(cur, stats);
+    प्रत्यानय cur;
+}
+कार्य optimize_module(mod: IRModule) -> OptStats {
+    स्थापय stats = OptStats(०, ०, ०, ०, ०, ०);
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < दैर्घ्य(mod.functions) {
+        स्थापय kary = mod.functions.प्राप्नु(i);
+        स्थापय परिवर्तनीय _tmp_k = optimize_function(kary, stats);
+        i += १;
+    }
+    प्रत्यानय stats;
+}
+
+// ---------------------------------------------------------------------------
+// Built-in checks
+// ---------------------------------------------------------------------------
+कार्य run_builtin_checks() -> पूर्णाङ्क {
+    स्थापय परिवर्तनीय cases = ०;
+    // 1) constant folding int+int
+    स्थापय mod1 = new_module("demo1");
+    स्थापय kary1 = IRFunction("alpha", ५, "पूर्णाङ्क", []);
+    kary1.instrs.योजय(IRInstr("const", ०, "2", "", "", "पूर्णाङ्क", ""));
+    kary1.instrs.योजय(IRInstr("const", १, "3", "", "", "पूर्णाङ्क", ""));
+    kary1.instrs.योजय(IRInstr("binop", २, "+", "0", "1", "पूर्णाङ्क", ""));
+    kary1.instrs.योजय(IRInstr("return", -१, "2", "", "", "", ""));
+    module_add_function(mod1, kary1);
+    स्थापय stats1 = optimize_module(mod1);
+    निश्चिनु(stats1.constants_folded == १);
+    निश्चिनु(दैर्घ्य(mod1.functions.प्राप्नु(०).instrs) == २);
+    निश्चिनु(mod1.functions.प्राप्नु(०).instrs.प्राप्नु(०).op == "const");
+    निश्चिनु(mod1.functions.प्राप्नु(०).instrs.प्राप्नु(०).dest == २);
+    cases += १;
+    // 2) branch folding true -> jump
+    स्थापय mod2 = new_module("demo2");
+    स्थापय kary2 = IRFunction("beta", ३, "एकक", []);
+    kary2.instrs.योजय(IRInstr("const", ०, "true", "", "", "सत्यता", ""));
+    kary2.instrs.योजय(IRInstr("branch", -१, "0", "then", "else", "", ""));
+    kary2.instrs.योजय(IRInstr("label", -१, "then", "", "", "", ""));
+    kary2.instrs.योजय(IRInstr("const", १, "1", "", "", "पूर्णाङ्क", ""));
+    kary2.instrs.योजय(IRInstr("jump", -१, "endif", "", "", "", ""));
+    kary2.instrs.योजय(IRInstr("label", -१, "else", "", "", "", ""));
+    kary2.instrs.योजय(IRInstr("const", १, "2", "", "", "पूर्णाङ्क", ""));
+    kary2.instrs.योजय(IRInstr("jump", -१, "endif", "", "", "", ""));
+    kary2.instrs.योजय(IRInstr("label", -१, "endif", "", "", "", ""));
+    kary2.instrs.योजय(IRInstr("return", -१, "1", "", "", "", ""));
+    module_add_function(mod2, kary2);
+    स्थापय stats2 = optimize_module(mod2);
+    निश्चिनु(stats2.branches_folded == १);
+    स्थापय परिवर्तनीय has_branch2 = असत्य;
+    स्थापय परिवर्तनीय bi2 = ०;
+    यावत् bi2 < दैर्घ्य(mod2.functions.प्राप्नु(०).instrs) {
+        यदि mod2.functions.प्राप्नु(०).instrs.प्राप्नु(bi2).op == "branch" { has_branch2 = सत्य; }
+        bi2 += १;
+    }
+    निश्चिनु(has_branch2 == असत्य);
+    cases += १;
+    // 3) peephole jump-to-next-label
+    स्थापय mod3 = new_module("demo3");
+    स्थापय kary3 = IRFunction("gamma", १, "एकक", []);
+    kary3.instrs.योजय(IRInstr("jump", -१, "next", "", "", "", ""));
+    kary3.instrs.योजय(IRInstr("label", -१, "next", "", "", "", ""));
+    kary3.instrs.योजय(IRInstr("return", -१, "null", "", "", "", ""));
+    module_add_function(mod3, kary3);
+    स्थापय stats3 = optimize_module(mod3);
+    निश्चिनु(stats3.jumps_removed == १);
+    निश्चिनु(दैर्घ्य(mod3.functions.प्राप्नु(०).instrs) == १);
+    cases += १;
+    // 4) string concat folding
+    स्थापय mod4 = new_module("demo4");
+    स्थापय kary4 = IRFunction("delta", ३, "अक्षरमाला", []);
+    kary4.instrs.योजय(IRInstr("const", ०, "a", "", "", "अक्षरमाला", ""));
+    kary4.instrs.योजय(IRInstr("const", १, "b", "", "", "अक्षरमाला", ""));
+    kary4.instrs.योजय(IRInstr("binop", २, "+", "0", "1", "अक्षरमाला", ""));
+    kary4.instrs.योजय(IRInstr("return", -१, "2", "", "", "", ""));
+    module_add_function(mod4, kary4);
+    स्थापय stats4 = optimize_module(mod4);
+    निश्चिनु(stats4.constants_folded == १);
+    निश्चिनु(दैर्घ्य(mod4.functions.प्राप्नु(०).instrs) == २);
+    निश्चिनु(mod4.functions.प्राप्नु(०).instrs.प्राप्नु(०).op == "const");
+    cases += १;
+    // 5) int division by zero not folded
+    स्थापय mod5 = new_module("demo5");
+    स्थापय kary5 = IRFunction("epsilon", ३, "पूर्णाङ्क", []);
+    kary5.instrs.योजय(IRInstr("const", ०, "5", "", "", "पूर्णाङ्क", ""));
+    kary5.instrs.योजय(IRInstr("const", १, "0", "", "", "पूर्णाङ्क", ""));
+    kary5.instrs.योजय(IRInstr("binop", २, "/", "0", "1", "पूर्णाङ्क", ""));
+    kary5.instrs.योजय(IRInstr("return", -१, "2", "", "", "", ""));
+    module_add_function(mod5, kary5);
+    स्थापय stats5 = optimize_module(mod5);
+    निश्चिनु(stats5.constants_folded == ०);
+    निश्चिनु(mod5.functions.प्राप्नु(०).instrs.प्राप्नु(२).op == "binop");
+    cases += १;
+    // 6) module digest non-empty
+    स्थापय mod6 = new_module("demo6");
+    module_add_use(mod6, "गणना");
+    स्थापय kary6 = IRFunction("zeta", १, "एकक", []);
+    kary6.instrs.योजय(IRInstr("return", -१, "null", "", "", "", ""));
+    module_add_function(mod6, kary6);
+    optimize_module(mod6);
+    स्थापय d = module_digest(mod6);
+    निश्चिनु(d != "");
+    cases += १;
+    प्रत्यानय cases;
+}
+कार्य मुख्य() -> एकक {
+    स्थापय checks = run_builtin_checks();
+    मुद्रय("PEACOCK optimizer checks passed (" + पाठ्यीकरण(checks) + " assertions)");
+}

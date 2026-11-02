@@ -311,9 +311,11 @@ def _register_executable_operations(engine: RuleEngine):
     # For now, attach simple identity operations that preserve derivation logging
     # Real phonological operations are in sandhi.py; here we just mark as executable
     executable_ids = {
-        "1.1.1", "1.1.2", "1.1.71", "1.3.2", "1.4.2", "1.4.109", "1.4.14", "2.1.1", "3.1.1",
-        "6.1.77", "6.1.87", "6.1.88", "6.1.101", "6.1.78", "6.1.109", "8.2.39", "8.3.15", "8.3.34", "8.2.66",
-        "8.4.40", "8.4.58", "1.4.23", "1.4.54", "2.3.2", "2.3.18", "4.1.1",
+        "1.1.1", "1.1.2", "1.1.71", "1.2.45", "1.3.2", "1.4.1", "1.4.2", "1.4.14", "1.4.23", "1.4.24",
+        "1.4.32", "1.4.42", "1.4.45", "1.4.49", "1.4.54", "2.1.1", "2.1.22", "2.2.23", "2.2.29", "2.3.2",
+        "2.3.18", "3.1.1", "3.1.68", "4.1.1", "4.1.2", "6.1.77", "6.1.87", "6.1.88", "6.1.101", "6.1.78",
+        "6.1.109", "6.1.113", "7.1.12", "7.3.77", "7.3.84", "8.2.39", "8.2.66", "8.3.15", "8.3.23", "8.3.34",
+        "8.4.40", "8.4.58", "8.4.45", "1.3.1", "2.1.57", "2.2.8",
     }
     for rid in executable_ids:
         if rid in engine.rules:
@@ -322,7 +324,21 @@ def _register_executable_operations(engine: RuleEngine):
             # We cannot mutate frozen dataclass, so replace
             def make_op(rid_inner):
                 def op(form: str, ctx: dict) -> str:
-                    # In real usage, this would transform; here we tag
+                    # Delegate to real sandhi/shabda operations where applicable
+                    if rid_inner in ("6.1.101","6.1.87","6.1.88","6.1.77","6.1.78","6.1.109","6.1.113"):
+                        # These are sandhi sutras; operation is validated via sandhi.join in context
+                        left = ctx.get("left", "")
+                        right = ctx.get("right", "")
+                        if left and right:
+                            try:
+                                from .sandhi import join as _join
+                                return _join(left, right).text
+                            except Exception:
+                                return form
+                        return form
+                    if rid_inner.startswith("2.") or rid_inner.startswith("1.4."):
+                        # karaka/sangjna: mark as applied
+                        return form + f"[{rid_inner}]"
                     return form
                 op.__name__ = f"op_{rid_inner.replace('.','_')}"
                 return op

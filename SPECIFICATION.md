@@ -20,17 +20,16 @@ A program is a sequence of top-level declarations:
 ```
 program        = [ module-decl ] { use-decl | function | struct | model | training } EOF
 module-decl    = "प्रकरण" IDENT
-use-decl       = "उपयोग" IDENT [ ";" ]
+use-decl       = "उपयोग" IDENT { "." IDENT } [ "रूपेण" IDENT ] [ ";" ]
 ```
 
 * `प्रकरण` is optional but, if present, MUST be the first item.
 * A module name does not create a namespace for values; v0.4 has one flat
-  value namespace per program.
-* `उपयोग` imports a standard-library namespace: `गणित`, `तन्त्रजाल`, `रङ्ग`,
-  `चित्र`, `गति`, `सञ्चय`, `पाठ्य`, `प्रक्रिया`, `व्याकरण`, `दृश्य`, `त्रिअयाम`,
-  `अभिकर्तृ`, `गणनयन्त्र`, or `सेवक`. Aliases (`उपयोग तन्त्रजाल रूपेण n`) are
-  rejected (PE2005). A namespace MUST be imported before its members are used.
-* There are no user-defined file imports in 0.4. The whole program is one file.
+  value namespace per program plus qualified file-module namespaces.
+* `उपयोग` imports a namespace. Two forms are supported:
+  - **Standard-library namespace:** `गणित`, `तन्त्रजाल`, `रङ्ग`, `चित्र`, `गति`, `सञ्चय`, `पाठ्य`, `प्रक्रिया`, `व्याकरण`, `दृश्य`, `त्रिअयाम`, `अभिकर्तृ`, `गणनयन्त्र`, or `सेवक`. Example: `उपयोग गणित;` or `उपयोग गणित रूपेण g;` with optional `रूपेण` alias.
+  - **File module:** `उपयोग सहायक;` or `उपयोग pkg.गणित;` or `उपयोग सहायक रूपेण S;`. The path is resolved to `<base_dir>/<dotted>.सूत्र` and `<base_dir>/peacock_modules/<dotted>.सूत्र` (both internal and surface spellings). File imports are merged flat for unqualified use and kept for qualified `सहायक.वर्ग` / `S.वर्ग` calls. Recursive imports are depth-first; circular imports are `PE3001`. When `रूपेण` is used, only the alias is the valid namespace; the original name is not injected.
+* A namespace (builtin or file) MUST be imported before its members are used.
 * Declarations are order-independent: a function may call one declared later.
 * Names are Unicode identifiers. The first character is `_` or a Unicode
   letter; later characters may also be Unicode decimal digits or combining

@@ -232,16 +232,14 @@ class Parser:
         path = [str(self.expect(TokenKind.IDENT, "after 'use'").value)]
         while self.match(TokenKind.DOT):
             path.append(str(self.expect(TokenKind.IDENT, "in module path").value))
+        alias: str | None = None
         if self.at(TokenKind.AS):
-            self.error(
-                "PE2005",
-                "module aliases ('रूपेण') are not implemented in 0.3",
-                self.current.span,
-                hint="use the canonical namespace name, e.g. 'उपयोग तन्त्रजाल;'",
-            )
+            self.advance()
+            alias_tok = self.expect(TokenKind.IDENT, "after 'रूपेण'")
+            alias = str(alias_tok.value)
         # The semicolon is optional for use declarations, matching module style.
         self.match(TokenKind.SEMICOLON)
-        return UseDecl(path, self._merge(start))
+        return UseDecl(path, self._merge(start), alias)
 
     def parse_function(self) -> FunctionDecl:
         start = self.advance().span

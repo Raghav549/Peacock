@@ -1,0 +1,635 @@
+// PEACOCK-native bytecode compiler (migration stage 5).
+प्रकरण selfhost_bytecode
+उपयोग पाठ्य;
+संघटन BCInstr {
+    op: अक्षरमाला,
+    arg0: अक्षरमाला,
+    arg1: अक्षरमाला,
+    arg2: अक्षरमाला
+}
+संघटन BCFunction {
+    नाम: अक्षरमाला,
+    arity: पूर्णाङ्क,
+    slots: पूर्णाङ्क,
+    return_type_key: अक्षरमाला,
+    caps_repr: अक्षरमाला,
+    संकेत: सूची<BCInstr>
+}
+संघटन BCModule {
+    नाम: अक्षरमाला,
+    uses: सूची<अक्षरमाला>,
+    functions: सूची<BCFunction>,
+    struct_descs: सूची<अक्षरमाला>
+}
+संघटन BCBuilder {
+    नाम: अक्षरमाला,
+    arity: पूर्णाङ्क,
+    slots: पूर्णाङ्क,
+    return_type_key: अक्षरमाला,
+    caps_repr: अक्षरमाला,
+    संकेत: सूची<BCInstr>,
+    lines: सूची<अक्षरमाला>,
+    label_keys: सूची<अक्षरमाला>,
+    label_vals: सूची<पूर्णाङ्क>,
+    patch_idx: सूची<पूर्णाङ्क>,
+    patch_arg: सूची<पूर्णाङ्क>,
+    patch_label: सूची<अक्षरमाला>,
+    try_stack: सूची<पूर्णाङ्क>,
+    try_catch_label: सूची<अक्षरमाला>,
+    finally_stack: सूची<पूर्णाङ्क>
+}
+कार्य new_bc_module(नाम: अक्षरमाला) -> BCModule {
+    प्रत्यानय BCModule(नाम, [], [], []);
+}
+कार्य bc_module_add_use(mod: BCModule, cap: अक्षरमाला) {
+    mod.uses.योजय(cap);
+}
+कार्य bc_module_add_struct(mod: BCModule, desc: अक्षरमाला) {
+    mod.struct_descs.योजय(desc);
+}
+कार्य bc_module_add_function(mod: BCModule, kary: BCFunction) {
+    mod.functions.योजय(kary);
+}
+कार्य new_bc_builder(नाम: अक्षरमाला, arity: पूर्णाङ्क, slots: पूर्णाङ्क, return_type_key: अक्षरमाला, caps_repr: अक्षरमाला) -> BCBuilder {
+    प्रत्यानय BCBuilder(नाम, arity, slots, return_type_key, caps_repr, [], [], [], [], [], [], [], [], [], []);
+}
+कार्य bc_find_label(b: BCBuilder, chihna: अक्षरमाला) -> पूर्णाङ्क {
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < दैर्घ्य(b.label_keys) {
+        यदि b.label_keys.प्राप्नु(i) == chihna {
+            प्रत्यानय b.label_vals.प्राप्नु(i);
+        }
+        i += १;
+    }
+    प्रत्यानय -१;
+}
+कार्य bc_emit_raw(b: BCBuilder, op: अक्षरमाला, arg0: अक्षरमाला, arg1: अक्षरमाला, arg2: अक्षरमाला) -> पूर्णाङ्क {
+    b.संकेत.योजय(BCInstr(op, arg0, arg1, arg2));
+    b.lines.योजय("0:0");
+    प्रत्यानय दैर्घ्य(b.संकेत) - १;
+}
+कार्य bc_emit_patched(b: BCBuilder, op: अक्षरमाला, chihna: अक्षरमाला, extra: अक्षरमाला) -> पूर्णाङ्क {
+    स्थापय idx = bc_emit_raw(b, op, "@", extra, "");
+    b.patch_idx.योजय(idx);
+    b.patch_arg.योजय(०);
+    b.patch_label.योजय(chihna);
+    प्रत्यानय idx;
+}
+कार्य bc_push_const(b: BCBuilder, repr: अक्षरमाला) {
+    bc_emit_raw(b, "PUSH_CONST", repr, "", "");
+}
+कार्य bc_push_slot(b: BCBuilder, slot: पूर्णाङ्क) {
+    bc_emit_raw(b, "PUSH_SLOT", पाठ्यीकरण(slot), "", "");
+}
+कार्य bc_store_slot(b: BCBuilder, slot: पूर्णाङ्क) {
+    bc_emit_raw(b, "STORE_SLOT", पाठ्यीकरण(slot), "", "");
+}
+कार्य bc_pop(b: BCBuilder) {
+    bc_emit_raw(b, "POP", "", "", "");
+}
+कार्य bc_binop(b: BCBuilder, op: अक्षरमाला) {
+    bc_emit_raw(b, "BINOP", op, "", "");
+}
+कार्य bc_unop(b: BCBuilder, op: अक्षरमाला) {
+    bc_emit_raw(b, "UNOP", op, "", "");
+}
+कार्य bc_call(b: BCBuilder, callee: अक्षरमाला, argc: पूर्णाङ्क) {
+    bc_emit_raw(b, "CALL", callee, पाठ्यीकरण(argc), "");
+}
+कार्य bc_call_native(b: BCBuilder, callee: अक्षरमाला, argc: पूर्णाङ्क) {
+    bc_emit_raw(b, "CALL_NATIVE", callee, पाठ्यीकरण(argc), "");
+}
+कार्य bc_method(b: BCBuilder, method: अक्षरमाला, argc: पूर्णाङ्क) {
+    bc_emit_raw(b, "METHOD", method, पाठ्यीकरण(argc), "");
+}
+कार्य bc_model_init(b: BCBuilder, model_नाम: अक्षरमाला, argc: पूर्णाङ्क) {
+    bc_emit_raw(b, "MODEL_INIT", model_नाम, पाठ्यीकरण(argc), "");
+}
+कार्य bc_training_method(b: BCBuilder, abhyasa: अक्षरमाला, method: अक्षरमाला, argc: पूर्णाङ्क) {
+    bc_emit_raw(b, "TRAINING_METHOD", abhyasa, method, पाठ्यीकरण(argc));
+}
+कार्य bc_struct_new(b: BCBuilder, struct_नाम: अक्षरमाला, argc: पूर्णाङ्क) {
+    bc_emit_raw(b, "STRUCT_NEW", struct_नाम, पाठ्यीकरण(argc), "");
+}
+कार्य bc_field_get(b: BCBuilder, field: अक्षरमाला, kind: अक्षरमाला) {
+    bc_emit_raw(b, "FIELD_GET", field, kind, "");
+}
+कार्य bc_field_set(b: BCBuilder, field: अक्षरमाला) {
+    bc_emit_raw(b, "FIELD_SET", field, "", "");
+}
+कार्य bc_index_get(b: BCBuilder) {
+    bc_emit_raw(b, "INDEX_GET", "", "", "");
+}
+कार्य bc_index_set(b: BCBuilder) {
+    bc_emit_raw(b, "INDEX_SET", "", "", "");
+}
+कार्य bc_make_list(b: BCBuilder, argc: पूर्णाङ्क) {
+    bc_emit_raw(b, "MAKE_LIST", पाठ्यीकरण(argc), "", "");
+}
+कार्य bc_make_range(b: BCBuilder) {
+    bc_emit_raw(b, "MAKE_RANGE", "", "", "");
+}
+कार्य bc_len(b: BCBuilder) {
+    bc_emit_raw(b, "LEN", "", "", "");
+}
+कार्य bc_assert(b: BCBuilder, has_msg: पूर्णाङ्क) {
+    bc_emit_raw(b, "ASSERT", पाठ्यीकरण(has_msg), "", "");
+}
+कार्य bc_throw(b: BCBuilder) {
+    bc_emit_raw(b, "THROW", "", "", "");
+}
+कार्य bc_jump(b: BCBuilder, chihna: अक्षरमाला) {
+    bc_emit_patched(b, "JUMP", chihna, "");
+}
+कार्य bc_jump_if_false(b: BCBuilder, chihna: अक्षरमाला) {
+    bc_emit_patched(b, "JUMP_IF_FALSE", chihna, "");
+}
+कार्य bc_ret(b: BCBuilder, has_val: पूर्णाङ्क) {
+    bc_emit_raw(b, "RET", पाठ्यीकरण(has_val), "", "");
+}
+कार्य bc_try_begin(b: BCBuilder, catch_label: अक्षरमाला) {
+    स्थापय idx = bc_emit_raw(b, "TRY_BEGIN", "@", "-1", "");
+    b.patch_idx.योजय(idx);
+    b.patch_arg.योजय(०);
+    b.patch_label.योजय(catch_label);
+    b.try_stack.योजय(idx);
+    b.try_catch_label.योजय(catch_label);
+}
+कार्य bc_try_end(b: BCBuilder) -> अक्षरमाला {
+    यदि दैर्घ्य(b.try_stack) == ० {
+        प्रत्यानय "try_end without try_begin";
+    }
+    स्थापय begin_idx = b.try_stack.प्राप्नु(दैर्घ्य(b.try_stack) - १);
+    b.try_stack.निष्कासय();
+    b.try_catch_label.निष्कासय();
+    b.संकेत.प्राप्नु(begin_idx).arg1 = पाठ्यीकरण(दैर्घ्य(b.संकेत));
+    bc_emit_raw(b, "TRY_END", "", "", "");
+    प्रत्यानय "";
+}
+कार्य bc_catch(b: BCBuilder) {
+    bc_emit_raw(b, "CATCH", "", "", "");
+}
+कार्य bc_catch_store(b: BCBuilder, slot: पूर्णाङ्क) {
+    bc_catch(b);
+    bc_store_slot(b, slot);
+}
+कार्य bc_finally_begin(b: BCBuilder, chihna: अक्षरमाला) {
+    स्थापय idx = bc_emit_raw(b, "FINALLY_BEGIN", "@", "-1", "");
+    b.patch_idx.योजय(idx);
+    b.patch_arg.योजय(०);
+    b.patch_label.योजय(chihna);
+    b.finally_stack.योजय(idx);
+}
+कार्य bc_finally_end(b: BCBuilder, chihna: अक्षरमाला) -> अक्षरमाला {
+    यदि दैर्घ्य(b.finally_stack) == ० {
+        प्रत्यानय "finally_end without finally_begin";
+    }
+    स्थापय begin_idx = b.finally_stack.प्राप्नु(दैर्घ्य(b.finally_stack) - १);
+    b.finally_stack.निष्कासय();
+    b.संकेत.प्राप्नु(begin_idx).arg1 = पाठ्यीकरण(दैर्घ्य(b.संकेत));
+    स्थापय idx = bc_emit_raw(b, "FINALLY_END", "@", "", "");
+    b.patch_idx.योजय(idx);
+    b.patch_arg.योजय(०);
+    b.patch_label.योजय(chihna);
+    प्रत्यानय "";
+}
+कार्य bc_finally_resume(b: BCBuilder) {
+    bc_emit_raw(b, "FINALLY_RESUME", "", "", "");
+}
+कार्य bc_label(b: BCBuilder, chihna: अक्षरमाला) -> अक्षरमाला {
+    यदि bc_find_label(b, chihna) >= ० {
+        प्रत्यानय "duplicate label '" + chihna + "'";
+    }
+    b.label_keys.योजय(chihna);
+    b.label_vals.योजय(दैर्घ्य(b.संकेत));
+    प्रत्यानय "";
+}
+कार्य bc_nop(b: BCBuilder) {
+    bc_emit_raw(b, "NOP", "", "", "");
+}
+कार्य parse_int(s: अक्षरमाला) -> पूर्णाङ्क {
+    यदि s == "" वा s == "null" {
+        प्रत्यानय ०;
+    }
+    स्थापय परिवर्तनीय neg = असत्य;
+    स्थापय परिवर्तनीय आरम्भ = ०;
+    यदि पाठ्य.अक्षरम्(s, ०) == "-" {
+        neg = सत्य;
+        आरम्भ = १;
+    }
+    स्थापय परिवर्तनीय val = ०;
+    स्थापय परिवर्तनीय i = आरम्भ;
+    यावत् i < दैर्घ्य(s) {
+        स्थापय ch = पाठ्य.अक्षरम्(s, i);
+        यदि पाठ्य.अङ्कः(ch) {
+            स्थापय digit = पाठ्य.अक्षरसङ्ख्या(ch) - पाठ्य.अक्षरसङ्ख्या("0");
+            val = val * १० + digit;
+        } अन्यथा {
+            विच्छिन्दु;
+        }
+        i += १;
+    }
+    यदि neg {
+        val = -val;
+    }
+    प्रत्यानय val;
+}
+कार्य bc_on_const(b: BCBuilder, dest: पूर्णाङ्क, value_repr: अक्षरमाला) {
+    bc_push_const(b, value_repr);
+    bc_store_slot(b, dest);
+}
+कार्य bc_on_slot_get(b: BCBuilder, dest: पूर्णाङ्क, slot: पूर्णाङ्क) {
+    bc_push_slot(b, slot);
+    bc_store_slot(b, dest);
+}
+कार्य bc_on_slot_set(b: BCBuilder, लक्ष्य_slot: पूर्णाङ्क, src: पूर्णाङ्क) {
+    bc_push_slot(b, src);
+    bc_store_slot(b, लक्ष्य_slot);
+}
+कार्य bc_on_move(b: BCBuilder, dest: पूर्णाङ्क, src: पूर्णाङ्क) {
+    bc_push_slot(b, src);
+    bc_store_slot(b, dest);
+}
+कार्य bc_on_binop(b: BCBuilder, dest: पूर्णाङ्क, op: अक्षरमाला, left: पूर्णाङ्क, right: पूर्णाङ्क) {
+    bc_push_slot(b, left);
+    bc_push_slot(b, right);
+    bc_binop(b, op);
+    bc_store_slot(b, dest);
+}
+कार्य bc_on_unop(b: BCBuilder, dest: पूर्णाङ्क, op: अक्षरमाला, operand: पूर्णाङ्क) {
+    bc_push_slot(b, operand);
+    bc_unop(b, op);
+    bc_store_slot(b, dest);
+}
+कार्य bc_on_call(b: BCBuilder, dest: पूर्णाङ्क, callee: अक्षरमाला, तर्कावली: सूची<पूर्णाङ्क>) {
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < दैर्घ्य(तर्कावली) {
+        bc_push_slot(b, तर्कावली.प्राप्नु(i));
+        i += १;
+    }
+    bc_call(b, callee, दैर्घ्य(तर्कावली));
+    bc_store_slot(b, dest);
+}
+कार्य bc_on_call_native(b: BCBuilder, dest: पूर्णाङ्क, callee: अक्षरमाला, तर्कावली: सूची<पूर्णाङ्क>) {
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < दैर्घ्य(तर्कावली) {
+        bc_push_slot(b, तर्कावली.प्राप्नु(i));
+        i += १;
+    }
+    bc_call_native(b, callee, दैर्घ्य(तर्कावली));
+    bc_store_slot(b, dest);
+}
+कार्य bc_on_method(b: BCBuilder, dest: पूर्णाङ्क, method: अक्षरमाला, receiver: पूर्णाङ्क, तर्कावली: सूची<पूर्णाङ्क>) {
+    bc_push_slot(b, receiver);
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < दैर्घ्य(तर्कावली) {
+        bc_push_slot(b, तर्कावली.प्राप्नु(i));
+        i += १;
+    }
+    bc_method(b, method, १ + दैर्घ्य(तर्कावली));
+    bc_store_slot(b, dest);
+}
+कार्य bc_on_model_init(b: BCBuilder, dest: पूर्णाङ्क, model_नाम: अक्षरमाला, तर्कावली: सूची<पूर्णाङ्क>) {
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < दैर्घ्य(तर्कावली) {
+        bc_push_slot(b, तर्कावली.प्राप्नु(i));
+        i += १;
+    }
+    bc_model_init(b, model_नाम, दैर्घ्य(तर्कावली));
+    bc_store_slot(b, dest);
+}
+कार्य bc_on_training_method(b: BCBuilder, dest: पूर्णाङ्क, abhyasa: अक्षरमाला, method: अक्षरमाला, तर्कावली: सूची<पूर्णाङ्क>) {
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < दैर्घ्य(तर्कावली) {
+        bc_push_slot(b, तर्कावली.प्राप्नु(i));
+        i += १;
+    }
+    bc_training_method(b, abhyasa, method, दैर्घ्य(तर्कावली));
+    bc_store_slot(b, dest);
+}
+कार्य bc_on_struct_new(b: BCBuilder, dest: पूर्णाङ्क, struct_नाम: अक्षरमाला, तर्कावली: सूची<पूर्णाङ्क>) {
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < दैर्घ्य(तर्कावली) {
+        bc_push_slot(b, तर्कावली.प्राप्नु(i));
+        i += १;
+    }
+    bc_struct_new(b, struct_नाम, दैर्घ्य(तर्कावली));
+    bc_store_slot(b, dest);
+}
+कार्य bc_on_field_get(b: BCBuilder, dest: पूर्णाङ्क, आधार: पूर्णाङ्क, field: अक्षरमाला) {
+    bc_push_slot(b, आधार);
+    स्थापय परिवर्तनीय kind = "struct_field";
+    स्थापय परिवर्तनीय fname = field;
+    स्थापय parts = field.विभाजय("|");
+    यदि दैर्घ्य(parts) == २ {
+        fname = parts.प्राप्नु(०);
+        kind = parts.प्राप्नु(१);
+    }
+    bc_field_get(b, fname, kind);
+    bc_store_slot(b, dest);
+}
+कार्य bc_on_field_set(b: BCBuilder, आधार: पूर्णाङ्क, field: अक्षरमाला, mulya: पूर्णाङ्क) {
+    bc_push_slot(b, आधार);
+    bc_push_slot(b, mulya);
+    bc_field_set(b, field);
+}
+कार्य bc_on_index_get(b: BCBuilder, dest: पूर्णाङ्क, आधार: पूर्णाङ्क, soochaka: पूर्णाङ्क) {
+    bc_push_slot(b, आधार);
+    bc_push_slot(b, soochaka);
+    bc_index_get(b);
+    bc_store_slot(b, dest);
+}
+कार्य bc_on_index_set(b: BCBuilder, आधार: पूर्णाङ्क, soochaka: पूर्णाङ्क, mulya: पूर्णाङ्क) {
+    bc_push_slot(b, आधार);
+    bc_push_slot(b, soochaka);
+    bc_push_slot(b, mulya);
+    bc_index_set(b);
+}
+कार्य bc_on_make_list(b: BCBuilder, dest: पूर्णाङ्क, तर्कावली: सूची<पूर्णाङ्क>) {
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < दैर्घ्य(तर्कावली) {
+        bc_push_slot(b, तर्कावली.प्राप्नु(i));
+        i += १;
+    }
+    bc_make_list(b, दैर्घ्य(तर्कावली));
+    bc_store_slot(b, dest);
+}
+कार्य bc_on_make_range(b: BCBuilder, dest: पूर्णाङ्क, aarambha: पूर्णाङ्क, samapti: पूर्णाङ्क) {
+    bc_push_slot(b, aarambha);
+    bc_push_slot(b, samapti);
+    bc_make_range(b);
+    bc_store_slot(b, dest);
+}
+कार्य bc_on_len(b: BCBuilder, dest: पूर्णाङ्क, operand: पूर्णाङ्क) {
+    bc_push_slot(b, operand);
+    bc_len(b);
+    bc_store_slot(b, dest);
+}
+कार्य bc_on_assert(b: BCBuilder, cond: पूर्णाङ्क, msg_slot: पूर्णाङ्क) {
+    bc_push_slot(b, cond);
+    यदि msg_slot >= ० {
+        bc_push_slot(b, msg_slot);
+        bc_assert(b, १);
+    } अन्यथा {
+        bc_push_const(b, "null");
+        bc_assert(b, ०);
+    }
+}
+कार्य bc_on_throw(b: BCBuilder, mulya: पूर्णाङ्क) {
+    bc_push_slot(b, mulya);
+    bc_throw(b);
+}
+कार्य bc_on_jump(b: BCBuilder, chihna: अक्षरमाला) {
+    bc_jump(b, chihna);
+}
+कार्य bc_on_branch(b: BCBuilder, cond: पूर्णाङ्क, then_label: अक्षरमाला, else_label: अक्षरमाला) {
+    bc_push_slot(b, cond);
+    bc_jump_if_false(b, else_label);
+    bc_jump(b, then_label);
+}
+कार्य bc_on_return(b: BCBuilder, mulya: पूर्णाङ्क) {
+    यदि mulya >= ० {
+        bc_push_slot(b, mulya);
+        bc_ret(b, १);
+    } अन्यथा {
+        bc_ret(b, ०);
+    }
+}
+कार्य bc_on_try_begin(b: BCBuilder, catch_chihna: अक्षरमाला) {
+    bc_try_begin(b, catch_chihna);
+}
+कार्य bc_on_try_end(b: BCBuilder) -> अक्षरमाला {
+    प्रत्यानय bc_try_end(b);
+}
+कार्य bc_on_catch(b: BCBuilder, dest: पूर्णाङ्क) {
+    bc_catch_store(b, dest);
+}
+कार्य bc_on_finally_begin(b: BCBuilder, chihna: अक्षरमाला) {
+    bc_finally_begin(b, chihna);
+}
+कार्य bc_on_finally_end(b: BCBuilder, chihna: अक्षरमाला) -> अक्षरमाला {
+    प्रत्यानय bc_finally_end(b, chihna);
+}
+कार्य bc_on_finally_resume(b: BCBuilder) {
+    bc_finally_resume(b);
+}
+कार्य bc_on_label(b: BCBuilder, chihna: अक्षरमाला) -> अक्षरमाला {
+    प्रत्यानय bc_label(b, chihna);
+}
+कार्य bc_on_nop(b: BCBuilder) {
+    bc_nop(b);
+}
+कार्य bc_resolve_patches(b: BCBuilder) -> अक्षरमाला {
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < दैर्घ्य(b.patch_idx) {
+        स्थापय idx = b.patch_idx.प्राप्नु(i);
+        स्थापय argpos = b.patch_arg.प्राप्नु(i);
+        स्थापय chihna = b.patch_label.प्राप्नु(i);
+        स्थापय लक्ष्य = bc_find_label(b, chihna);
+        यदि लक्ष्य < ० {
+            प्रत्यानय "unknown label '" + chihna + "'";
+        }
+        यदि argpos == ० {
+            b.संकेत.प्राप्नु(idx).arg0 = पाठ्यीकरण(लक्ष्य);
+        } अन्यथा यदि argpos == १ {
+            b.संकेत.प्राप्नु(idx).arg1 = पाठ्यीकरण(लक्ष्य);
+        } अन्यथा {
+            b.संकेत.प्राप्नु(idx).arg2 = पाठ्यीकरण(लक्ष्य);
+        }
+        i += १;
+    }
+    यदि दैर्घ्य(b.try_stack) != ० {
+        प्रत्यानय "unclosed try_begin";
+    }
+    यदि दैर्घ्य(b.finally_stack) != ० {
+        प्रत्यानय "unclosed finally_begin";
+    }
+    प्रत्यानय "";
+}
+कार्य bc_builder_finish(b: BCBuilder) -> BCFunction {
+    स्थापय err = bc_resolve_patches(b);
+    यदि err != "" {
+        bc_emit_raw(b, "NOP", "", "", "");
+    }
+    यदि दैर्घ्य(b.संकेत) == ० {
+        bc_emit_raw(b, "RET", "0", "", "");
+    }
+    प्रत्यानय BCFunction(b.नाम, b.arity, b.slots, b.return_type_key, b.caps_repr, b.संकेत);
+}
+कार्य bc_escape(s: अक्षरमाला) -> अक्षरमाला {
+    स्थापय परिवर्तनीय t = s.प्रतिस्थापय("\\", "\\\\");
+    t = t.प्रतिस्थापय("\"", "\\\"");
+    t = t.प्रतिस्थापय("\n", "\\n");
+    t = t.प्रतिस्थापय("\r", "\\r");
+    t = t.प्रतिस्थापय("\t", "\\t");
+    प्रत्यानय t;
+}
+कार्य bc_instr_digest(instr: BCInstr) -> अक्षरमाला {
+    स्थापय परिवर्तनीय out = "(" + instr.op;
+    यदि instr.arg0 != "" {
+        out = out + " " + instr.arg0;
+    }
+    यदि instr.arg1 != "" {
+        out = out + " " + instr.arg1;
+    }
+    यदि instr.arg2 != "" {
+        out = out + " " + instr.arg2;
+    }
+    प्रत्यानय out + ")";
+}
+कार्य bc_function_digest(kary: BCFunction) -> अक्षरमाला {
+    स्थापय परिवर्तनीय out = "(fn " + kary.नाम + " arity=" + पाठ्यीकरण(kary.arity) + " slots=" + पाठ्यीकरण(kary.slots) + " ret=" + kary.return_type_key;
+    यदि kary.caps_repr != "" {
+        out = out + " caps=" + kary.caps_repr;
+    }
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < दैर्घ्य(kary.संकेत) {
+        out = out + "\n  " + bc_instr_digest(kary.संकेत.प्राप्नु(i));
+        i += १;
+    }
+    प्रत्यानय out + "\n)";
+}
+कार्य bc_module_digest(mod: BCModule) -> अक्षरमाला {
+    स्थापय परिवर्तनीय out = "(module " + mod.नाम;
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < दैर्घ्य(mod.uses) {
+        out = out + " (use " + mod.uses.प्राप्नु(i) + ")";
+        i += १;
+    }
+    out = out + ")";
+    स्थापय परिवर्तनीय j = ०;
+    यावत् j < दैर्घ्य(mod.functions) {
+        out = out + "\n" + bc_function_digest(mod.functions.प्राप्नु(j));
+        j += १;
+    }
+    स्थापय परिवर्तनीय k = ०;
+    यावत् k < दैर्घ्य(mod.struct_descs) {
+        out = out + "\n" + mod.struct_descs.प्राप्नु(k);
+        k += १;
+    }
+    प्रत्यानय out;
+}
+कार्य bc_verify_function(kary: BCFunction) -> अक्षरमाला {
+    यदि kary.slots < kary.arity {
+        प्रत्यानय "slots < arity";
+    }
+    यदि दैर्घ्य(kary.संकेत) == ० {
+        प्रत्यानय "no code";
+    }
+    स्थापय परिवर्तनीय i = ०;
+    यावत् i < दैर्घ्य(kary.संकेत) {
+        स्थापय instr = kary.संकेत.प्राप्नु(i);
+        यदि instr.op == "PUSH_SLOT" वा instr.op == "STORE_SLOT" {
+            स्थापय s = parse_int(instr.arg0);
+            यदि s < ० वा s >= kary.slots {
+                प्रत्यानय "slot out of range at " + पाठ्यीकरण(i);
+            }
+        }
+        यदि instr.op == "JUMP" वा instr.op == "JUMP_IF_FALSE" वा instr.op == "FINALLY_END" {
+            स्थापय p = parse_int(instr.arg0);
+            यदि p < ० वा p >= दैर्घ्य(kary.संकेत) {
+                प्रत्यानय "jump target invalid at " + पाठ्यीकरण(i);
+            }
+        }
+        यदि instr.op == "TRY_BEGIN" वा instr.op == "FINALLY_BEGIN" {
+            स्थापय p = parse_int(instr.arg0);
+            यदि p < ० वा p >= दैर्घ्य(kary.संकेत) {
+                प्रत्यानय "catch target invalid at " + पाठ्यीकरण(i);
+            }
+        }
+        i += १;
+    }
+    प्रत्यानय "";
+}
+कार्य bc_run_builtin_checks() -> पूर्णाङ्क {
+    स्थापय परिवर्तनीय cases = ०;
+    स्थापय b1 = new_bc_builder("alpha", ०, १, "पूर्णाङ्क", "");
+    bc_on_const(b1, ०, "42");
+    bc_on_return(b1, ०);
+    स्थापय kary1 = bc_builder_finish(b1);
+    निश्चिनु(दैर्घ्य(kary1.संकेत) == ४);
+    निश्चिनु(kary1.संकेत.प्राप्नु(०).op == "PUSH_CONST");
+    निश्चिनु(kary1.संकेत.प्राप्नु(३).op == "RET");
+    निश्चिनु(bc_verify_function(kary1) == "");
+    cases += १;
+    स्थापय b2 = new_bc_builder("beta", २, ४, "पूर्णाङ्क", "");
+    bc_on_binop(b2, २, "+", ०, १);
+    bc_on_return(b2, २);
+    स्थापय kary2 = bc_builder_finish(b2);
+    निश्चिनु(kary2.संकेत.प्राप्नु(२).op == "BINOP");
+    निश्चिनु(bc_verify_function(kary2) == "");
+    cases += १;
+    स्थापय b3 = new_bc_builder("branchy", ०, ३, "पूर्णाङ्क", "");
+    bc_on_const(b3, ०, "true");
+    bc_on_branch(b3, ०, "then", "else");
+    bc_on_label(b3, "then");
+    bc_on_const(b3, १, "1");
+    bc_on_jump(b3, "endif");
+    bc_on_label(b3, "else");
+    bc_on_const(b3, २, "2");
+    bc_on_jump(b3, "endif");
+    bc_on_label(b3, "endif");
+    bc_on_return(b3, १);
+    स्थापय kary3 = bc_builder_finish(b3);
+    निश्चिनु(bc_verify_function(kary3) == "");
+    स्थापय jif = kary3.संकेत.प्राप्नु(३);
+    निश्चिनु(jif.op == "JUMP_IF_FALSE");
+    cases += १;
+    स्थापय b4 = new_bc_builder("misc", ०, ५, "एकक", "");
+    bc_on_const(b4, ०, "1");
+    bc_on_const(b4, १, "2");
+    स्थापय args4: सूची<पूर्णाङ्क> = [];
+    args4.योजय(०);
+    args4.योजय(१);
+    bc_on_make_list(b4, २, args4);
+    स्थापय args4b: सूची<पूर्णाङ्क> = [];
+    args4b.योजय(२);
+    bc_on_call(b4, ३, "मुद्रय", args4b);
+    bc_on_return(b4, -१);
+    स्थापय kary4 = bc_builder_finish(b4);
+    निश्चिनु(bc_verify_function(kary4) == "");
+    cases += १;
+    स्थापय b5 = new_bc_builder("trying", ०, २, "एकक", "");
+    bc_on_try_begin(b5, "handler");
+    bc_on_const(b5, ०, "1");
+    bc_on_try_end(b5);
+    bc_on_jump(b5, "done");
+    bc_on_label(b5, "handler");
+    bc_on_catch(b5, १);
+    bc_on_label(b5, "done");
+    bc_on_return(b5, -१);
+    स्थापय kary5 = bc_builder_finish(b5);
+    निश्चिनु(bc_verify_function(kary5) == "");
+    cases += १;
+    स्थापय b6 = new_bc_builder("final", ०, १, "एकक", "");
+    bc_on_finally_begin(b6, "fin");
+    bc_on_const(b6, ०, "5");
+    bc_on_finally_end(b6, "after");
+    bc_on_label(b6, "fin");
+    bc_on_finally_resume(b6);
+    bc_on_label(b6, "after");
+    bc_on_return(b6, -१);
+    स्थापय kary6 = bc_builder_finish(b6);
+    निश्चिनु(bc_verify_function(kary6) == "");
+    cases += १;
+    स्थापय mod = new_bc_module("demo");
+    bc_module_add_use(mod, "गणना");
+    bc_module_add_function(mod, kary1);
+    bc_module_add_function(mod, kary2);
+    स्थापय d = bc_module_digest(mod);
+    निश्चिनु(d != "");
+    cases += १;
+    स्थापय b8 = new_bc_builder("fields", १, ४, "पूर्णाङ्क", "");
+    bc_on_field_get(b8, १, ०, "x|struct_field");
+    bc_on_len(b8, २, १);
+    bc_on_assert(b8, २, -१);
+    bc_on_return(b8, २);
+    स्थापय kary8 = bc_builder_finish(b8);
+    निश्चिनु(bc_verify_function(kary8) == "");
+    cases += १;
+    प्रत्यानय cases;
+}
+कार्य मुख्य() -> एकक {
+    स्थापय checks = bc_run_builtin_checks();
+    मुद्रय("PEACOCK bytecode checks passed (" + पाठ्यीकरण(checks) + " assertions)");
+}

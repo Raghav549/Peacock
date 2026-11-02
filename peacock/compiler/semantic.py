@@ -157,7 +157,7 @@ class TypedProgram:
 
 
 class SemanticAnalyzer:
-    def __init__(self, module, diag: DiagnosticBag | None = None):
+    def __init__(self, module, diag: DiagnosticBag | None = None, file_modules: dict[str, Any] | None = None, native_aliases: dict[str, str] | None = None):
         self.module = module
         self.diag = diag if diag is not None else DiagnosticBag()
         self.functions: dict[str, FunctionSymbol] = {}
@@ -165,6 +165,11 @@ class SemanticAnalyzer:
         self.models: dict[str, ModelSymbol] = {}
         self.trainings: dict[str, TrainingSymbol] = {}
         self.namespaces: set[str] = set()
+        self.file_modules: dict[str, Any] = file_modules or {}
+        self.native_aliases: dict[str, str] = native_aliases or {}
+        # For qualified access: map from short import name -> its FunctionSymbol/StructSymbol dicts
+        self.file_module_funcs: dict[str, dict[str, FunctionSymbol]] = {}
+        self.file_module_structs: dict[str, dict[str, StructSymbol]] = {}
         self.scopes: list[dict[str, LocalSymbol]] = []
         self.current_function: FunctionSymbol | None = None
         self.next_slot = 0
@@ -250,6 +255,27 @@ class SemanticAnalyzer:
     def _check_uses(self) -> None:
         seen: set[str] = set()
         for use in self.module.uses:
+            effective = use.alias or (use.path[-1] if use.path else "")
+            # File imports: effective name is alias if present else last component
+            if effective in self.file_modules:
+                if effective in seen:
+                    self.diag.error("PE3001", f"module '{surface(effective)}' is imported more than once", use.span)
+                    continue
+                seen.add(effective)
+                self.namespaces.add(effective)
+                if effective not in self.file_module_funcs:
+                    self.file_module_funcs[effective] = {}
+                    self.file_module_structs[effective] = {}
+                continue
+            # Native alias: alias maps to canonical namespace
+            if use.alias and use.alias in self.native_aliases:
+                canonical = self.native_aliases[use.alias]
+                if effective in seen:
+                    self.diag.error("PE3001", f"module '{surface(effective)}' is imported more than once", use.span)
+                    continue
+                seen.add(effective)
+                self.namespaces.add(effective)
+                continue
             if len(use.path) != 1:
                 self.diag.error(
                     "PE3006",
@@ -260,7 +286,7 @@ class SemanticAnalyzer:
                 continue
             ns = use.path[0]
             if ns not in B.NAMESPACES:
-                suggestion = self._suggest(ns, B.NAMESPACES)
+                suggestion = self._suggest(ns, list(B.NAMESPACES.keys()) + list(self.file_modules.keys()))
                 self.diag.error(
                     "PE3006",
                     f"unknown module '{ns}'",
@@ -1256,6 +1282,10 @@ class SemanticAnalyzer:
             return "training", self.trainings[name.ident]
         if name.ident in B.NAMESPACES:
             return "namespace", name.ident
+        if name.ident in self.native_aliases:
+            return "namespace", self.native_aliases[name.ident]
+        if name.ident in self.file_modules:
+            return "file_module", name.ident
         if name.ident in B.GLOBAL_NATIVES:
             return "native", B.GLOBAL_NATIVES[name.ident]
         return "unknown", None
@@ -1890,16 +1920,18 @@ class SemanticAnalyzer:
             base.resolution = kind
             base.symbol = symbol
             if kind == "namespace":
-                namespace = base.ident
-                if namespace not in self.namespaces:
+                # base.ident may be an alias (native_aliases maps alias->canonical)
+                canonical = self.native_aliases.get(base.ident, base.ident)
+                if base.ident not in self.namespaces:
                     for arg in call.args:
                         self._check_expr(arg)
                     return self._error(
                         "PE3006",
-                        f"module '{namespace}' is used but not imported",
+                        f"module '{base.ident}' is used but not imported",
                         base.span,
-                        hint=f"add 'उपयोग {surface(namespace)};'",
+                        hint=f"add 'उपयोग {surface(base.ident)};'",
                     )
+                namespace = canonical
                 full_name = f"{namespace}.{field.name}"
                 if full_name not in B.NATIVES:
                     available = B.NAMESPACES.get(namespace, ())
@@ -1911,6 +1943,44 @@ class SemanticAnalyzer:
                     )
                 field.field_kind = "namespace_member"
                 return self._check_native_call(call, full_name, B.NATIVES[full_name])
+            if kind == "file_module":
+                mod_name = base.ident
+                imported_mod = self.file_modules.get(mod_name)
+                if imported_mod is None:
+                    for arg in call.args:
+                        self._check_expr(arg)
+                    return self._error("PE3002", f"unknown file module '{mod_name}'", base.span)
+                # Check for function in file module
+                for fn_decl in imported_mod.functions:
+                    if fn_decl.name == field.name:
+                        # Find the FunctionSymbol for this decl (merged flat, so it exists in self.functions)
+                        fn_sym = self.functions.get(fn_decl.name)
+                        if fn_sym is None:
+                            # Create a temporary symbol if not found (should not happen with flat merge)
+                            for arg in call.args:
+                                self._check_expr(arg)
+                            return self._error("PE3002", f"function '{field.name}' not found in module '{mod_name}'", field.name_span)
+                        field.field_kind = "file_module_member"
+                        return self._check_user_call(call, fn_sym)
+                # Check for struct constructor in file module
+                for st_decl in imported_mod.structs:
+                    if st_decl.name == field.name:
+                        struct_sym = self.structs.get(st_decl.name)
+                        if struct_sym is None:
+                            for arg in call.args:
+                                self._check_expr(arg)
+                            return self._error("PE3002", f"struct '{field.name}' not found in module '{mod_name}'", field.name_span)
+                        field.field_kind = "file_module_member"
+                        return self._check_struct_constructor(call, struct_sym)
+                # Not found in file module
+                for arg in call.args:
+                    self._check_expr(arg)
+                return self._error(
+                    "PE3006",
+                    f"module '{surface(mod_name)}' has no member '{field.name}'",
+                    field.name_span,
+                    hint=f"available in file module: {', '.join(fn.name for fn in imported_mod.functions)}",
+                )
             if kind == "model":
                 base.ty = T.ModelDeclType(base.ident)
                 return self._check_decl_method(call, symbol, B.MODEL_DECL_METHODS, "model")
