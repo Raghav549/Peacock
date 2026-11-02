@@ -213,7 +213,8 @@ them in the VM, and compare against the Python oracle. Regressions cover valid
 and invalid inputs, selected diagnostic equality, the `.सूत्र` corpus and
 ErrorType iterable recovery. Python semantic analysis remains authoritative;
 the kernel does not generate diagnostics, misses several semantic domains and
-is not a replacement analyser.
+is not a replacement analyser. This increment adds `selfhost/ir.सूत्र` — a flat
+PIR builder with slots/registers, labels/branches/jumps, const/slot/binop/call/method/make_list/range/index/field/len/assert/struct/try/catch/finally/model_init/training_method and structural verification. It achieves IR-digest parity with the Python IR on a 16-file corpus (examples, linguist, fixtures, tokenizer, xor/spiral) via `peacock/compiler/selfhost_ir.py` and `tests/integration/test_selfhost_ir.py` (the 1,139-line parser and 563-line type_model exceed the 256-slot VM limit for the single-`main` shadow wrapper).
 
 Stages:
 
@@ -224,7 +225,7 @@ Stages:
    expressions, scope/name/assignment/call/return/condition/iterable rules are
    probed; diagnostics, fields/methods, native overloads and model/training
    analysis are not ported; Python remains authoritative;
-4. IR and bytecode emitter — planned;
+4. IR/optimiser/bytecode emitter — **partial**: PIR builder/verifier with differential parity on core corpus; optimiser and bytecode emitter still planned;
 5. VM in PEACOCK with a minimal host ABI — planned;
 6. fixed point: the PEACOCK compiler compiles itself, and the resulting image
    passes the full suite.

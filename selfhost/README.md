@@ -11,7 +11,8 @@ self-hosting.
 |---|---:|---|---|
 | `tokenizer.सूत्र` | 235 | lexes a `.सूत्र` file into labelled tokens (keywords, identifiers, numbers, strings, operators, comments) | token count and non-string token-label parity with the bootstrap lexer on `examples/tour.सूत्र` (367 tokens) |
 | `parser.सूत्र` | 1,139 | lexes and parses the full 0.4 grammar — प्रकरण/उपयोग/संघटन/कार्य, statements including `अन्ते`, expressions, प्रतिमान and अभ्यास declarations — and prints a canonical AST digest | byte-identical digest with the bootstrap AST on the 15-file core corpus, plus parsing its own source and `tokenizer.सूत्र` |
-| `type_model.सूत्र` | — | executable PEACOCK kernel for recursive type relations, unary/binary/list/index inference, lexical bindings, declaration/assignment, user-function signatures/calls, conditions, returns and iterable rules | VM-run assertions plus opt-in typed-AST shadow probes against Python; experimental, incomplete and not a production semantic analyser |
+| `type_model.सूत्र` | 563 | executable PEACOCK kernel for recursive type relations, unary/binary/list/index inference, lexical bindings, declaration/assignment, user-function signatures/calls, conditions, returns and iterable rules | VM-run 55 assertions plus opt-in typed-AST shadow probes against Python; experimental, incomplete and not a production semantic analyser |
+| `ir.सूत्र` | 765 | flat typed PIR with slots/registers, labels/branches/jumps, const/slot/binop/call/method/make_list/range/index/field/len/assert/struct/try/catch/finally/model_init/training_method and structural verification | VM-run 8 assertions plus IR-digest shadow parity with Python on 16-file corpus (examples, linguist, fixtures, tokenizer, xor/spiral); `parser.सूत्र`/`type_model.सूत्र` exceed 256-slot VM limit and are excluded |
 | `fixtures/core_syntax.सूत्र` | 57 | covers else-if, nested blocks, indexing, power associativity, `न/तथा/वा`, `%`, ranges, विच्छिन्दु/अनुवर्तय, `निश्चिनु` and generics | included in the parity corpus and executable |
 | `fixtures/finally.सूत्र` | 19 | covers `यत्न`/`गृह्ण` with `अन्ते` and nested cleanup syntax | included in the AST-digest parity corpus |
 | `fixtures/invalid/*.सूत्र` | — | malformed programs for the negative suite | assert a non-zero exit, a `PE4020` diagnostic, line/column and no stdout AST |
@@ -75,7 +76,7 @@ python3 -m unittest tests.integration.test_selfhost_parser -v
 | 1. lexer/tokenizer | done (`tokenizer.सूत्र`, plus the lexer inside `parser.सूत्र`) |
 | 2. parser and AST | **partial** — full-grammar syntax parity and self-parse; diagnostics/recovery and typed AST pending |
 | 3. semantic analyser/type checker | **shadow prototype** (`type_model.सूत्र` executes supported typed-AST expression/scope/name/assignment/call/return/condition/iterable probes; Python remains authoritative and kernel-generated diagnostics are not implemented) |
-| 4. IR/optimiser/bytecode emitter | planned |
+| 4. IR/optimiser/bytecode emitter | **partial** — PIR builder and verifier with differential digest parity on core corpus (see `tests/integration/test_selfhost_ir.py`); optimiser and bytecode emitter still planned |
 | 5. VM in PEACOCK | planned |
 | 6. fixed point | planned |
 
