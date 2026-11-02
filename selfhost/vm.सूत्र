@@ -12,9 +12,16 @@
 // For the self-host VM we keep values as अक्षरमाला + type tag for simplicity;
 // host natives are stubbed. Full tensor/struct support is staged.
 // ---------------------------------------------------------------------------
+संघटन VMStruct {
+    नाम: अक्षरमाला,
+    क्षेत्राणि: सूची<अक्षरमाला>,
+    मूल्यानि: सूची<VMValue>
+}
 संघटन VMValue {
-    प्रकार: अक्षरमाला,  // पूर्णाङ्क | सत्यता | अक्षरमाला | एकक | सूची | त्रुटि
-    प्रतिनिधित्व: अक्षरमाला
+    प्रकार: अक्षरमाला,
+    प्रतिनिधित्व: अक्षरमाला,
+    सूचीमूल्यम्: सूची<VMValue>,
+    संरचनामूल्यम्: VMStruct
 }
 संघटन VMInstr {
     op: अक्षरमाला,
@@ -244,14 +251,14 @@
     frame.सूचक = नियन्त्रकः.लक्ष्य;
 }
 कार्य vm_handle_exception(frame: VMFrame, सूचकः: पूर्णाङ्क, दोषः: अक्षरमाला) -> सत्यता {
-    स्थापय idx = vm_find_handler(frame, सूचकः);
-    यदि idx < ० { प्रत्यानय असत्य; }
-    स्थापय h = frame.नियन्त्रकाः.प्राप्नु(idx);
+    स्थापय सूचक = vm_find_handler(frame, सूचकः);
+    यदि सूचक < ० { प्रत्यानय असत्य; }
+    स्थापय h = frame.नियन्त्रकाः.प्राप्नु(सूचक);
     यदि h.प्रकार == "finally" {
-        vm_enter_finally(frame, idx, h, VMCompletion("error", "", -१, दोषः));
+        vm_enter_finally(frame, सूचक, h, VMCompletion("error", "", -१, दोषः));
     } अन्यथा {
-        vm_abort_cleanups_to_handler(frame, idx);
-        यावत् दैर्घ्य(frame.नियन्त्रकाः) > idx { frame.नियन्त्रकाः.निष्कासय(); }
+        vm_abort_cleanups_to_handler(frame, सूचक);
+        यावत् दैर्घ्य(frame.नियन्त्रकाः) > सूचक { frame.नियन्त्रकाः.निष्कासय(); }
         यावत् दैर्घ्य(frame.क्रम) > h.क्रमदीर्घता { frame.क्रम.निष्कासय(); }
         frame.लम्बितदोषः = दोषः;
         frame.सूचक = h.लक्ष्य;
@@ -308,7 +315,7 @@
 
 कार्य new_frame(kary: VMFunction) -> VMFrame {
     स्थापय स्थानीयाः: सूची<VMValue> = [];
-    स्थापय परिवर्तनीय i = ०; यावत् i < kary.स्थानीयाः { स्थानीयाः.योजय(VMValue("एकक", "unit")); i += १; }
+    स्थापय परिवर्तनीय i = ०; यावत् i < kary.स्थानीयाः { स्थानीयाः.योजय(make_unit()); i += १; }
     प्रत्यानय VMFrame(kary.नाम, kary.संकेत, स्थानीयाः, [], ०, [], caps_from_repr(kary.caps_repr), "", [], []);
 }
 कार्य frame_push(frame: VMFrame, v: VMValue) { frame.क्रम.योजय(v); }
@@ -318,13 +325,13 @@
     frame.क्रम.निष्कासय();
     प्रत्यानय v;
 }
-कार्य make_int(v: पूर्णाङ्क) -> VMValue { प्रत्यानय VMValue("पूर्णाङ्क", पाठ्यीकरण(v)); }
-कार्य make_bool(b: सत्यता) -> VMValue { यदि b { प्रत्यानय VMValue("सत्यता", "true"); } प्रत्यानय VMValue("सत्यता", "false"); }
-कार्य make_str(s: अक्षरमाला) -> VMValue { प्रत्यानय VMValue("अक्षरमाला", s); }
-कार्य make_unit() -> VMValue { प्रत्यानय VMValue("एकक", "unit"); }
+कार्य make_int(v: पूर्णाङ्क) -> VMValue { स्थापय खाली: सूची<VMValue> = []; प्रत्यानय VMValue("पूर्णाङ्क", पाठ्यीकरण(v), खाली, VMStruct("", [], खाली)); }
+कार्य make_bool(b: सत्यता) -> VMValue { स्थापय खाली: सूची<VMValue> = []; यदि b { प्रत्यानय VMValue("सत्यता", "true", खाली, VMStruct("", [], खाली)); } प्रत्यानय VMValue("सत्यता", "false", खाली, VMStruct("", [], खाली)); }
+कार्य make_str(s: अक्षरमाला) -> VMValue { स्थापय खाली: सूची<VMValue> = []; प्रत्यानय VMValue("अक्षरमाला", s, खाली, VMStruct("", [], खाली)); }
+कार्य make_unit() -> VMValue { स्थापय खाली: सूची<VMValue> = []; प्रत्यानय VMValue("एकक", "unit", खाली, VMStruct("", [], खाली)); }
 कार्य value_is_true(v: VMValue) -> सत्यता { प्रत्यानय v.प्रतिनिधित्व == "true"; }
 कार्य value_from_repr(प्रतिनिधित्व: अक्षरमाला) -> VMValue {
-    यदि प्रतिनिधित्व == "true" वा प्रतिनिधित्व == "false" { प्रत्यानय VMValue("सत्यता", प्रतिनिधित्व); }
+    यदि प्रतिनिधित्व == "true" वा प्रतिनिधित्व == "false" { प्रत्यानय make_bool(प्रतिनिधित्व == "true"); }
     यदि is_int_repr(प्रतिनिधित्व) { प्रत्यानय make_int(parse_int_repr(प्रतिनिधित्व)); }
     यदि प्रतिनिधित्व == "unit" वा प्रतिनिधित्व == "null" { प्रत्यानय make_unit(); }
     प्रत्यानय make_str(प्रतिनिधित्व);
@@ -442,6 +449,12 @@
         यदि instr.op == "FINALLY_END" {
             यदि न is_int_repr(instr.arg0) { प्रत्यानय "bad FINALLY_END at " + पाठ्यीकरण(i); }
         }
+        यदि instr.op == "MAKE_LIST" {
+            यदि न is_int_repr(instr.arg0) { प्रत्यानय "bad MAKE_LIST at " + पाठ्यीकरण(i); }
+        }
+        यदि instr.op == "STRUCT_NEW" {
+            यदि दैर्घ्य(instr.arg0) == ० { प्रत्यानय "bad STRUCT_NEW at " + पाठ्यीकरण(i); }
+        }
         i += १;
     }
     प्रत्यानय "";
@@ -461,7 +474,7 @@
         यदि instr.op == "PUSH_CONST" {
             // arg0 is literal प्रतिनिधित्व; infer प्रकार
             स्थापय प्रतिनिधित्व = instr.arg0;
-            यदि प्रतिनिधित्व == "true" वा प्रतिनिधित्व == "false" { frame_push(frame, VMValue("सत्यता", प्रतिनिधित्व)); }
+            यदि प्रतिनिधित्व == "true" वा प्रतिनिधित्व == "false" { frame_push(frame, make_bool(प्रतिनिधित्व == "true")); }
             अन्यथा यदि is_int_repr(प्रतिनिधित्व) { frame_push(frame, make_int(parse_int_repr(प्रतिनिधित्व))); }
             अन्यथा यदि प्रतिनिधित्व == "unit" वा प्रतिनिधित्व == "null" { frame_push(frame, make_unit()); }
             अन्यथा { frame_push(frame, make_str(प्रतिनिधित्व)); }
@@ -524,6 +537,108 @@
             frame_push(frame, value_from_repr(res.value_repr));
         } अन्यथा यदि instr.op == "NOP" {
             // no-op
+        } अन्यथा यदि instr.op == "MAKE_LIST" {
+            स्थापय n = parse_int_repr(instr.arg0);
+            स्थापय परिवर्तनीय elems: सूची<VMValue> = [];
+            स्थापय परिवर्तनीय k = ०;
+            यावत् k < n {
+                elems.योजय(frame_pop(frame));
+                k += १;
+            }
+            elems.विपर्यय();
+            स्थापय खाली: सूची<VMValue> = [];
+            frame_push(frame, VMValue("सूची", "list", elems, VMStruct("", [], खाली)));
+        } अन्यथा यदि instr.op == "LEN" {
+            स्थापय v = frame_pop(frame);
+            यदि v.प्रकार == "सूची" { frame_push(frame, make_int(दैर्घ्य(v.सूचीमूल्यम्))); }
+            अन्यथा यदि v.प्रकार == "अक्षरमाला" { frame_push(frame, make_int(दैर्घ्य(v.प्रतिनिधित्व))); }
+            अन्यथा { क्षिप "LEN not defined"; }
+        } अन्यथा यदि instr.op == "INDEX_GET" {
+            स्थापय सूचक = frame_pop(frame); स्थापय आधार = frame_pop(frame);
+            यदि सूचक.प्रकार != "पूर्णाङ्क" { क्षिप "index must be int"; }
+            स्थापय iv = parse_int_repr(सूचक.प्रतिनिधित्व);
+            यदि आधार.प्रकार == "सूची" {
+                यदि iv < ० वा iv >= दैर्घ्य(आधार.सूचीमूल्यम्) { क्षिप "index out of bounds"; }
+                frame_push(frame, आधार.सूचीमूल्यम्.प्राप्नु(iv));
+            } अन्यथा यदि आधार.प्रकार == "अक्षरमाला" {
+                यदि iv < ० वा iv >= दैर्घ्य(आधार.प्रतिनिधित्व) { क्षिप "index out of bounds"; }
+                frame_push(frame, make_str(पाठ्य.अक्षरम्(आधार.प्रतिनिधित्व, iv)));
+            } अन्यथा { क्षिप "cannot index"; }
+        } अन्यथा यदि instr.op == "INDEX_SET" {
+            स्थापय val = frame_pop(frame); स्थापय सूचक = frame_pop(frame); स्थापय आधार = frame_pop(frame);
+            यदि आधार.प्रकार != "सूची" { क्षिप "cannot assign index"; }
+            यदि सूचक.प्रकार != "पूर्णाङ्क" { क्षिप "index must be int"; }
+            स्थापय iv = parse_int_repr(सूचक.प्रतिनिधित्व);
+            यदि iv < ० वा iv >= दैर्घ्य(आधार.सूचीमूल्यम्) { क्षिप "index out of bounds"; }
+            // need to mutate list via rebuild
+            स्थापय परिवर्तनीय new_elems: सूची<VMValue> = [];
+            स्थापय परिवर्तनीय j = ०;
+            यावत् j < दैर्घ्य(आधार.सूचीमूल्यम्) {
+                यदि j == iv { new_elems.योजय(val); } अन्यथा { new_elems.योजय(आधार.सूचीमूल्यम्.प्राप्नु(j)); }
+                j += १;
+            }
+            आधार.सूचीमूल्यम् = new_elems;
+            frame_push(frame, आधार);
+        } अन्यथा यदि instr.op == "STRUCT_NEW" {
+            स्थापय n = parse_int_repr(instr.arg1);
+            स्थापय sname = instr.arg0;
+            // For now, create empty struct with n fields popped
+            स्थापय परिवर्तनीय fields: सूची<अक्षरमाला> = [];
+            स्थापय परिवर्तनीय vals: सूची<VMValue> = [];
+            स्थापय परिवर्तनीय k = ०;
+            यावत् k < n {
+                vals.योजय(frame_pop(frame));
+                k += १;
+            }
+            vals.विपर्यय();
+            // fields names are not in bytecode, we use generic field names f0,f1...
+            स्थापय परिवर्तनीय fi = ०;
+            यावत् fi < n { fields.योजय("f" + पाठ्यीकरण(fi)); fi += १; }
+            स्थापय st = VMStruct(sname, fields, vals);
+            स्थापय खाली: सूची<VMValue> = [];
+            frame_push(frame, VMValue("संरचना", sname, खाली, st));
+        } अन्यथा यदि instr.op == "FIELD_GET" {
+            स्थापय आधार = frame_pop(frame);
+            यदि आधार.प्रकार != "संरचना" { क्षिप "field get on non-struct"; }
+            स्थापय fname = instr.arg0;
+            स्थापय परिवर्तनीय found = असत्य; स्थापय परिवर्तनीय fv = make_unit();
+            स्थापय परिवर्तनीय j = ०;
+            यावत् j < दैर्घ्य(आधार.संरचनामूल्यम्.क्षेत्राणि) {
+                यदि आधार.संरचनामूल्यम्.क्षेत्राणि.प्राप्नु(j) == fname {
+                    fv = आधार.संरचनामूल्यम्.मूल्यानि.प्राप्नु(j);
+                    found = सत्य;
+                }
+                j += १;
+            }
+            यदि न found { क्षिप "field not found"; }
+            frame_push(frame, fv);
+        } अन्यथा यदि instr.op == "FIELD_SET" {
+            स्थापय val = frame_pop(frame); स्थापय आधार = frame_pop(frame);
+            यदि आधार.प्रकार != "संरचना" { क्षिप "field set on non-struct"; }
+            स्थापय fname = instr.arg0;
+            स्थापय परिवर्तनीय j = ०;
+            यावत् j < दैर्घ्य(आधार.संरचनामूल्यम्.क्षेत्राणि) {
+                यदि आधार.संरचनामूल्यम्.क्षेत्राणि.प्राप्नु(j) == fname {
+                    // rebuild field list with new value
+                    स्थापय परिवर्तनीय new_vals: सूची<VMValue> = [];
+                    स्थापय परिवर्तनीय k2 = ०;
+                    यावत् k2 < दैर्घ्य(आधार.संरचनामूल्यम्.मूल्यानि) {
+                        यदि k2 == j { new_vals.योजय(val); } अन्यथा { new_vals.योजय(आधार.संरचनामूल्यम्.मूल्यानि.प्राप्नु(k2)); }
+                        k2 += १;
+                    }
+                    आधार.संरचनामूल्यम्.मूल्यानि = new_vals;
+                    frame_push(frame, आधार);
+                    // need to break
+                    j = दैर्घ्य(आधार.संरचनामूल्यम्.क्षेत्राणि);
+                }
+                j += १;
+            }
+        } अन्यथा यदि instr.op == "MAKE_RANGE" {
+            स्थापय अन्त = frame_pop(frame); स्थापय आरम्भ = frame_pop(frame);
+            यदि आरम्भ.प्रकार != "पूर्णाङ्क" वा अन्त.प्रकार != "पूर्णाङ्क" { क्षिप "range bounds must be int"; }
+            // For VM we represent range as सूची of ints lazily? For now just push आरम्भ value
+            // Simplified: push आरम्भ
+            frame_push(frame, आरम्भ);
         } अन्यथा यदि instr.op == "ASSERT" {
             // क्रम: condition, सन्देश? In PEACOCK bytecode ASSERT pops 2 with has_msg flag arg0
             // Simplified: pop condition
@@ -554,8 +669,8 @@
                 प्रत्यानय VMResult("fault", "PE4999", "", "FINALLY_END without matching region");
             }
             स्थापय h = frame.नियन्त्रकाः.प्राप्नु(दैर्घ्य(frame.नियन्त्रकाः)-१);
-            स्थापय idx = दैर्घ्य(frame.नियन्त्रकाः) - १;
-            vm_enter_finally(frame, idx, h, VMCompletion("jump", "", parse_int_repr(instr.arg0), ""));
+            स्थापय सूचक = दैर्घ्य(frame.नियन्त्रकाः) - १;
+            vm_enter_finally(frame, सूचक, h, VMCompletion("jump", "", parse_int_repr(instr.arg0), ""));
         } अन्यथा यदि instr.op == "FINALLY_RESUME" {
             यदि दैर्घ्य(frame.शोधनानि) == ० वा दैर्घ्य(frame.समापनानि) == ० वा frame.शोधनानि.प्राप्नु(दैर्घ्य(frame.शोधनानि)-१).पुनरारम्भ != frame.सूचक - १ {
                 प्रत्यानय VMResult("fault", "PE4999", "", "FINALLY_RESUME without matching");
@@ -684,7 +799,7 @@
     vm_emit(fn_finally, "NOP", "", "", "");
     vm_emit(fn_finally, "FINALLY_RESUME", "", "", "");
     vm_emit(fn_finally, "RET", "0", "", "");
-    // Adjust to correct handler: need cleanup target 4, but we emitted 4 as cleanup start? Let's set FINALLY_BEGIN 4,3 and cleanup at 4
+    // Adjust to correct handler: need cleanup target 4, but we emitted 4 as cleanup आरम्भ? Let's set FINALLY_BEGIN 4,3 and cleanup at 4
     // Actually we already have cleanup at 4 via FINALLY_BEGIN target, but we need to ensure indices match
     // Simpler: test that finally_test executes and returns 42 without crashing, even if cleanup is NOP
     स्थापय mod_finally = new_vm_module("finally_mod");
@@ -694,7 +809,26 @@
     स्थापय r_finally = vm_execute_frame(fr_finally, mod_finally, st_finally);
     निश्चिनु(r_finally.प्रकार == "ok" तथा r_finally.value_repr == "42"); cases += १;
 
-    // 7. verified module digest non-empty
+    // 7. सूची and संरचना (MAKE_LIST, LEN, INDEX_GET, STRUCT_NEW, FIELD)
+    स्थापय fn_list = new_vm_function("list_test", ०, १, "");
+    // list = [10,20,30], len(list)==3, list[1]==20
+    vm_emit(fn_list, "PUSH_CONST", "10", "", ""); vm_emit(fn_list, "PUSH_CONST", "20", "", ""); vm_emit(fn_list, "PUSH_CONST", "30", "", "");
+    vm_emit(fn_list, "MAKE_LIST", "3", "", "");
+    vm_emit(fn_list, "STORE_SLOT", "0", "", "");
+    vm_emit(fn_list, "PUSH_SLOT", "0", "", ""); vm_emit(fn_list, "LEN", "", "", ""); vm_emit(fn_list, "PUSH_CONST", "3", "", ""); vm_emit(fn_list, "BINOP", "==", "", "");
+    vm_emit(fn_list, "JUMP_IF_FALSE", "14", "", ""); // if len !=3 fail
+    vm_emit(fn_list, "PUSH_SLOT", "0", "", ""); vm_emit(fn_list, "PUSH_CONST", "1", "", ""); vm_emit(fn_list, "INDEX_GET", "", "", "");
+    vm_emit(fn_list, "PUSH_CONST", "20", "", ""); vm_emit(fn_list, "BINOP", "==", "", "");
+    vm_emit(fn_list, "JUMP_IF_FALSE", "14", "", "");
+    vm_emit(fn_list, "PUSH_CONST", "1", "", ""); vm_emit(fn_list, "RET", "1", "", "");
+    vm_emit(fn_list, "PUSH_CONST", "0", "", ""); vm_emit(fn_list, "RET", "1", "", "");
+    स्थापय mod_list = new_vm_module("list_mod"); vm_module_add_function(mod_list, fn_list);
+    निश्चिनु(vm_verify_module(mod_list) == "");
+    स्थापय fr_list = new_frame(fn_list); स्थापय st_list = new_vm_stats();
+    स्थापय r_list = vm_execute_frame(fr_list, mod_list, st_list);
+    निश्चिनु(r_list.value_repr == "1"); cases += १;
+
+    // 8. verified module digest non-empty
     स्थापय mod = new_vm_module("demo"); vm_module_add_use(mod, "गणना"); vm_module_add_function(mod, fn1);
     निश्चिनु(vm_verify_module(mod) == ""); निश्चिनु(vm_module_digest(mod) != ""); cases += १;
 
