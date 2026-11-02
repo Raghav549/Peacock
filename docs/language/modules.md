@@ -54,10 +54,23 @@ Both forms work:
 }
 ```
 
+## Aliases (`रूपेण`)
+
+`रूपेण` introduces a local alias; only the alias is visible:
+
+```peacock
+उपयोग गणित रूपेण g
+उपयोग सहायक रूपेण S
+
+कार्य मुख्य() -> एकक {
+    g.वर्गमूल(९.०);
+    S.वर्ग(५);
+}
+```
+
 ## Limitations (0.4)
 
-* Flat merge + qualified `module.func`/`module.Struct` now implemented.
-* No `रूपेण` aliases.
+* Flat merge + qualified `module.func`/`module.Struct` + `रूपेण` aliases now implemented.
 * No package versioning; `peacock_modules/` is conventional, not enforced.
 
 This is an incremental foundation; future phases will add re-exports,

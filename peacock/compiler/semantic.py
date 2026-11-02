@@ -157,7 +157,7 @@ class TypedProgram:
 
 
 class SemanticAnalyzer:
-    def __init__(self, module, diag: DiagnosticBag | None = None, file_modules: dict[str, Any] | None = None):
+    def __init__(self, module, diag: DiagnosticBag | None = None, file_modules: dict[str, Any] | None = None, native_aliases: dict[str, str] | None = None):
         self.module = module
         self.diag = diag if diag is not None else DiagnosticBag()
         self.functions: dict[str, FunctionSymbol] = {}
@@ -166,6 +166,7 @@ class SemanticAnalyzer:
         self.trainings: dict[str, TrainingSymbol] = {}
         self.namespaces: set[str] = set()
         self.file_modules: dict[str, Any] = file_modules or {}
+        self.native_aliases: dict[str, str] = native_aliases or {}
         # For qualified access: map from short import name -> its FunctionSymbol/StructSymbol dicts
         self.file_module_funcs: dict[str, dict[str, FunctionSymbol]] = {}
         self.file_module_structs: dict[str, dict[str, StructSymbol]] = {}
@@ -254,20 +255,26 @@ class SemanticAnalyzer:
     def _check_uses(self) -> None:
         seen: set[str] = set()
         for use in self.module.uses:
-            # File imports (उपयोग सहायक;) are kept as valid namespaces for qualified calls.
-            # They may be dotted (pkg.गणित) where last component is the short name.
-            short_name = use.path[-1] if use.path else ""
-            if short_name in self.file_modules or (use.path and use.path[0] in self.file_modules):
-                key = use.path[0]
-                if key in seen:
-                    self.diag.error("PE3001", f"module '{surface(key)}' is imported more than once", use.span)
+            effective = use.alias or (use.path[-1] if use.path else "")
+            # File imports: effective name is alias if present else last component
+            if effective in self.file_modules:
+                if effective in seen:
+                    self.diag.error("PE3001", f"module '{surface(effective)}' is imported more than once", use.span)
                     continue
-                seen.add(key)
-                self.namespaces.add(key)
-                # Remember file module for qualified lookup (store by short name and full)
-                if short_name not in self.file_module_funcs:
-                    self.file_module_funcs[short_name] = {}
-                    self.file_module_structs[short_name] = {}
+                seen.add(effective)
+                self.namespaces.add(effective)
+                if effective not in self.file_module_funcs:
+                    self.file_module_funcs[effective] = {}
+                    self.file_module_structs[effective] = {}
+                continue
+            # Native alias: alias maps to canonical namespace
+            if use.alias and use.alias in self.native_aliases:
+                canonical = self.native_aliases[use.alias]
+                if effective in seen:
+                    self.diag.error("PE3001", f"module '{surface(effective)}' is imported more than once", use.span)
+                    continue
+                seen.add(effective)
+                self.namespaces.add(effective)
                 continue
             if len(use.path) != 1:
                 self.diag.error(
@@ -1275,6 +1282,8 @@ class SemanticAnalyzer:
             return "training", self.trainings[name.ident]
         if name.ident in B.NAMESPACES:
             return "namespace", name.ident
+        if name.ident in self.native_aliases:
+            return "namespace", self.native_aliases[name.ident]
         if name.ident in self.file_modules:
             return "file_module", name.ident
         if name.ident in B.GLOBAL_NATIVES:
@@ -1911,16 +1920,18 @@ class SemanticAnalyzer:
             base.resolution = kind
             base.symbol = symbol
             if kind == "namespace":
-                namespace = base.ident
-                if namespace not in self.namespaces:
+                # base.ident may be an alias (native_aliases maps alias->canonical)
+                canonical = self.native_aliases.get(base.ident, base.ident)
+                if base.ident not in self.namespaces:
                     for arg in call.args:
                         self._check_expr(arg)
                     return self._error(
                         "PE3006",
-                        f"module '{namespace}' is used but not imported",
+                        f"module '{base.ident}' is used but not imported",
                         base.span,
-                        hint=f"add 'उपयोग {surface(namespace)};'",
+                        hint=f"add 'उपयोग {surface(base.ident)};'",
                     )
+                namespace = canonical
                 full_name = f"{namespace}.{field.name}"
                 if full_name not in B.NATIVES:
                     available = B.NAMESPACES.get(namespace, ())

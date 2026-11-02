@@ -89,7 +89,8 @@ def compile_source(
 
     t0 = time.perf_counter()
     file_mods = getattr(module, "file_modules", {})
-    typed = SemanticAnalyzer(module, result.diagnostics, file_modules=file_mods).analyze()
+    alias_map = getattr(module, "native_aliases", {})
+    typed = SemanticAnalyzer(module, result.diagnostics, file_modules=file_mods, native_aliases=alias_map).analyze()
     result.stats["semantic_ms"] = (time.perf_counter() - t0) * 1000.0
     result.typed = typed
 
@@ -184,9 +185,11 @@ def _resolve_file_imports(module, base_path: str, result: CompileResult) -> None
     from . import builtins as B
 
     visited: set[str] = set()
-    # file_modules maps short import name (e.g. 'सहायक' internal) -> imported Module
+    # file_modules maps effective import name (alias or short name) -> imported Module
     if not hasattr(module, "file_modules"):
         module.file_modules = {}
+    if not hasattr(module, "native_aliases"):
+        module.native_aliases = {}
 
     def _merge_import(imported_path: Path, parent_module, import_name: str) -> None:
         key = str(imported_path.resolve())
@@ -247,15 +250,22 @@ def _resolve_file_imports(module, base_path: str, result: CompileResult) -> None
                 result.diagnostics.error("PE3001", f"duplicate training '{tr.name}' from import '{imported_path}'", tr.name_span)
                 continue
             parent_module.trainings.append(tr)
-        # Merge builtin uses from imported module
+        # Merge builtin uses and alias maps from imported module
         for u in imported_mod.uses:
-            # Only propagate builtin uses; file uses are already resolved and kept as file_modules
-            if u.path and u.path[0] in B.NAMESPACES and u not in parent_module.uses:
+            if u.path and len(u.path) == 1 and u.path[0] in B.NAMESPACES and u not in parent_module.uses:
                 parent_module.uses.append(u)
+        if hasattr(imported_mod, "native_aliases"):
+            if not hasattr(parent_module, "native_aliases"):
+                parent_module.native_aliases = {}
+            for k, v in imported_mod.native_aliases.items():
+                if k not in parent_module.native_aliases:
+                    parent_module.native_aliases[k] = v
 
     def _resolve_file_imports_inner(mod, mod_path: str, res: CompileResult, seen: set[str]) -> None:
         if not hasattr(mod, "file_modules"):
             mod.file_modules = {}
+        if not hasattr(mod, "native_aliases"):
+            mod.native_aliases = {}
         # Work on a snapshot so we can mutate mod.uses
         remaining = []
         for use in list(mod.uses):
@@ -263,7 +273,10 @@ def _resolve_file_imports(module, base_path: str, result: CompileResult) -> None
                 remaining.append(use)
                 continue
             first = use.path[0]
+            # Builtin namespace import (with optional alias)
             if first in B.NAMESPACES and len(use.path) == 1:
+                if use.alias:
+                    mod.native_aliases[use.alias] = first
                 remaining.append(use)
                 continue
             # Attempt file import (handle dotted path, last component is short name)
@@ -274,8 +287,8 @@ def _resolve_file_imports(module, base_path: str, result: CompileResult) -> None
                 continue
             # File found: keep the use as file-module namespace for qualified calls
             remaining.append(use)
-            short_name = use.path[-1]
-            _merge_import(found, mod, short_name)
+            effective = use.alias or use.path[-1]
+            _merge_import(found, mod, effective)
             # Record successful file import for stats
             res.stats["modules_loaded"] = res.stats.get("modules_loaded", 0) + 1
         mod.uses = remaining

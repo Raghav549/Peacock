@@ -112,7 +112,7 @@ byte-for-byte. Android/iOS were not built.
 * **Self-host components:** PEACOCK-written tokenizer, full-grammar parser
   with AST-digest parity, deterministic `formatter.सूत्र` (brace-depth,
   operator spacing, idempotent) and user-module system (`उपयोग <file>;`
-  file imports with recursive merge, circular detection, 628-test gate);
+  file imports with recursive merge, qualified `module.func`, `रूपेण` aliases for file and builtin namespaces, circular detection, 233 compiler tests);
   experimental VM-executed semantic-shadow probes. Python remains authoritative
   for production semantics, IR, bytecode and VM.
 * **Applications/tooling:** twelve-route PEACOCK-authored static website,

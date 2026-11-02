@@ -35,10 +35,11 @@ Acceptance criteria:
 * spans and caret diagnostics are correct on multiline input;
 * reserved keywords fail with targeted messages.
 
-Delivered incrementally: basic file imports (`उपयोग <file>;` with dotted paths,
+Delivered incrementally: user file imports (`उपयोग <file>;` with dotted paths,
 same-directory and `peacock_modules/` search, recursive merge, circular detection,
-633-test gate; see `docs/language/modules.md` and `examples/modules/`). Remaining
-for a future version: qualified imports, `रूपेण` aliases, generics, enums, pattern
+qualified `module.func`, and `रूपेण` aliases for both file and builtin namespaces;
+233 compiler tests green; see `docs/language/modules.md` and `examples/modules/`). Remaining
+for a future version: re-exports, visibility control, package versioning, generics, enums, pattern
 matching, closures, traits, concurrency.
 
 ## Phase 2 — Compiler and bytecode — **done**

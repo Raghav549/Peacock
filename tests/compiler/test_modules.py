@@ -68,6 +68,28 @@ class ModuleImportTests(unittest.TestCase):
             result = compile_source(src, str(tmp / "main.सूत्र"))
             self.assertTrue(result.ok, result.diagnostics.render_all(src))
 
+    def test_file_alias_import(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            (tmp / "सहायक.सूत्र").write_text(
+                "प्रकरण सहायक\nकार्य वर्ग(अ: पूर्णाङ्क) -> पूर्णाङ्क { प्रत्यानय अ * अ; }",
+                encoding="utf-8",
+            )
+            src = "प्रकरण मुख्य\nउपयोग सहायक रूपेण S\nकार्य मुख्य() -> एकक { मुद्रय(पाठ्यीकरण(S.वर्ग(५))); }"
+            result = compile_source(src, str(tmp / "main.सूत्र"))
+            self.assertTrue(result.ok, result.diagnostics.render_all(src))
+            src2 = "प्रकरण मुख्य\nउपयोग सहायक रूपेण S\nकार्य मुख्य() -> एकक { मुद्रय(पाठ्यीकरण(सहायक.वर्ग(५))); }"
+            result2 = compile_source(src2, str(tmp / "main.सूत्र"))
+            self.assertFalse(result2.ok)
+
+    def test_builtin_alias_import(self):
+        src = "प्रकरण मुख्य\nउपयोग गणित रूपेण g\nकार्य मुख्य() -> एकक { स्थापय x = g.वर्गमूल(४.०); मुद्रय(x); }"
+        result = compile_source(src, "<source>")
+        self.assertTrue(result.ok, result.diagnostics.render_all(src))
+        src2 = "प्रकरण मुख्य\nउपयोग गणित रूपेण g\nकार्य मुख्य() -> एकक { स्थापय x = गणित.वर्गमूल(४.०); }"
+        result2 = compile_source(src2, "<source>")
+        self.assertFalse(result2.ok)
+
 
 if __name__ == "__main__":
     unittest.main()
