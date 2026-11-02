@@ -541,11 +541,19 @@ cleanup closes remaining handles. See [docs/platforms/README.md](docs/platforms/
 * Exactly one input and one output are supported in 0.4.
 * Inputs/outputs must be floating tensors with a statically known shape. The
   model's feature dimension is the last input dimension.
-* The stack must be non-empty. `सघन(एककानि: N, सक्रियण: A)` is the only
-  layer. `N` is an integer literal > 0. `A` is one of `रैखिक`, `धनाङ्क`,
-  `वक्रसीमा`, `अतिस्पर्शज्या`, `कोमलाधिकतम`, or a string with that name; the default is
-  `रैखिक`.
-* The final layer's `एककानि` must equal the output's last dimension.
+* The stack must be non-empty. Supported layers:
+
+  | Layer | Sanskrit | Arguments | Notes |
+  |---|---|---|---|
+  | Dense | `सघन` | `एककानि: N, सक्रियण: A` | `N>0`, `A` in `रैखिक/धनाङ्क/वक्रसीमा/अतिस्पर्शज्या/कोमलाधिकतम` (default `रैखिक`) |
+  | LayerNorm | `सामान्यीकरण` | `सामान्यमान: N, सहिष्णुता: eps` | `N` must match previous dim |
+  | Attention | `एकाग्रता` | `प्रारूपविस्तार: M, शीर्षसंख्या: H, निवेशविस्तार: I?, कारणबद्ध: सत्य/असत्य` | `M%H==0`; `I` defaults to previous dim; causal mask when `कारणबद्ध: सत्य` |
+  | Transformer | `रूपान्तरक` | `प्रारूपविस्तार: M, शीर्षसंख्या: H, अग्रविस्तार: F?` | `M` must match input; `M%H==0`; `F` default `4M`; self-attn → norm → FFN |
+  | Decoder | `विसंकेतक` | `प्रारूपविस्तार: M, शीर्षसंख्या: H, अग्रविस्तार: F?` | causal self-attn → cross-attn → norm → FFN; `M` must match input |
+  | CrossAttention | `तिर्यगेकाग्रता` | `प्रारूपविस्तार: M, शीर्षसंख्या: H, निवेशविस्तार: I?, प्रसङ्गविस्तार: C?` | Q from decoder, K/V from encoder |
+
+  Unknown layer arguments or `M%H!=0` are PE3009.
+* The final layer's `एककानि`/`d_model` must equal the output's last dimension (PE3009 if mismatch).
 
 `Net.प्रारम्भ(बीज: पूर्णाङ्क)` creates a `प्रतिमानप्रकार` value and requires `गणना`.
 `Training.चलाय(प्रतिमानमूल्य, दत्त)` returns `सूची<दशमलव>` of per-epoch losses.
@@ -617,8 +625,8 @@ The following are **not** part of this version and must not be assumed to work:
 * garbage collection tuning, arenas, manual memory management;
 * whole-language native AOT, LLVM or Wasm. The separate C backend implements
   only the subset in [docs/native.md](docs/native.md) and rejects other opcodes;
-* multiple model inputs/outputs, layers other than सघन, convolution/attention
-  layers, optimisers other than SGD/Adam;
+* multiple model inputs/outputs, convolution layers, beam-search/KV-cache,
+  distributed training, optimisers other than SGD/Adam;
 * GPU autodiff/training, CUDA/Metal/Vulkan, asynchronous device graphs, or
   GPU/ray-traced 3D; smooth-normal interpolation, textures and mesh formats;
 * complete native complex-script text shaping/accessibility, text-input widgets,

@@ -1,12 +1,13 @@
 # PEACOCK Status
 
-Last verified: **2026-11-02** on `arena/c0fe52eb-peacock` (working tree;
+Last verified: **2026-11-03** on `arena/c0fe52eb-peacock` (working tree;
 not a released/tagged upstream version). Re-run the commands before relying on
 any number. Canonical source extension: `.सूत्र`. The compiler is **not
 self-hosting** (bootstrap is pipeline-digest parity via `peacock.tools.bootstrap`;
 `pipeline.सूत्र` now wires all 7 selfhost kernels with chunked literals and
-hash/len parity). GitHub does **not** yet recognise PEACOCK; local Linguist
-metadata and the prepared submission are not upstream acceptance.
+hash/len parity; new decoder/cross-attention/causal DSL is Python-authoritative
+until selfhost IR catches up). GitHub does **not** yet recognise PEACOCK; local
+Linguist metadata and the prepared submission are not upstream acceptance.
 
 ## 1. Current verification
 
@@ -18,16 +19,22 @@ python -m unittest discover -s tests -q
 # OK (skipped=2)
 ```
 
-New in 2026-11-02: **Transformer stack — LayerNorm, Attention, TransformerBlock.**
-* `peacock/intelligence/tensor.py:layer_norm` and `peacock/intelligence/layers.py:LayerNorm`
-  per-last-dim normalization with learnable γ/β (finite-difference verified).
-* `peacock/intelligence/tensor.py:scaled_dot_product_attention` + batched `matmul`
-  (rank N-D) and `peacock/intelligence/layers.py:MultiHeadAttention`/
-  `TransformerBlock`/`positional_encoding` — full encoder with residual+norm+FFN,
-  872 params per block, 18 new tests.
+New in 2026-11-02/03: **Transformer stack — encoder + decoder with causal & cross-attention.**
+* `peacock/intelligence/tensor.py:layer_norm`, `causal_mask(seq_q,seq_k)` and
+  `scaled_dot_product_attention(..., is_causal)` — lower-triangular 1/0 mask,
+  broadcast combine, -1e9 masked softmax; `matmul` rank N-D with batched ND.
+* `peacock/intelligence/layers.py:LayerNorm` (γ/β, finite-diff), `MultiHeadAttention`
+  (Xavier, split/combine, `is_causal` flag), `TransformerBlock` (872p @8/2/16),
+  `CrossAttention` (Q decoder, K/V encoder, 8 tensors), `DecoderBlock` (causal
+  self→cross→FFN, 3 norms), `positional_encoding` sinusoid, `Sequential`/`Model`
+  with `causal_mask` support — 18 attention tests + causal/decoder smoke.
 * PEACOCK DSL now accepts `सामान्यीकरण(सामान्यमान: N, सहिष्णुता: eps)`,
-  `एकाग्रता(प्रारूपविस्तार: M, शीर्षसंख्या: H)` and
-  `रूपान्तरक(प्रारूपविस्तार: M, शीर्षसंख्या: H, अग्रविस्तार: F)`;
+  `एकाग्रता(प्रारूपविस्तार: M, शीर्षसंख्या: H, कारणबद्ध: सत्य/असत्य)`,
+  `रूपान्तरक(प्रारूपविस्तार: M, शीर्षसंख्या: H, अग्रविस्तार: F)`,
+  `विसंकेतक(प्रारूपविस्तार: M, शीर्षसंख्या: H, अग्रविस्तार: F)` and
+  `तिर्यगेकाग्रता(प्रारूपविस्तार: M, शीर्षसंख्या: H)`; `is_causal` preserved in
+  `.बीज`, `disasm` shows `एकाग्रता(M,H,causal)`/`विसंकेतक`/`तिर्यगेकाग्रता`. CLI
+  gives PE4001 hint `add --grant गणना`.
   see `tests/ai/test_attention.py`, `examples/transformer_demo.सूत्र`.
 
 The two skips are explicit environment gates: the real OpenCL device parity
@@ -105,13 +112,15 @@ byte-for-byte. Android/iOS were not built.
   checked values/operators/lists/strings/functions, standalone executables and
   an embeddable `peacock_run` shared-library ABI with output callbacks and
   recoverable errors. Unsupported opcodes fail before C compilation.
-* **AI:** broadcasting tensors, reverse-mode autodiff, Dense models, SGD/Adam,
-  XOR/spiral training, evaluation, `.ज्ञान` serialisation and int8 analysis;
-  deterministic production-rule/Dijkstra agents; bounded OpenAI-compatible
-  LLM/tool agents with schemas, grants, traces and aggregate budgets.
+* **AI:** broadcasting tensors, reverse-mode autodiff, Dense/LayerNorm/
+  MultiHeadAttention/Transformer/CrossAttention/Decoder + positional_encoding +
+  causal masking, SGD/Adam, XOR/spiral training, evaluation, `.ज्ञान`
+  serialisation and int8 analysis; deterministic Dijkstra agents; bounded
+  OpenAI-compatible LLM/tool agents with schemas, grants, traces and aggregate budgets.
 * **Compute:** CPU addition/multiplication/ReLU/matmul and a real OpenCL 1.2
   implementation using device kernels/buffers. CPU tests pass, including
   non-square `[m,k] × [k,n]`; actual OpenCL execution remains untested here.
+  Transformer/decoder training uses only the CPU autodiff path.
 * **Graphics/UI:** advanced sRGB/XYZ/Lab/Oklab/Oklch colour, CIEDE2000, weighted
   and approximate-subtractive mixing, gamut mapping; RGBA canvas/PNG; CPU 3-D
   meshes/depth/lights; retained Sanskrit UI, layout, audits, bounded bubbling
@@ -126,9 +135,11 @@ byte-for-byte. Android/iOS were not built.
 * **Grammar:** attributed offline corpus of all 3,983 Aṣṭādhyāyī sūtra texts,
   inheritance/anuvṛtti display, generic Māheśvara pratyāhāra expansion, 20
   executable sandhi rules with varṇa/paribhāṣā/adhikāra ordering and derivation
-  traces, plus śabda (12 paradigms)/dhātu (12 dhātus)/samāsa (17)/kāraka (9 sentences)/validator and 10 vyutpatti prakriyās (`6.1.77`, `6.1.78`, `6.1.87`,
-  `6.1.88`, `6.1.101`, `6.1.109`, `6.1.113`, `8.2.39`, `8.3.15`, `8.3.23`, `8.3.34`,
-  `8.4.40` etc.; 46 executable transforms).
+  traces, plus śabda (12 paradigms)/dhātu (12 dhātus)/samāsa (17)/kāraka (9
+  sentence kinds)/validator and 10 vyutpatti prakriyās (`6.1.77`, `6.1.78`,
+  `6.1.87`, `6.1.88`, `6.1.101`, `6.1.109`, `6.1.113`, `8.2.39`, `8.3.15`, `8.3.23`,
+  `8.3.34`, `8.4.40` etc.; 46 executable transforms via `sutra_engine` with 5
+  paribhāṣā — 1.4.2 paraṃ kāryam, 1.4.1, 1.1.66, 1.1.67, 8.2.1 asiddha).
 * **Self-host components:** PEACOCK-written tokenizer, full-grammar parser
   with AST-digest parity, deterministic `formatter.सूत्र` (brace-depth,
   operator spacing, idempotent) and user-module system (`उपयोग <file>;`

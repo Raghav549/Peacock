@@ -75,31 +75,39 @@ Acceptance criteria:
 Remaining: process-level sandbox hardening (seccomp/landlock or WASM isolation),
 memory accounting and collection, deterministic scheduling.
 
-## Phase 4 — Intelligence engine — **done** (small models)
+## Phase 4 — Intelligence engine — **done** (small + transformer models)
 
-Deliverables: tensor engine with broadcasting and reverse-mode autodiff, Dense
-layers, SGD/Adam, cross-entropy/MSE, XOR and spiral datasets, training reports,
-evaluation metrics, `.ज्ञान` serialisation and int8 quantisation. Phase 4 also
-has a bounded symbolic-agent library: string blackboards, condition/action/
-effect rules, positive-cost Dijkstra planning, salience tie-breaking, execution
-and traces, gated by `गणना`. A separate bounded LLM/tool loop adds host-configured
-providers, JSON schemas, capability checks, redirects disabled and aggregate
-budgets, gated by `सञ्जाल`; its default tools are offline grammar/calculator
-operations. `gpu.py` adds tested CPU operations and an OpenCL 1.2 implementation
-for add/multiply/ReLU/matmul, with no actual-device result in this environment.
+Deliverables: tensor engine with broadcasting and reverse-mode autodiff, Dense/
+LayerNorm/MultiHeadAttention/Transformer/CrossAttention/Decoder + positional
+encoding + causal masking, batched matmul and scaled dot-product attention,
+SGD/Adam, cross-entropy/MSE, XOR and spiral datasets, training reports,
+evaluation metrics, `.ज्ञान` serialisation and int8 quantisation. DSL layers
+`सघन/सामान्यीकरण/एकाग्रता(कारणबद्ध)/रूपान्तरक/विसंकेतक/तिर्यगेकाग्रता` with
+`प्रारूपविस्तार/शीर्षसंख्या/अग्रविस्तार/निवेशविस्तार/प्रसङ्गविस्तार` are
+type-checked and round-trip via `.बीज`. Phase 4 also has a bounded
+symbolic-agent library (string blackboards, condition/action/effect rules,
+positive-cost Dijkstra planning, salience tie-breaking, execution and traces,
+gated by `गणना`) and a bounded LLM/tool loop (host-configured providers, JSON
+schemas, capability checks, redirects disabled, aggregate budgets, gated by
+`सञ्जाल`; default tools offline grammar/calculator). `gpu.py` adds tested CPU
+ops and an OpenCL 1.2 implementation for add/multiply/ReLU/matmul, with no
+actual-device result in this environment.
 
 Acceptance criteria:
 
-* finite-difference gradient checks pass for representative graphs;
+* finite-difference gradient checks pass for representative graphs (now includes
+  attention and layernorm);
 * XOR reaches accuracy 1.0 and loss < 0.01 with a recorded configuration;
+* transformer forward/serialisation round-trip preserves output (tested);
 * model round-trips preserve predictions;
 * corrupt/truncated models are rejected.
 
-Planned: convolution/attention layers, embedding/sequence APIs, data loading,
-mixed precision, larger models, CPU performance, device-resident/autodiff GPU
-graphs and actual OpenCL hardware CI. Agent follow-up requires cancellable tool
-execution, richer host tools, persistent blackboards, plan monitoring and model
-quality/safety evaluation; none of that is an AGI claim.
+Still planned: convolution, embedding/sequence data loaders, mixed precision,
+larger-scale training, CPU performance, device-resident/autodiff GPU graphs
+(GPU attention not yet), beam search/KV-cache and actual OpenCL hardware CI.
+Agent follow-up requires cancellable tool execution, richer host tools,
+persistent blackboards, plan monitoring and model quality/safety evaluation;
+none of that is an AGI claim.
 
 ## Phase 5 — Frontend, colour and UI — **partial**
 
@@ -257,13 +265,13 @@ derivation traces and 32 native `.सूत्र` calls and a Sanskrit CLI (26 
 transforms). Provenance and the distinction between textual and executable
 coverage are recorded in `peacock/vyakarana/data/` and `docs/language/vyakarana.md`.
 
-Still required: a rule representation for environments, transformations and
-anuvṛtti; ordered interaction and conflict resolution; derivation traces;
-declension, conjugation, samāsa and kāraka; broader sandhi including consonants
-and visarga; segmentation with explicit ambiguity; and independently licensed,
-validated connected-literature corpora. Catalogue entries for the Mahābhāṣya,
-Kāśikāvṛtti, Dhātupāṭha, Gaṇapāṭha, Vākyapadīya and related works are not full
-texts or executable semantics.
+Still required: broader sandhi (full consonant/visarga coverage beyond the 20
+rules), expanded śabda/dhātu paradigms beyond the initial 12 each, additional
+samāsa/kāraka sentence patterns, segmentation with explicit ambiguity, and
+independently licensed, validated connected-literature corpora. The 20/46-rule
+core is not a full Aṣṭādhyāyī; catalogue entries for the Mahābhāṣya, Kāśikāvṛtti,
+Dhātupāṭha, Gaṇapāṭha, Vākyapadīya and related works are not full texts or
+executable semantics.
 
 Acceptance criteria for broader coverage: each rule family cites its source,
 has positive and negative derivation tests, reports ambiguity rather than

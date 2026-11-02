@@ -65,7 +65,7 @@ model/training checks, diagnostics, IR, bytecode and VM are not migrated.
 
 ## Grants and sandbox
 
-Nothing is granted by default.
+Nothing is granted by default. On PE4001 (host has not granted capability) the CLI prints a hint: `hint: add --grant गणना` (or `सञ्चय/दृश्य/सञ्जाल`) with both Sanskrit and internal names.
 
 ```bash
 ./bin/peacock run app.सूत्र --grant सञ्चय

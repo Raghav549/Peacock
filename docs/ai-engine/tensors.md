@@ -7,15 +7,31 @@
   binary64 before storage (documented deviation).
 * **Ops:** broadcasting, elementwise arithmetic, matmul (rank 2 and batched
   N-D), reductions, reshape, transpose (including last-2 transpose), select rows,
-  softmax/log-softmax, activations, scaled dot-product attention.
+  softmax/log-softmax, activations, scaled dot-product attention with causal
+  masking (`causal_mask`, `scaled_dot_product_attention`).
 * **Autodiff:** reverse-mode; each op records parents and a backward closure.
   `backward()` topologically sorts the graph and accumulates gradients;
   `zero_grad()` clears them. Non-scalar outputs need an explicit gradient.
-* **Training:** Dense/Sequential/Model, LayerNorm, MultiHeadAttention,
-  TransformerBlock, SGD (optional momentum) and Adam, mini-batches,
-  cross-entropy/MSE, finite-loss checks, deterministic seeding, per-epoch
-  losses/accuracies and a report with dataset provenance. Positional encoding
-  (`positional_encoding`) and batched matmul enable sequence models.
+* **Layers:** Dense / Sequential / Model plus LayerNorm (per-last-dim, γ/β,
+  finite-difference verified), `positional_encoding(seq_len, d_model)` (sin/cos),
+  `MultiHeadAttention(input_dim, d_model, num_heads, is_causal)` (Xavier,
+  split/combine heads, 4 tensors), `TransformerBlock(d_model, num_heads, d_ff)`
+  (self-attn → add+norm → FFN(ReLU) → add+norm, 872 params @8/2/16),
+  `CrossAttention(input_dim, context_dim, d_model, num_heads)` (Q from decoder,
+  K/V from encoder), and `DecoderBlock(d_model, num_heads, d_ff)` (masked
+  self-attn → cross-attn → FFN with 3 LayerNorms). All support `parameters()`,
+  `zero_grad()`, `forward()` and `Model.architecture()`/`build_model()` dict
+  round-trip.
+* **DSL:** `सामान्यीकरण(सामान्यमान: N, सहिष्णुता: eps)`,
+  `एकाग्रता(प्रारूपविस्तार: M, शीर्षसंख्या: H, कारणबद्ध: सत्य/असत्य)`,
+  `रूपान्तरक(प्रारूपविस्तार: M, शीर्षसंख्या: H, अग्रविस्तार: F)`,
+  `विसंकेतक(प्रारूपविस्तार: M, शीर्षसंख्या: H, अग्रविस्तार: F)` and
+  `तिर्यगेकाग्रता(प्रारूपविस्तार: M, शीर्षसंख्या: H)` — see
+  `tests/ai/test_attention.py` and `examples/transformer_demo.सूत्र`. `is_causal`
+  compiles to a lower-triangular `causal_mask` and is preserved in `.बीज`.
+* **Training:** Dense/Sequential/Model, SGD (optional momentum) and Adam,
+  mini-batches, cross-entropy/MSE, finite-loss checks, deterministic seeding,
+  per-epoch losses/accuracies and a report with dataset provenance.
 * **Evaluation:** accuracy, confusion matrix, per-class precision/recall/F1.
 * **Serialisation:** `.ज्ञान` v1 with a versioned header, parameter table, float32
   payload, metadata and SHA-256; `quantize_tensor`/`quantization_report` provide
@@ -27,12 +43,10 @@ for matmul/softmax/MSE and a small MLP, with tolerances appropriate to Float32.
 That is numerical evidence, not a proof.
 
 Limits: one input/output per declared model, small datasets, and no
-convolution layers yet. Attention and transformer are now implemented (see
-`MultiHeadAttention`/`TransformerBlock` and the Sanskrit `एकाग्रता`/`रूपान्तरक`
-layers) but cross-attention and causal masking remain optional. Trainable
-tensors require the `गणना`
-capability. Accelerated operations below are separate from autodiff/training and
-do not provide GPU gradients or GPU model execution.
+convolution layers yet. Attention variants (causal, cross) are implemented and
+tested; beam search, KV-cache and distributed training remain open. Trainable
+tensors require the `गणना` capability. Accelerated operations below are separate
+from autodiff/training and do not provide GPU gradients or GPU model execution.
 
 ## Compute backends (0.4)
 

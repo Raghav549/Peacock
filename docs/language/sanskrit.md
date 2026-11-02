@@ -79,7 +79,15 @@ not an implementation claim.
 | `निवेश`, `निर्गम` | model input and output tensors |
 | `क्रम` | ordered layer stack |
 | `सघन` | dense layer |
-| `एककानि`, `सक्रियण` | layer width and activation |
+| `सामान्यीकरण` | LayerNorm |
+| `एकाग्रता` | Multi-head self-attention |
+| `रूपान्तरक` | Transformer encoder block |
+| `विसंकेतक` | Decoder block (causal self-attn + cross-attn) |
+| `तिर्यगेकाग्रता` | Cross-attention (Q decoder, K/V encoder) |
+| `एककानि`, `सक्रियण` | dense width and activation |
+| `सामान्यमान`, `सहिष्णुता` | LayerNorm dim and eps |
+| `प्रारूपविस्तार`, `शीर्षसंख्या`, `अग्रविस्तार` | transformer d_model, num_heads, d_ff |
+| `निवेशविस्तार`, `प्रसङ्गविस्तार`, `कारणबद्ध` | attention input_dim, context_dim, causal flag (सत्य/असत्य) |
 | `उद्देश्य`, `अनुकूलक` | training objective and optimiser |
 | `आवृत्ति`, `अधिगमदर`, `समूहमान`, `बीज` | epochs, learning rate, batch size, and deterministic seed |
 | `प्रारम्भ`, `चलाय`, `मूल्याङ्कय` | model initialisation, training run, and evaluation |
@@ -93,7 +101,7 @@ not an implementation claim.
 | Dtype | `दशमलव३२`, `दशमलव६४`, `पूर्णाङ्क३२` |
 | Host values | `वर्ण`, `चित्रपट`, `प्रतिमानप्रकार`, `दत्तसमूह`, `सीमा` |
 | Recovery/internal signature display | `अभाव`, `सर्व` |
-| Capabilities | `गणना`, `सञ्चय`, `दृश्य` |
+| Capabilities | `गणना`, `सञ्चय`, `दृश्य`, `सञ्जाल` |
 | Standard namespaces | `गणित`, `तन्त्रजाल`, `रङ्ग`, `चित्र`, `गति`, `पाठ्य`, `प्रक्रिया`, `सञ्चय` |
 
 Algorithm values are native words too: activations include `रैखिक`,
