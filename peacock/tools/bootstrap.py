@@ -10,11 +10,11 @@ Current status (2026-11-02): the PEACOCK pipeline is a deterministic
 wiring stub (lex→parse→type→ir→bytecode→opt→vm via the selfhost kernels);
 full semantic parity is still Python-authoritative (see AUDIT.md).  The
 harness therefore checks strict fixed-point for the Python oracle and
-strict digest parity for a small synthetic source via `pipeline_digest`
-(tag-chain) — the gate that will become full ``.बीज`` parity once the
-type-model shadow covers all natives/members/models.  The 10-file
-selfhost corpus is checked leniently (non-empty digest) due to string-
-literal size limits for large sources.
+strict digest parity via `pipeline_digest` (tag-chain) — the gate that will
+become full ``.बीज`` parity once the type-model shadow covers all
+natives/members/models.  Large selfhost sources (up to 60K) are handled via
+chunked string literals (CHUNK_SIZE) and hash/len parity to avoid single-
+literal limits and output truncation.
 
 Usage:
     python -m peacock.tools.bootstrap            # check all selfhost/*.सूत्र
@@ -39,6 +39,11 @@ from peacock.runtime.vm import VM
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SELFHOST = REPO_ROOT / "selfhost"
 BUILD_BOOTSTRAP = REPO_ROOT / "build" / "bootstrap"
+
+# Chunk size for PEACOCK string literals — avoids single-literal limits and
+# makes the VM wrapper robust for 60K+ sources.  500 chars keeps each
+# literal well under any implicit limit while keeping chunk count manageable.
+CHUNK_SIZE = 500
 
 def _compile_python(path: Path):
     src = path.read_text(encoding="utf-8")
@@ -69,11 +74,39 @@ def pipeline_digest_py(source: str) -> str:
     compiled = _compile_py(source)
     return f"{compiled} [{len(compiled)}]"
 
+def pipeline_digest_hash_py(source: str) -> tuple[str, int]:
+    """Hash/len parity for pipeline_digest — Python oracle."""
+    d = pipeline_digest_py(source)
+    h = hashlib.sha256(d.encode("utf-8")).hexdigest()[:16]
+    return h, len(d)
+
 def _escape_peacock_string(s: str) -> str:
     return s.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
 
+def _chunked_peacock_expr(s: str) -> str:
+    """Return a PEACOCK expression that reconstructs s via chunked literals.
+
+    Splits s into CHUNK_SIZE pieces, escapes each, and joins with ` + `.
+    This avoids a single huge string literal and is robust for 60K+ sources
+    where a lone literal might hit lexer or diagnostic limits.
+    """
+    if not s:
+        return '""'
+    chunks = []
+    for i in range(0, len(s), CHUNK_SIZE):
+        chunk = s[i:i+CHUNK_SIZE]
+        escaped = _escape_peacock_string(chunk)
+        chunks.append(f'"{escaped}"')
+    if len(chunks) == 1:
+        return chunks[0]
+    return " + ".join(chunks)
+
 def _run_peacock_pipeline(source: str) -> str:
-    """Run selfhost/pipeline.सूत्र via the VM and return its pipeline_digest(source)."""
+    """Run selfhost/pipeline.सूत्र via the VM and return its pipeline_digest(source).
+
+    Uses chunked literals to handle large sources (vm.सूत्र 41K, parser 33K, etc.)
+    without hitting PE1021 single-literal span or PE1002 escape issues.
+    """
     from peacock.compiler.pipeline import compile_source as cs
     pipeline_path = SELFHOST / "pipeline.सूत्र"
     pipeline_src = pipeline_path.read_text(encoding="utf-8")
@@ -85,15 +118,26 @@ def _run_peacock_pipeline(source: str) -> str:
     if idx < 0:
         raise RuntimeError("pipeline.सूत्र missing मुख्य")
     lib = pipeline_src[:idx]
-    escaped = _escape_peacock_string(source)
-    wrapper = f'कार्य मुख्य() -> एकक {{\n    मुद्रय(pipeline_digest("{escaped}"));\n}}\n'
+    chunked_expr = _chunked_peacock_expr(source)
+    wrapper = f'कार्य मुख्य() -> एकक {{\n    स्थापय src = {chunked_expr};\n    मुद्रय(pipeline_digest(src));\n}}\n'
     combined = lib + wrapper
     compiled2 = cs(combined, "<pipeline-wrapper>")
     if not compiled2.ok:
         raise RuntimeError(f"Wrapper compile failed: {compiled2.diagnostics.render_all(combined)}")
     out = io.StringIO()
-    VM(compiled2.image, HostPolicy(root=str(REPO_ROOT), max_steps=10_000_000), stdout=out).run()
+    VM(compiled2.image, HostPolicy(root=str(REPO_ROOT), max_steps=20_000_000), stdout=out).run()
     return out.getvalue().strip()
+
+def _run_peacock_pipeline_hash_len(source: str) -> tuple[str, int, str]:
+    """Return (peacock_digest, peacock_hash, peacock_len) via chunked wrapper.
+
+    The PEACOCK side returns the full digest; we compute hash/len on the Python
+    side for parity.  This is the hash/len-based strict gate that avoids
+    comparing huge strings byte-for-byte in the harness output.
+    """
+    d = _run_peacock_pipeline(source)
+    h = hashlib.sha256(d.encode("utf-8")).hexdigest()[:16]
+    return d, h, len(d)
 
 def bootstrap(check_peacock: bool = True, write: bool = False, verbose: bool = False, strict: bool = True) -> dict:
     programs = sorted(SELFHOST.glob("*.सूत्र"))
@@ -101,19 +145,25 @@ def bootstrap(check_peacock: bool = True, write: bool = False, verbose: bool = F
     all_ok = True
     peacock_ok = True
 
-    # Strict check on a small synthetic source (fits in string literal)
+    # Strict check on a small synthetic source (fits in single literal) — fast gate
     strict_source = "hello"
     strict_py = pipeline_digest_py(strict_source)
+    strict_py_hash, strict_py_len = pipeline_digest_hash_py(strict_source)
     strict_peacock = None
+    strict_peacock_hash = None
+    strict_peacock_len = None
     strict_match = None
     if check_peacock:
         try:
             strict_peacock = _run_peacock_pipeline(strict_source)
-            strict_match = (strict_py == strict_peacock)
+            strict_peacock_hash = hashlib.sha256(strict_peacock.encode("utf-8")).hexdigest()[:16]
+            strict_peacock_len = len(strict_peacock)
+            # Hash/len parity: more robust than full string compare for large outputs
+            strict_match = (strict_py == strict_peacock) and (strict_py_hash == strict_peacock_hash) and (strict_py_len == strict_peacock_len)
             if strict and not strict_match:
                 peacock_ok = False
                 if verbose:
-                    print(f"STRICT MISMATCH synthetic: py {strict_py!r} != peacock {strict_peacock!r}", file=sys.stderr)
+                    print(f"STRICT MISMATCH synthetic: py {strict_py!r} != peacock {strict_peacock!r} (hash {strict_py_hash} vs {strict_peacock_hash} len {strict_py_len} vs {strict_peacock_len})", file=sys.stderr)
             elif not strict and not (strict_py and strict_peacock):
                 peacock_ok = False
         except Exception as exc:
@@ -140,35 +190,49 @@ def bootstrap(check_peacock: bool = True, write: bool = False, verbose: bool = F
                 print(f"FAIL round-trip {path.name}", file=sys.stderr)
 
         digest_py = _artifact_digest(res1.image)
-        # For the 10-file corpus we do lenient (non-empty) due to string-literal size
         src_text = path.read_text(encoding="utf-8")
-        pipeline_py = pipeline_digest_py(src_text[:200])  # truncate for len check
+        # Python-side full pipeline digest (for reference)
+        pipeline_py = pipeline_digest_py(src_text)
+        pipeline_py_hash, pipeline_py_len = pipeline_digest_hash_py(src_text)
         digest_peacock = None
+        pipeline_peacock_hash = None
+        pipeline_peacock_len = None
+        # Per-file strict is now full-source via chunked literals + hash/len parity
+        per_file_strict = None
         lenient_match = None
         if check_peacock:
             try:
-                # Lenient: just verify the pipeline kernel can run (its own checks)
-                # We already tested strict on synthetic, so for corpus we just check VM can run pipeline checks
+                # Strict: full source via chunked literals, hash/len parity
+                peacock_digest, peacock_hash, peacock_len = _run_peacock_pipeline_hash_len(src_text)
+                digest_peacock = peacock_digest
+                pipeline_peacock_hash = peacock_hash
+                pipeline_peacock_len = peacock_len
+                per_file_strict = (pipeline_py == peacock_digest) and (pipeline_py_hash == peacock_hash) and (pipeline_py_len == peacock_len)
+                # Lenient is the pipeline's own checks (still valid)
                 from peacock.compiler.pipeline import compile_source as cs
                 pipeline_path = SELFHOST / "pipeline.सूत्र"
                 pipeline_src = pipeline_path.read_text(encoding="utf-8")
                 compiled = cs(pipeline_src, str(pipeline_path))
                 out = io.StringIO()
                 VM(compiled.image, HostPolicy(root=str(REPO_ROOT), max_steps=5_000_000), stdout=out).run()
-                digest_peacock = out.getvalue().strip()
-                lenient_match = bool(digest_peacock and "PEACOCK pipeline checks passed" in digest_peacock)
+                lenient_out = out.getvalue().strip()
+                lenient_match = bool(lenient_out and "PEACOCK pipeline checks passed" in lenient_out)
                 if not lenient_match:
-                    # fallback to strict synthetic result
-                    lenient_match = strict_match
+                    lenient_match = per_file_strict
+                if strict and not per_file_strict:
+                    peacock_ok = False
+                    if verbose:
+                        print(f"STRICT MISMATCH {path.name}: py hash {pipeline_py_hash} len {pipeline_py_len} vs peacock hash {pipeline_peacock_hash} len {pipeline_peacock_len}", file=sys.stderr)
             except Exception as exc:
                 if verbose:
-                    print(f"PEACOCK pipeline lenient fail {path.name}: {exc}", file=sys.stderr)
+                    print(f"PEACOCK pipeline strict fail {path.name}: {exc}", file=sys.stderr)
+                per_file_strict = False
                 lenient_match = False
                 digest_peacock = f"error:{exc}"
-                if not strict:
+                if strict:
                     peacock_ok = False
-            # For strict mode, the gate is the synthetic strict_match
-            if strict and not strict_match:
+            # For strict mode, the gate is per-file strict (full-source)
+            if strict and per_file_strict is not None and not per_file_strict:
                 peacock_ok = False
 
         if write:
@@ -182,28 +246,33 @@ def bootstrap(check_peacock: bool = True, write: bool = False, verbose: bool = F
             "functions": res1.stats.get("functions", 0),
             "digest_py": digest_py[:16],
             "pipeline_py": pipeline_py[:40],
+            "pipeline_py_hash": pipeline_py_hash,
+            "pipeline_py_len": pipeline_py_len,
             "pipeline_peacock": (digest_peacock[:40] if digest_peacock else None),
-            "strict_match": strict_match,
+            "pipeline_peacock_hash": pipeline_peacock_hash,
+            "pipeline_peacock_len": pipeline_peacock_len,
+            "strict_match": per_file_strict if per_file_strict is not None else strict_match,
             "lenient_match": lenient_match,
             "bytes": len(b1),
             "fixed_point": b1 == b2,
         }
         results.append(entry)
         if verbose:
-            print(f"{path.name}: {entry['instructions']} instr, pipeline strict {strict_match}, lenient {lenient_match}, fixed-point {entry['fixed_point']}")
+            print(f"{path.name}: {entry['instructions']} instr, pipeline strict {entry['strict_match']} (hash {pipeline_py_hash} vs {pipeline_peacock_hash} len {pipeline_py_len} vs {pipeline_peacock_len}), lenient {lenient_match}, fixed-point {entry['fixed_point']}")
 
     summary = {
         "programs": len(programs),
         "python_fixed_point": all_ok,
-        "peacock_strict": strict_match if check_peacock else None,
+        "peacock_strict": all(r["strict_match"] for r in results) if check_peacock and results else strict_match,
         "peacock_lenient": peacock_ok if not strict else None,
         "peacock_strict_synthetic": strict_match,
+        "peacock_hash_len_parity": all(r["strict_match"] for r in results) if check_peacock and results else False,
         "total_instructions": sum(r["instructions"] for r in results),
         "results": results,
     }
     # Keep backward-compat
     summary["peacock_lenient"] = peacock_ok
-    summary["peacock_strict"] = strict_match
+    summary["peacock_strict"] = summary["peacock_strict"] if isinstance(summary["peacock_strict"], bool) else strict_match
     return summary
 
 def main(argv=None):
