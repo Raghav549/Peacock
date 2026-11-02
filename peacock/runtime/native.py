@@ -777,6 +777,170 @@ def _grammar_coverage(ctx, args):
     return len(EXECUTABLE_RULE_IDS)
 
 
+def _grammar_vibhakti(ctx, args):
+    pratipadika = _need_str(args[0], "vibhakti pratipadika")
+    vibhakti = _need_str(args[1], "vibhakti")
+    vachana = _need_str(args[2], "vachana")
+    from peacock.vyakarana.shabda import vibhakti_rupa as vr
+    return _wrap_engine_errors(lambda: vr(pratipadika, vibhakti, vachana).rupa)
+
+
+def _grammar_declension(ctx, args):
+    pratipadika = _need_str(args[0], "declension pratipadika")
+    from peacock.vyakarana.shabda import declension_table as dt
+    table = _wrap_engine_errors(dt, pratipadika)
+    # Flatten as pipe-separated rows for सूची<अक्षरमाला>
+    return _wrap_engine_errors(lambda: ["|".join(row) for row in table])
+
+
+def _grammar_shabda_guess(ctx, args):
+    pada = _need_str(args[0], "shabda_guess pada")
+    from peacock.vyakarana.shabda import guess_pratipadika as gp
+    cands = _wrap_engine_errors(gp, pada)
+    return _wrap_engine_errors(lambda: [f"{c['pratipadika']} — {c['vibhakti']} {c['vachana']} ({c['sutra']})" for c in cands])
+
+
+def _grammar_dhatu_rupa(ctx, args):
+    dhatu = _need_str(args[0], "dhatu")
+    lakara = _need_str(args[1], "lakara")
+    purusha = _need_str(args[2], "purusha")
+    vachana = _need_str(args[3], "vachana")
+    from peacock.vyakarana.dhatu import dhatu_rupa as dr
+    return _wrap_engine_errors(lambda: dr(dhatu, lakara, purusha, vachana).rupa)
+
+
+def _grammar_conjugation(ctx, args):
+    dhatu = _need_str(args[0], "conjugation dhatu")
+    lakara = _need_str(args[1], "conjugation lakara")
+    from peacock.vyakarana.dhatu import conjugation_table as ct
+    table = _wrap_engine_errors(ct, dhatu, lakara)
+    return _wrap_engine_errors(lambda: ["|".join(row) for row in table])
+
+
+def _grammar_list_dhatus(ctx, args):
+    from peacock.vyakarana.dhatu import list_dhatus as ld
+    return _wrap_engine_errors(lambda: [f"{d['dhatu']} ({d['artha']}, {d['gana']})" for d in ld()])
+
+
+def _grammar_tin_analyze(ctx, args):
+    pada = _need_str(args[0], "tin pada")
+    from peacock.vyakarana.dhatu import tinanta_analyze as ta
+    cands = _wrap_engine_errors(ta, pada)
+    return _wrap_engine_errors(lambda: [f"{c['dhatu']} {c['lakara']} {c['purusha']} {c['vachana']} ({c['sutra']})" for c in cands])
+
+
+def _grammar_samasa(ctx, args):
+    pada = _need_str(args[0], "samasa pada")
+    from peacock.vyakarana.samasa import analyze as sa
+    a = _wrap_engine_errors(sa, pada)
+    return _wrap_engine_errors(lambda: f"{pada} → {a.samasa_type} | {a.vigraha} | {a.sutra}")
+
+
+def _grammar_samasa_vigraha(ctx, args):
+    pada = _need_str(args[0], "vigraha pada")
+    from peacock.vyakarana.samasa import vigraha as vg
+    return _wrap_engine_errors(vg, pada)
+
+
+def _grammar_samasa_type(ctx, args):
+    pada = _need_str(args[0], "samasa_type pada")
+    from peacock.vyakarana.samasa import samasa_type as st
+    return _wrap_engine_errors(st, pada)
+
+
+def _grammar_karaka(ctx, args):
+    sentence = _need_str(args[0], "karaka sentence")
+    from peacock.vyakarana.karaka import analyze_sentence as ka
+    labels = _wrap_engine_errors(ka, sentence)
+    return _wrap_engine_errors(lambda: [f"{l.pada} → {l.karaka} ({l.vibhakti}) [{l.sutra}]" for l in labels])
+
+
+def _grammar_karaka_info(ctx, args):
+    karaka = _need_str(args[0], "karaka")
+    from peacock.vyakarana.karaka import karaka_info as ki
+    info = _wrap_engine_errors(ki, karaka)
+    return _wrap_engine_errors(lambda: f"{info['karaka']} — {info['sutra']} : {info['desc']}")
+
+
+def _grammar_karaka_list(ctx, args):
+    from peacock.vyakarana.karaka import list_karakas as lk
+    return _wrap_engine_errors(lambda: [f"{k['karaka']} — {k['sutra']}" for k in lk()])
+
+
+def _grammar_vyutpatti(ctx, args):
+    shabda = _need_str(args[0], "vyutpatti shabda")
+    from peacock.vyakarana.derivation import vyutpatti as vy
+    v = _wrap_engine_errors(vy, shabda)
+    return _wrap_engine_errors(lambda: v.trace())
+
+
+def _grammar_prakriti(ctx, args):
+    shabda = _need_str(args[0], "prakriti shabda")
+    from peacock.vyakarana.derivation import prakriti_pratyaya_vibhaga as ppv
+    info = _wrap_engine_errors(ppv, shabda)
+    return _wrap_engine_errors(lambda: f"{info['prakriti']} + {info['pratyaya']} → {info['siddha']}")
+
+
+def _grammar_validation_word(ctx, args):
+    word = _need_str(args[0], "validation_word")
+    from peacock.vyakarana.validator import validate_word as vw
+    res = _wrap_engine_errors(vw, word)
+    return _wrap_engine_errors(lambda: res.report())
+
+
+def _grammar_validation_sentence(ctx, args):
+    sent = _need_str(args[0], "validation_sentence")
+    from peacock.vyakarana.validator import validate_sentence as vs
+    res = _wrap_engine_errors(vs, sent)
+    return _wrap_engine_errors(lambda: res.report())
+
+
+def _grammar_sutra_detail(ctx, args):
+    sid = _need_str(args[0], "sutra_detail id")
+    from peacock.vyakarana.sutra_engine import rule_detail as rd
+    info = _wrap_engine_errors(rd, sid)
+    return _wrap_engine_errors(lambda: f"{info['id']} {info['text']} [{info['kind']}] ad:{info['adhikara']} an:{info['anuvritti']} domain:{info['domain']} exec:{info['executable']} — {info['description']}")
+
+
+def _grammar_rule_apply(ctx, args):
+    inp = _need_str(args[0], "rule_apply input")
+    rules_str = _need_str(args[1], "rule_apply rules")
+    rule_ids = [r.strip() for r in rules_str.split(",") if r.strip()]
+    from peacock.vyakarana.sutra_engine import apply_rules as ar
+    der = _wrap_engine_errors(ar, inp, rule_ids)
+    return _wrap_engine_errors(lambda: der.trace_text() + ("\nconflicts: " + str(der.conflicts) if der.conflicts else ""))
+
+
+def _grammar_adhikara_scope(ctx, args):
+    term = _need_str(args[0], "adhikara_scope term")
+    from peacock.vyakarana.sutra_engine import adhikara_info as ai
+    return _wrap_engine_errors(ai, term)
+
+
+def _grammar_varna(ctx, args):
+    varna = _need_str(args[0], "varna")
+    from peacock.vyakarana.varna import classify_varna as cv
+    return _wrap_engine_errors(cv, varna)
+
+
+def _grammar_viccheda(ctx, args):
+    word = _need_str(args[0], "viccheda word")
+    from peacock.vyakarana.sandhi import viccheda as vc
+    cands = _wrap_engine_errors(vc, word)
+    if not cands:
+        return []
+    return _wrap_engine_errors(lambda: [f"{c.get('left','?')} + {c.get('right','?')} [{c.get('rule_id','?')}] conf:{c.get('confidence','')}" if 'left' in c else f"{c.get('note','')} amb:{c.get('ambiguous')}" for c in cands])
+
+
+def _grammar_sandhi_validate(ctx, args):
+    left = _need_str(args[0], "sandhi_validate left")
+    right = _need_str(args[1], "sandhi_validate right")
+    combined = _need_str(args[2], "sandhi_validate combined")
+    from peacock.vyakarana.sandhi import validate_sandhi as vs
+    res = _wrap_engine_errors(vs, left, right, combined)
+    return _wrap_engine_errors(lambda: f"valid:{res.get('valid')} expected:{res.get('expected')} rule:{res.get('rule_id')} {res.get('rule_name','')} err:{res.get('error','')}")
+
+
 # -- native UI builder --------------------------------------------------------
 def _ui_create(ctx, args):
     return _wrap_engine_errors(UIBuilder, _need_str(args[0], "ui title"), _need_int(args[1], "ui width"), _need_int(args[2], "ui height"), _need_color(args[3], "ui background"))
@@ -1399,6 +1563,29 @@ _IMPLS = {
     "vyakarana.adhikara_info": _grammar_adhikara,
     "vyakarana.literature": _grammar_literature,
     "vyakarana.coverage": _grammar_coverage,
+    "vyakarana.vibhakti": _grammar_vibhakti,
+    "vyakarana.declension_table": _grammar_declension,
+    "vyakarana.shabda_guess": _grammar_shabda_guess,
+    "vyakarana.dhatu_rupa": _grammar_dhatu_rupa,
+    "vyakarana.conjugation_table": _grammar_conjugation,
+    "vyakarana.list_dhatus": _grammar_list_dhatus,
+    "vyakarana.tin_analyze": _grammar_tin_analyze,
+    "vyakarana.samasa": _grammar_samasa,
+    "vyakarana.samasa_vigraha": _grammar_samasa_vigraha,
+    "vyakarana.samasa_type": _grammar_samasa_type,
+    "vyakarana.karaka": _grammar_karaka,
+    "vyakarana.karaka_info": _grammar_karaka_info,
+    "vyakarana.karaka_list": _grammar_karaka_list,
+    "vyakarana.vyutpatti": _grammar_vyutpatti,
+    "vyakarana.prakriti_vibhaga": _grammar_prakriti,
+    "vyakarana.validation_word": _grammar_validation_word,
+    "vyakarana.validation_sentence": _grammar_validation_sentence,
+    "vyakarana.sutra_detail": _grammar_sutra_detail,
+    "vyakarana.rule_apply": _grammar_rule_apply,
+    "vyakarana.adhikara_scope": _grammar_adhikara_scope,
+    "vyakarana.varna_class": _grammar_varna,
+    "vyakarana.viccheda": _grammar_viccheda,
+    "vyakarana.sandhi_validate": _grammar_sandhi_validate,
     "ui.create": _ui_create,
     "ui.panel": _ui_panel,
     "ui.text": _ui_text,

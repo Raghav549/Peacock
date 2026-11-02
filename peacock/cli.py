@@ -622,23 +622,64 @@ def cmd_vyakarana(argv: list[str]) -> int:
 
     from peacock.vyakarana import (
         EXPECTED_SUTRAS, EXECUTABLE_RULE_IDS, CorpusError, PratyaharaError,
-        SandhiError, expand, get_sutra, join, literature, search,
+        SandhiError, ShabdaError, DhatuError, SamasaError, KarakaError,
+        expand, get_sutra, join, literature, search,
+        vibhakti_rupa, declension_table, guess_pratipadika,
+        dhatu_rupa, conjugation_table, list_dhatus, tinanta_analyze,
+        samasa_analyze, karaka_info, list_karakas, vyutpatti, prakriti_pratyaya_vibhaga,
+        validate_word, validate_sentence, rule_detail, get_engine, viccheda, validate_sandhi,
+        classify_varna,
     )
 
     parser = argparse.ArgumentParser(prog="peacock व्याकरण")
     operations = parser.add_subparsers(dest="operation", required=True)
-    sutra = operations.add_parser("सूत्र")
-    sutra.add_argument("id")
-    lookup = operations.add_parser("अन्वेषय")
-    lookup.add_argument("query")
-    lookup.add_argument("--अवधि", type=int, default=50)
-    pratyahara = operations.add_parser("प्रत्याहार")
-    pratyahara.add_argument("name")
-    sandhi = operations.add_parser("संधि")
-    sandhi.add_argument("left")
-    sandhi.add_argument("right")
+    operations.add_parser("सूत्र").add_argument("id")
+    p_lookup = operations.add_parser("अन्वेषय")
+    p_lookup.add_argument("query")
+    p_lookup.add_argument("--अवधि", type=int, default=50)
+    operations.add_parser("प्रत्याहार").add_argument("name")
+    p_sandhi = operations.add_parser("संधि")
+    p_sandhi.add_argument("left")
+    p_sandhi.add_argument("right")
     operations.add_parser("साहित्य")
     operations.add_parser("आच्छादन")
+    p_vib = operations.add_parser("विभक्तिरूप")
+    p_vib.add_argument("pratipadika")
+    p_vib.add_argument("vibhakti")
+    p_vib.add_argument("vachana")
+    operations.add_parser("रूपावली").add_argument("pratipadika")
+    operations.add_parser("शब्दनिर्णय").add_argument("pada")
+    p_dhatu = operations.add_parser("धातुरूप")
+    p_dhatu.add_argument("dhatu")
+    p_dhatu.add_argument("lakara")
+    p_dhatu.add_argument("purusha")
+    p_dhatu.add_argument("vachana")
+    p_dt = operations.add_parser("धातुरूपावली")
+    p_dt.add_argument("dhatu")
+    p_dt.add_argument("lakara", nargs="?", default="लट्")
+    operations.add_parser("धातुसूची")
+    operations.add_parser("तिङ्विश्लेषण").add_argument("pada")
+    operations.add_parser("समास").add_argument("pada")
+    operations.add_parser("विग्रह").add_argument("pada")
+    operations.add_parser("समासप्रकार").add_argument("pada")
+    operations.add_parser("कारक").add_argument("sentence")
+    operations.add_parser("कारकविवरण").add_argument("karaka")
+    operations.add_parser("कारकसूची")
+    operations.add_parser("व्युत्पत्ति").add_argument("shabda")
+    operations.add_parser("प्रकृतिविभाग").add_argument("shabda")
+    operations.add_parser("शब्दसाधुत्व").add_argument("word")
+    operations.add_parser("वाक्यसाधुत्व").add_argument("sentence")
+    operations.add_parser("सूत्रविवरण").add_argument("id")
+    p_rule = operations.add_parser("नियमप्रयोग")
+    p_rule.add_argument("input")
+    p_rule.add_argument("rules")
+    operations.add_parser("अधिकारविस्तार").add_argument("term")
+    operations.add_parser("वर्णभेद").add_argument("varna")
+    operations.add_parser("संधिविच्छेद").add_argument("word")
+    p_sv = operations.add_parser("संधिसत्यापन")
+    p_sv.add_argument("left")
+    p_sv.add_argument("right")
+    p_sv.add_argument("combined")
     args = parser.parse_args(argv)
     try:
         if args.operation == "सूत्र":
@@ -656,8 +697,81 @@ def cmd_vyakarana(argv: list[str]) -> int:
                 print(row)
         elif args.operation == "आच्छादन":
             print(f"sūtra texts: {EXPECTED_SUTRAS}")
-            print(f"executable sandhi rules: {len(EXECUTABLE_RULE_IDS)} ({', '.join(sorted(EXECUTABLE_RULE_IDS))})")
-    except (CorpusError, PratyaharaError, SandhiError) as exc:
+            print(f"executable rules: {len(EXECUTABLE_RULE_IDS)} ({', '.join(sorted(EXECUTABLE_RULE_IDS))})")
+            eng = get_engine()
+            cov = eng.coverage_report()
+            print(f"engine: total {cov['total']} executable {cov['executable_transformations']} kinds {cov['by_kind']} paribhasha {cov['paribhasha_defined']} sapada {cov['sapada']} tripadi {cov['tripadi']}")
+        elif args.operation == "विभक्तिरूप":
+            print(vibhakti_rupa(args.pratipadika, args.vibhakti, args.vachana).rupa)
+        elif args.operation == "रूपावली":
+            table = declension_table(args.pratipadika)
+            for i, row in enumerate(table):
+                print(f"{['प्रथमा','द्वितीया','तृतीया','चतुर्थी','पञ्चमी','षष्ठी','सप्तमी','संबोधन'][i]}: {' | '.join(row)}")
+        elif args.operation == "शब्दनिर्णय":
+            for c in guess_pratipadika(args.pada):
+                print(f"{c['pratipadika']} — {c['vibhakti']} {c['vachana']} ({c['sutra']})")
+        elif args.operation == "धातुरूप":
+            print(dhatu_rupa(args.dhatu, args.lakara, args.purusha, args.vachana).rupa)
+        elif args.operation == "धातुरूपावली":
+            table = conjugation_table(args.dhatu, args.lakara)
+            for i, row in enumerate(table):
+                print(f"{['प्रथम','मध्यम','उत्तम'][i]}: {' | '.join(row)}")
+        elif args.operation == "धातुसूची":
+            for d in list_dhatus():
+                print(f"{d['dhatu']} ({d['artha']}, {d['gana']})")
+        elif args.operation == "तिङ्विश्लेषण":
+            for c in tinanta_analyze(args.pada):
+                print(f"{c['dhatu']} {c['lakara']} {c['purusha']} {c['vachana']} ({c['sutra']})")
+        elif args.operation == "समास":
+            a = samasa_analyze(args.pada)
+            print(f"{a.samasta_pada} → {a.samasa_type} | {a.vigraha} | {a.sutra} — {a.description}")
+        elif args.operation == "विग्रह":
+            from peacock.vyakarana.samasa import vigraha as vg
+            print(vg(args.pada))
+        elif args.operation == "समासप्रकार":
+            from peacock.vyakarana.samasa import samasa_type as st
+            print(st(args.pada))
+        elif args.operation == "कारक":
+            from peacock.vyakarana.karaka import analyze_sentence as ka
+            for l in ka(args.sentence):
+                print(f"{l.pada} → {l.karaka} ({l.vibhakti}) [{l.sutra}]")
+        elif args.operation == "कारकविवरण":
+            info = karaka_info(args.karaka)
+            print(f"{info['karaka']} — {info['sutra']} : {info['desc']}")
+        elif args.operation == "कारकसूची":
+            for k in list_karakas():
+                print(f"{k['karaka']} — {k['sutra']}")
+        elif args.operation == "व्युत्पत्ति":
+            print(vyutpatti(args.shabda).trace())
+        elif args.operation == "प्रकृतिविभाग":
+            info = prakriti_pratyaya_vibhaga(args.shabda)
+            print(f"{info['prakriti']} + {info['pratyaya']} → {info['siddha']}")
+        elif args.operation == "शब्दसाधुत्व":
+            print(validate_word(args.word).report())
+        elif args.operation == "वाक्यसाधुत्व":
+            print(validate_sentence(args.sentence).report())
+        elif args.operation == "सूत्रविवरण":
+            print(str(rule_detail(args.id)))
+        elif args.operation == "नियमप्रयोग":
+            from peacock.vyakarana.sutra_engine import apply_rules as ar
+            der = ar(args.input, [r.strip() for r in args.rules.split(",")])
+            print(der.trace_text())
+            if der.conflicts:
+                print("conflicts:", der.conflicts)
+        elif args.operation == "अधिकारविस्तार":
+            from peacock.vyakarana.sutra_engine import adhikara_info as ai
+            for line in ai(args.term):
+                print(line)
+        elif args.operation == "वर्णभेद":
+            print(classify_varna(args.varna))
+        elif args.operation == "संधिविच्छेद":
+            for c in viccheda(args.word):
+                print(c)
+        elif args.operation == "संधिसत्यापन":
+            print(validate_sandhi(args.left, args.right, args.combined))
+        else:
+            print(f"unknown operation {args.operation}")
+    except (CorpusError, PratyaharaError, SandhiError, ShabdaError, DhatuError, SamasaError, KarakaError) as exc:
         raise CLIError(str(exc), EXIT_DIAGNOSTICS) from exc
     return EXIT_OK
 
