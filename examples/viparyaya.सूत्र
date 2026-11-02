@@ -1,0 +1,35 @@
+प्रकरण उदाहरन_विपर्यय
+
+// Demonstrates the new अक्षरमाला.विपर्यय() (string reverse) native, added
+// in 2026-11-02 as part of the Sanskrit-native stdlib expansion.  This
+// example is compiled and executed by the real PEACOCK toolchain and is
+// used as a smoke-test for the hash/len parity pipeline.
+
+कार्य मुख्य() -> एकक {
+    // Basic reversal
+    स्थापय s = "hello";
+    स्थापय r = s.विपर्यय();
+    मुद्रय(r); // olleh
+    निश्चिनु(r == "olleh");
+
+    // Sanskrit Devanagari (code-point wise reversal)
+    स्थापय देवनागरी = "नमस्ते";
+    स्थापय वि = देवनागरी.विपर्यय();
+    मुद्रय(वि);
+    निश्चिनु(दैर्घ्य(वि) == दैर्घ्य(देवनागरी));
+
+    // Empty and single-char edge cases
+    निश्चिनु("".विपर्यय() == "");
+    निश्चिनु("अ".विपर्यय() == "अ");
+
+    // Double reverse is identity
+    स्थापय मूल = "PEACOCK मयूर 2024";
+    निश्चिनु(मूल.विपर्यय().विपर्यय() == मूल);
+
+    // List reverse still works (reference semantics)
+    स्थापय xs: सूची<पूर्णाङ्क> = [१, २, ३];
+    xs.विपर्यय();
+    निश्चिनु(xs.प्राप्नु(०) == ३);
+    निश्चिनु(xs.प्राप्नु(२) == १);
+    मुद्रय("विपर्ययः सिद्धः");
+}

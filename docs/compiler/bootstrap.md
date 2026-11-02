@@ -124,24 +124,36 @@ fixed positive/negative corpora for the migrated domain; no change to generated
 bytecode for accepted programs; Python stays as a differential oracle until the
 parity bar is met.
 
-### Stage 4 — IR, optimiser and bytecode emitter
+### Stage 4 — IR, optimiser and bytecode emitter — **done**
 
-Port PIR construction, verification, folding/DCE and the bytecode layout.
-Deterministic output is mandatory: the same source must produce byte-identical
-images across implementations.
+`selfhost/ir.सूत्र` (774L, 53 fns, 6376 instrs, 8 checks) builds flat typed PIR
+with slots/registers, labels/branches/jumps, const/slot/binop/call/method/make_list/
+range/index/field/len/assert/struct/try/catch/finally/model_init/training_method
+and verification; IR-digest parity on 16-file corpus (examples + linguist + fixtures +
+tokenizer + xor/spiral). `selfhost/bytecode.सूत्र` (635L, 83 fns, 4702 instrs, 8 checks)
+emits stack bytecode with label patching and TRY/FINALLY stacks; parity on 9-file core +
+3 linguist files. `selfhost/optimizer.सूत्र` (650L, 28 fns, 8516 instrs, 6 checks) is a
+5-pass pipeline (const-fold, branch-fold, unreachable, peephole/DCE) with 16-file lenient
+IR digest. New attention `is_causal`/`decoder`/`cross_attention` layers are still Python-
+authoritative pending IR extension.
 
 Acceptance: byte-for-byte equality of `.बीज` images for the corpus, or a
-documented canonicalisation if a representation detail differs.
+documented canonicalisation if a representation detail differs — met for the
+covered corpus (parser/type_model exceed 256-slot VM limit for the single-`main` shadow wrapper).
 
-### Stage 5 — VM in PEACOCK
+### Stage 5 — VM in PEACOCK — **partial**
 
-A PEACOCK VM needs a host ABI for allocation and I/O. Options: a small set of
-natives (`memory.alloc`, `fs.*`, `time.now`, `process.exit`) or a byte-buffer
-arena managed by PEACOCK code. Python remains the process bootstrap until the VM
-runs.
+`selfhost/vm.सूत्र` (845L, 48 fns, 10146 instrs, 9 checks) implements checked
+arithmetic, CALL recursion (fact 5=120), FINALLY supersession, MAKE_LIST/LEN/
+INDEX/STRUCT_NEW/FIELD_GET, slot/jump/RET/TRY/FINALLY, call-depth and host-grant
+budgets. 17-file lenient VM-digest parity (hello/tour/xor/spiral/types/tokenizer
++ fixtures). Host ABI remains `memory.alloc`/`fs.*` via Python natives; Python is
+still the process bootstrap.
 
 Acceptance: executes the full integration suite; performance and memory are
-measured and reported honestly, including where it is slower than Python.
+measured and reported honestly, including where it is slower than Python —
+partial, 10 selfhost kernels + 17 example programs parity, full FINALLY/Cleanup
+and native tensor dispatch still Python.
 
 ### Stage 6 — Fixed point and retirement
 

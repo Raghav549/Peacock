@@ -90,7 +90,7 @@ class ModelSpec:
     input_shape: tuple[int, ...]
     output_dtype: str
     output_shape: tuple[int, ...]
-    layers: list[tuple[int, str]]  # (units, activation)
+    layers: list[dict]  # {type: dense/layernorm, ...}
 
 
 @dataclass
@@ -624,13 +624,61 @@ def build_ir(program: TypedProgram, source: str = "", source_path: str = "<sourc
         input_t = model.input_type
         output_t = model.output_type
         assert input_t.shape is not None and output_t.shape is not None
+        layers = []
+        for layer in model.layers:
+            if layer.kind == "Dense":
+                layers.append({"type": "dense", "units": layer.units, "activation": layer.activation})
+            elif layer.kind == "LayerNorm":
+                layers.append(
+                    {"type": "layernorm", "normalized_dim": layer.normalized_dim, "eps": layer.eps}
+                )
+            elif layer.kind == "Attention":
+                entry = {
+                    "type": "attention",
+                    "input_dim": layer.input_dim,
+                    "d_model": layer.d_model,
+                    "num_heads": layer.num_heads,
+                }
+                if layer.is_causal:
+                    entry["is_causal"] = True
+                layers.append(entry)
+            elif layer.kind == "Transformer":
+                entry: dict = {
+                    "type": "transformer",
+                    "d_model": layer.d_model,
+                    "num_heads": layer.num_heads,
+                }
+                if layer.d_ff is not None:
+                    entry["d_ff"] = layer.d_ff
+                layers.append(entry)
+            elif layer.kind == "CrossAttention":
+                layers.append(
+                    {
+                        "type": "cross_attention",
+                        "input_dim": layer.input_dim,
+                        "context_dim": layer.context_dim,
+                        "d_model": layer.d_model,
+                        "num_heads": layer.num_heads,
+                    }
+                )
+            elif layer.kind == "Decoder":
+                entry = {
+                    "type": "decoder",
+                    "d_model": layer.d_model,
+                    "num_heads": layer.num_heads,
+                }
+                if layer.d_ff is not None:
+                    entry["d_ff"] = layer.d_ff
+                layers.append(entry)
+            else:
+                layers.append({"type": "dense", "units": layer.units, "activation": layer.activation})
         models[name] = ModelSpec(
             name,
             input_t.dtype,
             input_t.shape,
             output_t.dtype,
             output_t.shape,
-            [(layer.units, layer.activation) for layer in model.layers],
+            layers,
         )
     trainings = {name: dict(sym.config) for name, sym in program.trainings.items()}
     return IRModule(

@@ -641,6 +641,7 @@ METHODS: dict[tuple[str, str], tuple[tuple[T.Type | str, ...], T.Type | str | No
     ("String", "split"): ((S,), T.ListType(S), None),
     ("String", "replace"): ((S, S), S, None),
     ("String", "substring"): ((I, I), S, None),
+    ("String", "reverse"): ((), S, None),
     # Tensor
     ("Tensor", "sum"): ((), F, None),
     ("Tensor", "mean"): ((), F, None),

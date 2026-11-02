@@ -121,8 +121,16 @@ class StructSymbol:
 @dataclass
 class ResolvedLayer:
     kind: str
-    units: int
-    activation: str
+    units: int | None = None
+    activation: str | None = None
+    normalized_dim: int | None = None
+    eps: float | None = None
+    input_dim: int | None = None
+    d_model: int | None = None
+    num_heads: int | None = None
+    d_ff: int | None = None
+    is_causal: bool | None = None
+    context_dim: int | None = None
 
 
 @dataclass
@@ -549,7 +557,73 @@ class SemanticAnalyzer:
         if ok and inputs and outputs and layers:
             current = inputs[0].shape[-1] if inputs[0].shape else None
             for layer in layers:
-                current = layer.units
+                if layer.kind == "Dense":
+                    current = layer.units
+                elif layer.kind == "LayerNorm":
+                    if layer.normalized_dim != current:
+                        self.diag.error(
+                            "PE3009",
+                            f"सामान्यीकरण सामान्यमान {layer.normalized_dim} does not match previous layer output {current}",
+                            decl.span,
+                        )
+                        ok = False
+                    # LayerNorm preserves dimension, current stays same
+                elif layer.kind == "Attention":
+                    # input_dim defaults to current if not specified
+                    if layer.input_dim is None:
+                        layer.input_dim = current
+                    if layer.input_dim != current:
+                        self.diag.error(
+                            "PE3009",
+                            f"अवधान निवेशविस्तार {layer.input_dim} does not match previous layer output {current}",
+                            decl.span,
+                        )
+                        ok = False
+                    if layer.d_model is None or layer.num_heads is None:
+                        self.diag.error("PE3009", "अवधान requires प्रारूपविस्तार and शीर्षसंख्या", decl.span)
+                        ok = False
+                    elif layer.d_model % layer.num_heads != 0:
+                        self.diag.error(
+                            "PE3009",
+                            f"अवधान प्रारूपविस्तार {layer.d_model} must be divisible by शीर्षसंख्या {layer.num_heads}",
+                            decl.span,
+                        )
+                        ok = False
+                    else:
+                        current = layer.d_model
+                elif layer.kind == "Transformer":
+                    if layer.d_model != current:
+                        self.diag.error(
+                            "PE3009",
+                            f"परिवर्तक प्रारूपविस्तार {layer.d_model} does not match previous layer output {current}",
+                            decl.span,
+                        )
+                        ok = False
+                    if layer.d_model % layer.num_heads != 0:
+                        self.diag.error(
+                            "PE3009",
+                            f"परिवर्तक प्रारूपविस्तार {layer.d_model} must be divisible by शीर्षसंख्या {layer.num_heads}",
+                            decl.span,
+                        )
+                        ok = False
+                    # preserves dimension
+                elif layer.kind == "CrossAttention":
+                    if layer.input_dim is None:
+                        layer.input_dim = current
+                    if layer.input_dim != current:
+                        self.diag.error("PE3009", f"तिर्यगेकाग्रता निवेशविस्तार {layer.input_dim} != {current}", decl.span)
+                        ok = False
+                    else:
+                        current = layer.d_model if layer.d_model else current
+                elif layer.kind == "Decoder":
+                    if layer.d_model != current:
+                        self.diag.error("PE3009", f"विसंकेतक प्रारूपविस्तार {layer.d_model} != {current}", decl.span)
+                        ok = False
+                    if layer.d_model % layer.num_heads != 0:
+                        self.diag.error("PE3009", f"विसंकेतक {layer.d_model} must be divisible by {layer.num_heads}", decl.span)
+                        ok = False
+                else:
+                    current = layer.units
             if current is not None and outputs[0].shape and outputs[0].shape[-1] != current:
                 self.diag.error(
                     "PE3009",
@@ -564,62 +638,260 @@ class SemanticAnalyzer:
         return ModelSymbol(decl.name, decl, inputs[0], outputs[0], layers)
 
     def _analyse_layer(self, layer: LayerDecl) -> ResolvedLayer | None:
-        if layer.name != "Dense":
+        if layer.name == "Dense":
+            seen: set[str] = set()
+            units: int | None = None
+            activation = "linear"
+            for arg in layer.args:
+                if arg.name in seen:
+                    self.diag.error("PE3009", f"duplicate layer argument '{surface(arg.name)}'", arg.span)
+                    continue
+                seen.add(arg.name)
+                if arg.name == "units":
+                    if not isinstance(arg.value, IntLit):
+                        self.diag.error(
+                            "PE3009", "सघन 'एककानि' must be an integer literal in 0.3", arg.span
+                        )
+                        continue
+                    units = arg.value.value
+                    if units <= 0:
+                        self.diag.error("PE3009", "सघन 'एककानि' must be positive", arg.span)
+                elif arg.name == "activation":
+                    if arg.symbol is not None:
+                        activation = arg.symbol
+                    elif isinstance(arg.value, StringLit):
+                        activation = arg.value.value
+                    else:
+                        self.diag.error(
+                            "PE3009",
+                            "सघन 'सक्रियण' must be a bare name or string literal",
+                            arg.span,
+                            hint="सक्रियण: धनाङ्क",
+                        )
+                    activation = internalise_enum(activation)
+                    if activation not in _ACTIVATIONS:
+                        self.diag.error(
+                            "PE3009",
+                            f"unknown activation '{surface_enum(activation)}'",
+                            arg.span,
+                            hint=f"supported: {', '.join(sorted(surface_enum(v) for v in _ACTIVATIONS))}",
+                        )
+                else:
+                    self.diag.error(
+                        "PE3009",
+                        f"unknown सघन argument '{surface(arg.name)}'",
+                        arg.span,
+                        hint="supported arguments: एककानि, सक्रियण",
+                    )
+            if units is None:
+                self.diag.error("PE3009", "सघन layer requires 'एककानि'", layer.span)
+                return None
+            return ResolvedLayer("Dense", units=units, activation=activation)
+        elif layer.name == "LayerNorm":
+            seen: set[str] = set()
+            normalized_dim: int | None = None
+            eps: float | None = None
+            eps_val: float = 1e-5
+            for arg in layer.args:
+                if arg.name in seen:
+                    self.diag.error("PE3009", f"duplicate layer argument '{surface(arg.name)}'", arg.span)
+                    continue
+                seen.add(arg.name)
+                if arg.name == "normalized_dim":
+                    if not isinstance(arg.value, IntLit):
+                        self.diag.error("PE3009", "सामान्यीकरण 'सामान्यमान' must be an integer literal", arg.span)
+                        continue
+                    normalized_dim = arg.value.value
+                    if normalized_dim <= 0:
+                        self.diag.error("PE3009", "सामान्यीकरण 'सामान्यमान' must be positive", arg.span)
+                elif arg.name == "eps":
+                    # सहिष्णुता - can be float or int literal
+                    if isinstance(arg.value, FloatLit):
+                        eps_val = float(arg.value.value)
+                    elif isinstance(arg.value, IntLit):
+                        eps_val = float(arg.value.value)
+                    else:
+                        self.diag.error("PE3009", "सामान्यीकरण 'सहिष्णुता' must be a numeric literal", arg.span)
+                        continue
+                    if eps_val <= 0:
+                        self.diag.error("PE3009", "सामान्यीकरण 'सहिष्णुता' must be positive", arg.span)
+                else:
+                    self.diag.error(
+                        "PE3009",
+                        f"unknown सामान्यीकरण argument '{surface(arg.name)}'",
+                        arg.span,
+                        hint="supported arguments: सामान्यमान, सहिष्णुता",
+                    )
+            if normalized_dim is None:
+                self.diag.error("PE3009", "सामान्यीकरण layer requires 'सामान्यमान'", layer.span)
+                return None
+            return ResolvedLayer("LayerNorm", normalized_dim=normalized_dim, eps=eps_val)
+        elif layer.name == "Attention":
+            seen: set[str] = set()
+            input_dim = None
+            d_model = None
+            num_heads = None
+            is_causal = False
+            for arg in layer.args:
+                if arg.name in seen:
+                    self.diag.error("PE3009", f"duplicate layer argument '{surface(arg.name)}'", arg.span)
+                    continue
+                seen.add(arg.name)
+                if arg.name == "input_dim":
+                    if not isinstance(arg.value, IntLit):
+                        self.diag.error("PE3009", "अवधान 'निवेशविस्तार' must be an integer literal", arg.span)
+                        continue
+                    input_dim = arg.value.value
+                    if input_dim <= 0:
+                        self.diag.error("PE3009", "अवधान 'निवेशविस्तार' must be positive", arg.span)
+                elif arg.name == "d_model":
+                    if not isinstance(arg.value, IntLit):
+                        self.diag.error("PE3009", "अवधान 'प्रारूपविस्तार' must be an integer literal", arg.span)
+                        continue
+                    d_model = arg.value.value
+                    if d_model <= 0:
+                        self.diag.error("PE3009", "अवधान 'प्रारूपविस्तार' must be positive", arg.span)
+                elif arg.name == "num_heads":
+                    if not isinstance(arg.value, IntLit):
+                        self.diag.error("PE3009", "अवधान 'शीर्षसंख्या' must be an integer literal", arg.span)
+                        continue
+                    num_heads = arg.value.value
+                    if num_heads <= 0:
+                        self.diag.error("PE3009", "अवधान 'शीर्षसंख्या' must be positive", arg.span)
+                elif arg.name == "is_causal":
+                    if not isinstance(arg.value, BoolLit):
+                        self.diag.error("PE3009", "अवधान 'कारणबद्ध' must be सत्य/असत्य", arg.span)
+                        continue
+                    is_causal = bool(arg.value.value)
+                else:
+                    self.diag.error(
+                        "PE3009",
+                        f"unknown अवधान argument '{surface(arg.name)}'",
+                        arg.span,
+                        hint="supported arguments: निवेशविस्तार, प्रारूपविस्तार, शीर्षसंख्या, कारणबद्ध",
+                    )
+            if d_model is None or num_heads is None:
+                self.diag.error("PE3009", "अवधान layer requires 'प्रारूपविस्तार' and 'शीर्षसंख्या'", layer.span)
+                return None
+            return ResolvedLayer("Attention", input_dim=input_dim, d_model=d_model, num_heads=num_heads, is_causal=is_causal)
+        elif layer.name == "Transformer":
+            seen: set[str] = set()
+            d_model = None
+            num_heads = None
+            d_ff = None
+            for arg in layer.args:
+                if arg.name in seen:
+                    self.diag.error("PE3009", f"duplicate layer argument '{surface(arg.name)}'", arg.span)
+                    continue
+                seen.add(arg.name)
+                if arg.name == "d_model":
+                    if not isinstance(arg.value, IntLit):
+                        self.diag.error("PE3009", "परिवर्तक 'प्रारूपविस्तार' must be an integer literal", arg.span)
+                        continue
+                    d_model = arg.value.value
+                    if d_model <= 0:
+                        self.diag.error("PE3009", "परिवर्तक 'प्रारूपविस्तार' must be positive", arg.span)
+                elif arg.name == "num_heads":
+                    if not isinstance(arg.value, IntLit):
+                        self.diag.error("PE3009", "परिवर्तक 'शीर्षसंख्या' must be an integer literal", arg.span)
+                        continue
+                    num_heads = arg.value.value
+                    if num_heads <= 0:
+                        self.diag.error("PE3009", "परिवर्तक 'शीर्षसंख्या' must be positive", arg.span)
+                elif arg.name == "d_ff":
+                    if not isinstance(arg.value, IntLit):
+                        self.diag.error("PE3009", "परिवर्तक 'अग्रविस्तार' must be an integer literal", arg.span)
+                        continue
+                    d_ff = arg.value.value
+                    if d_ff <= 0:
+                        self.diag.error("PE3009", "परिवर्तक 'अग्रविस्तार' must be positive", arg.span)
+                else:
+                    self.diag.error(
+                        "PE3009",
+                        f"unknown परिवर्तक argument '{surface(arg.name)}'",
+                        arg.span,
+                        hint="supported arguments: प्रारूपविस्तार, शीर्षसंख्या, अग्रविस्तार",
+                    )
+            if d_model is None or num_heads is None:
+                self.diag.error("PE3009", "परिवर्तक layer requires 'प्रारूपविस्तार' and 'शीर्षसंख्या'", layer.span)
+                return None
+            return ResolvedLayer("Transformer", d_model=d_model, num_heads=num_heads, d_ff=d_ff)
+        elif layer.name == "CrossAttention":
+            seen: set[str] = set()
+            input_dim = None
+            context_dim = None
+            d_model = None
+            num_heads = None
+            for arg in layer.args:
+                if arg.name in seen:
+                    self.diag.error("PE3009", f"duplicate layer argument '{surface(arg.name)}'", arg.span)
+                    continue
+                seen.add(arg.name)
+                if arg.name == "input_dim":
+                    if not isinstance(arg.value, IntLit):
+                        self.diag.error("PE3009", "तिर्यगेकाग्रता 'निवेशविस्तार' must be an integer literal", arg.span)
+                        continue
+                    input_dim = arg.value.value
+                elif arg.name == "context_dim":
+                    if not isinstance(arg.value, IntLit):
+                        self.diag.error("PE3009", "तिर्यगेकाग्रता 'प्रसङ्गविस्तार' must be an integer literal", arg.span)
+                        continue
+                    context_dim = arg.value.value
+                elif arg.name == "d_model":
+                    if not isinstance(arg.value, IntLit):
+                        self.diag.error("PE3009", "तिर्यगेकाग्रता 'प्रारूपविस्तार' must be an integer literal", arg.span)
+                        continue
+                    d_model = arg.value.value
+                elif arg.name == "num_heads":
+                    if not isinstance(arg.value, IntLit):
+                        self.diag.error("PE3009", "तिर्यगेकाग्रता 'शीर्षसंख्या' must be an integer literal", arg.span)
+                        continue
+                    num_heads = arg.value.value
+                else:
+                    self.diag.error("PE3009", f"unknown तिर्यगेकाग्रता argument '{surface(arg.name)}'", arg.span, hint="supported: निवेशविस्तार, प्रसङ्गविस्तार, प्रारूपविस्तार, शीर्षसंख्या")
+            if d_model is None or num_heads is None:
+                self.diag.error("PE3009", "तिर्यगेकाग्रता layer requires 'प्रारूपविस्तार' and 'शीर्षसंख्या'", layer.span)
+                return None
+            return ResolvedLayer("CrossAttention", input_dim=input_dim, context_dim=context_dim, d_model=d_model, num_heads=num_heads)
+        elif layer.name == "Decoder":
+            seen: set[str] = set()
+            d_model = None
+            num_heads = None
+            d_ff = None
+            for arg in layer.args:
+                if arg.name in seen:
+                    self.diag.error("PE3009", f"duplicate layer argument '{surface(arg.name)}'", arg.span)
+                    continue
+                seen.add(arg.name)
+                if arg.name == "d_model":
+                    if not isinstance(arg.value, IntLit):
+                        self.diag.error("PE3009", "विसंकेतक 'प्रारूपविस्तार' must be an integer literal", arg.span)
+                        continue
+                    d_model = arg.value.value
+                elif arg.name == "num_heads":
+                    if not isinstance(arg.value, IntLit):
+                        self.diag.error("PE3009", "विसंकेतक 'शीर्षसंख्या' must be an integer literal", arg.span)
+                        continue
+                    num_heads = arg.value.value
+                elif arg.name == "d_ff":
+                    if not isinstance(arg.value, IntLit):
+                        self.diag.error("PE3009", "विसंकेतक 'अग्रविस्तार' must be an integer literal", arg.span)
+                        continue
+                    d_ff = arg.value.value
+                else:
+                    self.diag.error("PE3009", f"unknown विसंकेतक argument '{surface(arg.name)}'", arg.span, hint="supported: प्रारूपविस्तार, शीर्षसंख्या, अग्रविस्तार")
+            if d_model is None or num_heads is None:
+                self.diag.error("PE3009", "विसंकेतक layer requires 'प्रारूपविस्तार' and 'शीर्षसंख्या'", layer.span)
+                return None
+            return ResolvedLayer("Decoder", d_model=d_model, num_heads=num_heads, d_ff=d_ff)
+        else:
             self.diag.error(
                 "PE3009",
                 f"unknown layer '{surface(layer.name)}'",
                 layer.span,
-                hint="0.3 supports only सघन(एककानि: N, सक्रियण: धनाङ्क|वक्रसीमा|अतिस्पर्शज्या|कोमलाधिकतम|रैखिक)",
+                hint="supported: सघन(एककानि: N, ...), सामान्यीकरण(सामान्यमान: N, ...), एकाग्रता(प्रारूपविस्तार: N, शीर्षसंख्या: H, कारणबद्ध: सत्य/असत्य), रूपान्तरक(...), तिर्यगेकाग्रता(...), विसंकेतक(...)",
             )
             return None
-        seen: set[str] = set()
-        units: int | None = None
-        activation = "linear"
-        for arg in layer.args:
-            if arg.name in seen:
-                self.diag.error("PE3009", f"duplicate layer argument '{surface(arg.name)}'", arg.span)
-                continue
-            seen.add(arg.name)
-            if arg.name == "units":
-                if not isinstance(arg.value, IntLit):
-                    self.diag.error(
-                        "PE3009", "सघन 'एककानि' must be an integer literal in 0.3", arg.span
-                    )
-                    continue
-                units = arg.value.value
-                if units <= 0:
-                    self.diag.error("PE3009", "सघन 'एककानि' must be positive", arg.span)
-            elif arg.name == "activation":
-                if arg.symbol is not None:
-                    activation = arg.symbol
-                elif isinstance(arg.value, StringLit):
-                    activation = arg.value.value
-                else:
-                    self.diag.error(
-                        "PE3009",
-                        "सघन 'सक्रियण' must be a bare name or string literal",
-                        arg.span,
-                        hint="सक्रियण: धनाङ्क",
-                    )
-                activation = internalise_enum(activation)
-                if activation not in _ACTIVATIONS:
-                    self.diag.error(
-                        "PE3009",
-                        f"unknown activation '{surface_enum(activation)}'",
-                        arg.span,
-                        hint=f"supported: {', '.join(sorted(surface_enum(v) for v in _ACTIVATIONS))}",
-                    )
-            else:
-                self.diag.error(
-                    "PE3009",
-                    f"unknown सघन argument '{surface(arg.name)}'",
-                    arg.span,
-                    hint="supported arguments: एककानि, सक्रियण",
-                )
-        if units is None:
-            self.diag.error("PE3009", "सघन layer requires 'एककानि'", layer.span)
-            return None
-        return ResolvedLayer("Dense", units, activation)
 
     def _declare_trainings(self) -> None:
         for decl in self.module.trainings:

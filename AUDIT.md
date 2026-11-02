@@ -1,6 +1,6 @@
-# PEACOCK Repository Audit — 2026-11-02
+# PEACOCK Repository Audit — 2026-11-03
 
-Branch: `arena/00db4706-peacock` (641 tests OK, skipped=2; all 8 selfhost kernels OK)
+Branch: `arena/c0fe52eb-peacock` (668 tests OK, skipped=2; all 8 selfhost kernels OK + 18 attention tests, causal/cross/decoder landed)
 
 This file fulfills **Phase A — Audit** of the self-hosting migration strategy.
 
@@ -26,13 +26,13 @@ This file fulfills **Phase A — Audit** of the self-hosting migration strategy.
 ### Runtime & VM (to be independent of Python objects)
 | Module | LOC | Responsibility | Native boundary |
 |---|---|---|---|
-| `peacock/runtime/vm.py` | 745 | Stack VM, `Handler/Completion/Cleanup`, `Frame`, `CALL`, `TRY/CATCH/FINALLY`, `RET`, budgets (`max_steps=2M`, `max_call_depth=128`, `max_output=1M`), `HostPolicy` caps/fs | **PEACOCK kernel `selfhost/vm.सूत्र` 431→517L** — now 40 fns, 5990 instrs, **7 checks** (arith/FAULT/branch/loop/recursive CALLfact5!=120/module/overflow), single→multi-frame, `vm_host_has_grant`, `vm_invoke`, depth `गभीरता`, grants `अनुदानानि` |
+| `peacock/runtime/vm.py` | 745 | Stack VM, `Handler/Completion/Cleanup`, `Frame`, `CALL`, `TRY/CATCH/FINALLY`, `RET`, budgets (`max_steps=2M`, `max_call_depth=128`, `max_output=1M`), `HostPolicy` caps/fs | **PEACOCK kernel `selfhost/vm.सूत्र` 517L** — 40 fns, 5990 instrs, **9 checks**, single→multi-frame, `vm_host_has_grant`, `vm_invoke`, depth `गभीरता`, grants `अनुदानानि` |
 | `peacock/runtime/host.py` | ~120 | `HostPolicy` (grants/root/max_tensor/max_dataset/max_epochs/max_file, `presenter`, `llm_runner`, `server_handles`) | C11 sandbox (`root` resolve, symlink TOCTOU best-effort) remains |
 | `peacock/runtime/native.py` | 1664 | `NativeContext`, `call_native/call_method/get_property`, `native_capability/method_capability`, capability mapping per native, tensor/model/LLM/colour/canvas/scene dispatch | **staged** — PEACOCK VM stubs `CALL` only; full `native.py` still Python |
 | `peacock/runtime/values.py` | — | `UNIT`, `RangeValue`, `StructInstance`, `Tensor` | Python objects as value repr (doc’d temporary) |
-| `peacock/runtime/artifact.py` | — | `.बीज` verify/serialize | Python `verify_image` still authoritative |
+| `peacock/runtime/artifact.py` | — | `.बीज` verify/serialize (now includes `attention{is_causal}`, `decoder`, `cross_attention` layers) | Python `verify_image` still authoritative |
 | `peacock/runtime/errors.py` | — | `VMFault`, `PanicError`, `ResourceLimitError`, `CapabilityError` | PEACOCK `क्षिप` + `PE4xxx` |
-| `peacock/intelligence/*` | — | `tensor.py` (broadcast, autodiff), `layers.py`/`training.py` (Dense/SGD/Adam, `.ज्ञान`), `gpu.py` (CPU/OpenCL), `llm.py`, `agent.py` | CPython-only; no PEACOCK tensor kernel yet |
+| `peacock/intelligence/*` | — | `tensor.py` (broadcast, autodiff, `causal_mask`/`scaled_dot_product_attention`), `layers.py` (Dense/LayerNorm/MHA/Transformer/CrossAttention/Decoder/positional_encoding, 827L), `training.py` (Dense/SGD/Adam, `.ज्ञान`), `gpu.py` (CPU/OpenCL), `llm.py`, `agent.py` | CPython-only; no PEACOCK tensor kernel yet; `causal`/`cross` not yet in selfhost IR |
 | `peacock/frontend/*` | — | `colour.py` (sRGB/XYZ/Lab/Oklab/Oklch, CIEDE2000, gamut), `canvas.py`, `scene3d.py`, `ui.py`, `physics.py`, `spring.py`, etc. | Working but CPython; PEACOCK colour/3D APIs exist but not self-hosted |
 | `peacock/platforms/*` | — | `headless.py`, `httpd.py`, `server.py`, `window.py`, `web.py` | Python hosts; PEACOCK `present.सूत्र` etc. use them |
 | `peacock/native/*` | — | `builder.py`/`codegen.py` → deterministic C11, `peacock_run` ABI | C11 boundary allowed; VM-identical output verified |
@@ -45,15 +45,15 @@ This file fulfills **Phase A — Audit** of the self-hosting migration strategy.
 ## 2. Completed / Partial / Missing
 
 **Working & tested (evidence in STATUS.md):**
-- Lexer/parser with recovery diagnostics (641 tests), typed PIR + optimiser + bytecode + VM `अन्ते` (nested unwinding), native AOT deterministic C, bounded agents (rule/Dijkstra + LLM/tool loopback), CPU/OpenCL tensor ops (OpenCL hardware skip), colour science + 2D/3D, UI/layout/events, HTTP frame server, desktop shell.
+- Lexer/parser with recovery diagnostics (668 tests), typed PIR + optimiser + bytecode + VM `अन्ते` (nested unwinding), tensor transformer stack (causal mask, MHA, CrossAttention, DecoderBlock, LayerNorm, positional_encoding, 18 attention tests), native AOT deterministic C, bounded agents (rule/Dijkstra + LLM/tool loopback), CPU/OpenCL tensor ops (OpenCL hardware skip), colour science + 2D/3D, UI/layout/events, HTTP frame server, desktop shell, grammar 20 sandhi + 46-transform ordered engine with 5 paribhāṣā and derivation traces.
 
 **Partially completed:**
-- Self-host: tokenizer ✅, parser ✅ (no recovery), `type_model` ⚠️ experimental, IR ✅, bytecode ✅, optimizer ✅ (lenient), **VM ✅ Stage-5b** (checked arithmetic, slots/jumps/RET/TRY, **CALL + recursion + depth + host grants**, 7 checks, 16-file lenient digest; full `HOST`, `FINALLY`, `STRUCT/FIELD/INDEX/LIST/RANGE/LEN/ASSERT/THROW` and tensor/model native dispatch still Python), formatter ✅.
-- CLI: `fmt/new/init/lint/doc` now have PEACOCK `formatter.सूत्र` backing, but `cli.py` itself and `check/test/build/package` still Python.
-- Grammar: 3,983 searchable + 20 sandhi + 46 transforms; declension/conjugation/samāsa/kāraka ordered-rule interaction remain open.
+- Self-host: tokenizer ✅, parser ✅ (no recovery), `type_model` ⚠️ experimental, IR ✅, bytecode ✅, optimizer ✅ (lenient), VM ✅ (checked arithmetic, slots/jumps/RET/TRY, CALL + recursion + depth + host grants, 9 checks, 17-file lenient digest; full `HOST`, `FINALLY`, `STRUCT/FIELD/INDEX/LIST/RANGE/LEN/ASSERT/THROW` and tensor/model native dispatch still Python), formatter ✅; new `attention{is_causal}/decoder/cross_attention` DSL is Python-authoritative until selfhost IR extends.
+- CLI: `fmt/new/init/lint/doc` now have PEACOCK `formatter.सूत्र` backing, but `cli.py` itself and `check/test/build/package` still Python; `peacock run` now hints `add --grant गणना` on PE4001.
+- Grammar: 3,983 searchable + 20 sandhi + 46 transforms (5 paribhāṣā, adhikāra/anuvṛtti, derivation traces, 12 śabda/12 dhātu/17 samāsa/9 kāraka); broader consonant/visarga sandhi and fuller paradigms remain open.
 
 **Broken / Missing (roadmap):**
-- No PEACOCK-native `pipeline.सूत्र`, `host.सूत्र`, `native.सूत्र`, tensor/autodiff/LLM, UI/3D engine, `agent.सूत्र` runtime; no user modules, generics, closures, pattern matching, `map`, iterators, async/concurrency, GC, reflection, macros.
+- No PEACOCK-native pipeline hosting all kernels via chunked staged compilation (pipeline.सूत्र still Dense-only stable), `host.सूत्र`, `native.सूत्र`, tensor/autodiff/LLM, UI/3D engine, `agent.सूत्र` runtime; no user module re-exports, generics, closures, pattern matching, `map`, iterators, async/concurrency, GC, reflection, macros.
 - Python retirement **not started** — correct per Phase D gate. `verify_image`, `NativeContext`, `HostPolicy` root resolve, `.बीज`/`.ज्ञान` remain Python.
 - Strict VM digest equality not yet: Python bytecode `code len` vs PEACOCK `vm_module_digest` literal `\\n` are lenient.
 
@@ -61,12 +61,12 @@ This file fulfills **Phase A — Audit** of the self-hosting migration strategy.
 
 - `ir.सूत्र` types duplicated in `optimizer.सूत्र` and `bytecode.सूत्र` (intentional bootstrap, to be unified in `type_model.सूत्र`).
 - `KNOWN_CAPABILITIES` defined in both `peacock/compiler/tokens.py` and `peacock/runtime/host.py` (frozenset mirror).
-- `README` honest-status vs `STATUS` verified counts reconciled 2026-11-02 (641 tests, 3,983 sūtra, 7 VM checks).
+- `README` honest-status vs `STATUS` verified counts reconciled 2026-11-03 (668 tests, 3,983 sūtra, 9 VM checks, 20/46 grammar, causal/cross/decoder landed).
 - `.सूत्र` is Linguist hint only; GitHub does not recognise PEACOCK yet (submission prepared not accepted).
 
 ## 4. Test Coverage Gaps
 
-- 641 tests cover lexer/parser/semantic/IR/VM/`अन्ते`/capabilities/tensor/training/colour/3D/UI/platforms/native/grammar.
+- 668 tests cover lexer/parser/semantic/IR/VM/`अन्ते`/capabilities/tensor/training (dense+transformer)/colour/3D/UI/platforms/native/grammar (20 sandhi + derivation traces).
 - Skipped: real OpenCL device parity, real X11 `DISPLAY` open.
 - Not covered: self-host VM CALL/native, `FINALLY` differential (8/8 `test_finally` still Python VM), multi-tenant TOCTOU, HDR/wide-gamut, Android/iOS/X11 hardware, LLM provider live, tensor GPU vs CPU parity, full Aṣṭādhyāyī derivation/ambiguity.
 

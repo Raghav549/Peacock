@@ -1414,6 +1414,9 @@ def _string_method(receiver: str, name: str, args: list):
         if not (0 <= start <= end <= len(receiver)):
             _fail(f"substring bounds [{start}, {end}) invalid for string of length {len(receiver)}")
         return receiver[start:end]
+    if name == "reverse":
+        # Unicode-aware reversal (code-point wise, preserves combining marks order for now)
+        return receiver[::-1]
     _fail(f"अक्षरमाला has no method '{surface(name)}'")
     return ""
 

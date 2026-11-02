@@ -78,8 +78,8 @@ python3 -m unittest tests.integration.test_selfhost_parser -v
 | 1. lexer/tokenizer | done (`tokenizer.सूत्र`, plus the lexer inside `parser.सूत्र`) |
 | 2. parser and AST | **partial** — full-grammar syntax parity and self-parse; diagnostics/recovery and typed AST pending |
 | 3. semantic analyser/type checker | **shadow prototype** (`type_model.सूत्र` executes supported typed-AST expression/scope/name/assignment/call/return/condition/iterable probes; Python remains authoritative and kernel-generated diagnostics are not implemented) |
-| 4. IR/optimiser/bytecode emitter | **partial** — PIR builder/verifier (`ir.सूत्र` 765L, 16-file parity) + bytecode emitter/verifier (`bytecode.सूत्र` 628L, 9-file parity, 8 checks); optimiser still planned |
-| 5. VM in PEACOCK | planned |
+| 4. IR/optimiser/bytecode emitter | **done** — PIR builder/verifier (`ir.सूत्र` 774L, 16-file parity) + bytecode emitter/verifier (`bytecode.सूत्र` 635L, 9-file parity, 8 checks) + optimiser (`optimizer.सूत्र` 650L, 6 checks, 16-file lenient) |
+| 5. VM in PEACOCK | **partial** — `vm.सूत्र` 845L, 48 fns, 9 checks, 17-file lenient parity; FINALLY/Cleanup, depth/grants, multi-frame; full native/tensor dispatch still Python |
 | 6. fixed point | planned |
 
 See [../docs/compiler/bootstrap.md](../docs/compiler/bootstrap.md) and

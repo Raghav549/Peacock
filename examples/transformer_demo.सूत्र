@@ -1,0 +1,39 @@
+प्रकरण transformer_demo
+
+// Transformer (रूपान्तरक) + Attention (एकाग्रता) demo — 2026-11-02.
+// Shows the new native transformer engine: scaled dot-product attention,
+// multi-head projection, residual + LayerNorm, and feed-forward blocks.
+// The model below is a 2-layer encoder that trains on a synthetic sequence
+// task.  See tests/ai/test_attention.py for the Python API and
+// docs/ai-engine/tensors.md for the mathematical notes.
+
+उपयोग तन्त्रजाल
+
+प्रतिमान TinyTransformer {
+    निवेश क्ष: आयाम<दशमलव३२, [4, 8]>
+    निर्गम य: आयाम<दशमलव३२, [4, 8]>
+    क्रम {
+        एकाग्रता(प्रारूपविस्तार: ८, शीर्षसंख्या: २)
+        सामान्यीकरण(सामान्यमान: ८)
+        रूपान्तरक(प्रारूपविस्तार: ८, शीर्षसंख्या: २, अग्रविस्तार: १६)
+        सघन(एककानि: ८)
+    }
+}
+
+अभ्यास TinyTraining {
+    उद्देश्य: "माध्यवर्गदोष"
+    अनुकूलक: "आदम"
+    आवृत्ति: १०
+    अधिगमदर: ०.०१
+    समूहमान: ४
+    बीज: १
+}
+
+कार्य मुख्य() -> एकक {
+    अधिकार गणना;
+    स्थापय net = TinyTransformer.प्रारम्भ(बीज: १);
+    मुद्रय("layers: Attention → LayerNorm → Transformer → Dense");
+    मुद्रय("params: " + पाठ्यीकरण(net.प्राचलसंख्या));
+    मुद्रय("input: [4, 8] sequence × 8-dim embeddings");
+    मुद्रय("एकाग्रता + रूपान्तरकं सिद्धम् — see tests/ai/test_attention.py");
+}

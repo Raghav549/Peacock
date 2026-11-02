@@ -240,14 +240,24 @@ This is best-effort process-level isolation, **not** a kernel sandbox. See
 ## 5. Intelligence engine
 
 * `tensor.py`: flat float/int/bool storage plus shape; broadcasting; elementwise
-  ops; matmul; reductions; softmax/log-softmax; reverse-mode autodiff with a
-  topological backward pass. Float32 is rounded on storage; arithmetic uses
-  binary64 (documented deviation).
+  ops; matmul (2-D + batched N-D via `_batched_matmul`/`_matmul_2d`); reductions;
+  softmax/log-softmax; `causal_mask(seq_q,seq_k)` lower-triangular 1/0;
+  `scaled_dot_product_attention(Q,K,V,mask,is_causal)` — QKᵀ/√dₖ + mask(-1e9)
+  → softmax → V, with `is_causal` generating/broadcast-multiplying the causal
+  mask before masking. Float32 rounded on storage; arithmetic uses binary64.
 * `random.py`: xoshiro256** with deterministic seeding for reproducible runs.
 * `datasets.py`: XOR and synthetic two-arm spiral, plus host-supplied datasets.
-* `layers.py`: Dense and Sequential/Model; deterministic initialisation.
+* `layers.py`: Dense, LayerNorm (γ/β, last-dim), `positional_encoding` (sin/cos),
+  `MultiHeadAttention(input_dim,d_model,num_heads,is_causal)` (Xavier Q/K/V/O,
+  split_heads/combine_heads), `TransformerBlock(d_model,num_heads,d_ff)` (residual
+  + LayerNorm ×2 + FFN ReLU), `CrossAttention(input_dim,context_dim,d_model,
+  num_heads)` (Q decoder, K/V encoder), `DecoderBlock(d_model,num_heads,d_ff)`
+  (causal self-attn → cross-attn → FFN, 3× norm), `Sequential(input_dim,layers)`
+  with `_in_dim/_out_dim` helpers, `Model(Sequential, shapes)` +
+  `build_model(layers,dtype,seed)` and `architecture()` dict tags
+  (`dense/layernorm/attention{is_causal}/transformer/decoder/cross_attention`).
 * `training.py`: mini-batch SGD/Adam loops, cross-entropy and MSE, finite-loss
-  guards, training reports.
+  guards, training reports. Transformer training uses the same CPU autodiff graph.
 * `evaluation.py`: accuracy, confusion matrix, per-class report.
 * `optim.py`: original SGD (optional momentum) and Adam.
 * `serialization.py`: `.ज्ञान` v1 with per-parameter dtype/shape, float payload,
@@ -261,10 +271,12 @@ This is best-effort process-level isolation, **not** a kernel sandbox. See
   followed and no shell/filesystem/network tool is registered by default.
 * `gpu.py`: CPU reference and dynamically loaded OpenCL 1.2 operations for
   addition, multiplication, ReLU and rank-2 matmul. Explicit `त्वरक` never falls
-  back; automatic selection may use CPU. This is separate from autodiff/training.
+  back; automatic selection may use CPU. This is separate from autodiff/training;
+  GPU does not yet accelerate attention/matmul gradients.
 
 Gradient correctness is checked against finite differences in tests
-(`test_tensor.py`, `test_training.py`) with tolerances around 1e-9 for the
+(`test_tensor.py`, `test_training.py`, `test_attention.py` — matmul/softmax/MSE/
+attention LayerNorm/Transformer) with tolerances around 1e-9 / 1e-3 for the
 small analytic cases. This is numerical validation, not a proof.
 
 ## 6. Frontend engine

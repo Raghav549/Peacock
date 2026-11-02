@@ -15,16 +15,20 @@ security, and multiple deployment hosts behind one coherent language.
 > embeddable ABI, bounded LLM/tool agents, CPU/OpenCL compute operations,
 > interactive browser/X11 UI hosts, PEACOCK-controlled HTTP servers, and native
 > desktop/Android/iOS shell sources join the existing AI, colour, 2D/3D and
-> grammar engines. The Linux native library/desktop paths and real HTTP/event
+> grammar engines. Transformers now include multi-head self-attention with
+> causal masking, encoder blocks, cross-attention and decoder blocks with
+> positional encoding. The Linux native library/desktop paths and real HTTP/event
 > tests execute successfully; Android/iOS and actual OpenCL/X11 hardware remain
 > unverified in this environment. Native AOT covers only its documented opcode
 > subset. The grammar package contains all **3,983 sūtra texts**, generic
-> pratyāhāra expansion and four explicitly traced sandhi rules—not a complete
-> executable Aṣṭādhyāyī. Agents are bounded, not AGI. The compiler is **not
-> self-hosting**; Python remains authoritative for production semantics, IR and
-> codegen. GitHub does **not** yet recognise `.सूत्र`; a Linguist submission is
-> prepared in [`linguist/`](linguist/), not accepted. See [STATUS.md](STATUS.md)
-> for the current verified test count and evidence.
+> pratyāhāra expansion, 20 executable sandhi rules and 46 executable
+> transformations (sandhi + śabda/dhātu/samāsa/kāraka/varṇa/paribhāṣā with
+> ordered-rule engine, adhikāra/anuvṛtti tracking and derivation traces)—not a
+> complete executable Aṣṭādhyāyī. Agents are bounded, not AGI. The compiler is
+> **not self-hosting**; Python remains authoritative for production semantics, IR
+> and codegen. GitHub does **not** yet recognise `.सूत्र`; a Linguist submission
+> is prepared in [`linguist/`](linguist/), not accepted. See [STATUS.md](STATUS.md)
+> for the current verified test count (668 tests, 2 skipped) and evidence.
 
 ## What works today
 
@@ -43,7 +47,8 @@ security, and multiple deployment hosts behind one coherent language.
 | Bounded rule agents, Dijkstra plans, traces | Working deterministic planner | `tests/ai/test_agent.py`, `examples/agents.सूत्र` |
 | Bounded LLM/tool agents | Working host/provider loop; not AGI | `tests/ai/test_llm_agent.py`, `examples/autonomous_agent.सूत्र` |
 | CPU/OpenCL tensor operations | CPU tested; OpenCL hardware test environment-dependent | `tests/ai/test_gpu.py`, `examples/gpu.सूत्र` |
-| Sūtra corpus, pratyāhāra, traced vowel sandhi | Working; 3,983 texts, 4 sandhi rules | `tests/unit/test_vyakarana.py`, `examples/vyakarana.सूत्र` |
+| Sūtra corpus, pratyāhāra, traced sandhi | Working; 3,983 texts, 20 sandhi rules, 46 transforms, ordered engine, adhikāra/anuvṛtti, derivation traces | `tests/unit/test_vyakarana.py`, `examples/vyakarana.सूत्र` |
+| Tensor engine: attention + transformer | Working; scaled dot-product, batched matmul, causal mask, MHA, TransformerBlock, CrossAttention, DecoderBlock, positional encoding, LayerNorm | `tests/ai/test_attention.py`, `examples/transformer_demo.सूत्र` |
 | Retained Sanskrit UI, layout, events, audits, HTML | Working; browser and X11 hosts | `tests/frontend/test_ui.py`, `tests/integration/test_native_window.py` |
 | CPU 3D meshes, perspective, depth and lights | Working | `tests/frontend/test_scene3d.py`, `examples/scene3d.सूत्र` |
 | Software 2D rasteriser, PNG encode/decode | Working | `tests/frontend/test_canvas_png.py` |

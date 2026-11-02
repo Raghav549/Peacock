@@ -75,10 +75,39 @@ def disassemble(image: dict) -> str:
     if models:
         lines.append("models:")
         for name, spec in sorted(models.items()):
-            layers = " -> ".join(
-                f"{surface('Dense')}({units},{surface_enum(activation)})"
-                for units, activation in spec["layers"]
-            )
+            parts = []
+            for entry in spec["layers"]:
+                if isinstance(entry, dict):
+                    t = entry.get("type")
+                    if t == "layernorm":
+                        parts.append(
+                            f"{surface('LayerNorm')}({entry.get('normalized_dim')})"
+                        )
+                    elif t == "attention":
+                        causal = ",causal" if entry.get("is_causal") else ""
+                        parts.append(
+                            f"{surface('Attention')}({entry.get('d_model')},{entry.get('num_heads')}{causal})"
+                        )
+                    elif t == "transformer":
+                        parts.append(
+                            f"{surface('Transformer')}({entry.get('d_model')},{entry.get('num_heads')})"
+                        )
+                    elif t == "decoder":
+                        parts.append(
+                            f"{surface('Decoder')}({entry.get('d_model')},{entry.get('num_heads')})"
+                        )
+                    elif t in ("cross_attention", "crossattention"):
+                        parts.append(
+                            f"{surface('CrossAttention')}({entry.get('d_model')},{entry.get('num_heads')})"
+                        )
+                    else:
+                        parts.append(
+                            f"{surface('Dense')}({entry.get('units')},{surface_enum(entry.get('activation', 'linear'))})"
+                        )
+                else:
+                    units, activation = entry
+                    parts.append(f"{surface('Dense')}({units},{surface_enum(activation)})")
+            layers = " -> ".join(parts)
             lines.append(
                 f"  {surface(name)}: [{surface_type(spec['input_dtype'])}{spec['input_shape']}] -> "
                 f"[{surface_type(spec['output_dtype'])}{spec['output_shape']}] {layers}"
