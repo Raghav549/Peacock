@@ -1,4 +1,4 @@
-// PEACOCK-native VM (migration stage 5 — Part 1).
+// PEACOCK-native VM (migration stage 5 — Part 2: CALL + host budgets).
 // Stack interpreter for PEACOCK bytecode: checked 64-bit arithmetic,
 // क्रम, स्थानीयाः, jumps, आह्वानानि and capability gates.
 // Mirrors peacock/runtime/vm.py + bytecode.py verifier.
@@ -57,7 +57,9 @@
     निर्गतवर्णाः: पूर्णाङ्क,
     अधिकतमचरणानि: पूर्णाङ्क,
     अधिकतमआह्वानगभीरता: पूर्णाङ्क,
-    अधिकतमनिर्गतवर्णाः: पूर्णाङ्क
+    अधिकतमनिर्गतवर्णाः: पूर्णाङ्क,
+    गभीरता: पूर्णाङ्क,
+    अनुदानानि: सूची<अक्षरमाला>
 }
 संघटन VMResult {
     प्रकार: अक्षरमाला, // ok | fault | resource
@@ -165,6 +167,21 @@
     यदि s == "" { स्थापय खाली: सूची<अक्षरमाला> = []; प्रत्यानय खाली; }
     प्रत्यानय s.विभाजय(",");
 }
+कार्य new_vm_stats() -> VMStats {
+    स्थापय खाली: सूची<अक्षरमाला> = [];
+    प्रत्यानय VMStats(०, ०, ०, १०००, ६४, १०००, ०, खाली);
+}
+कार्य vm_host_has_grant(stats: VMStats, cap: अक्षरमाला) -> सत्यता {
+    प्रत्यानय vm_has_cap(stats.अनुदानानि, cap);
+}
+कार्य vm_require_cap(frame: VMFrame, stats: VMStats, cap: अक्षरमाला, what: अक्षरमाला) {
+    यदि न vm_has_cap(frame.क्षमताः, cap) {
+        क्षिप what + " requires capability " + cap + " not declared";
+    }
+    यदि न vm_has_cap(stats.अनुदानानि, cap) {
+        क्षिप "host has not granted capability " + cap;
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Frame & क्रम
@@ -196,6 +213,43 @@
 कार्य make_str(s: अक्षरमाला) -> VMValue { प्रत्यानय VMValue("अक्षरमाला", s); }
 कार्य make_unit() -> VMValue { प्रत्यानय VMValue("एकक", "unit"); }
 कार्य value_is_true(v: VMValue) -> सत्यता { प्रत्यानय v.प्रतिनिधित्व == "true"; }
+कार्य value_from_repr(प्रतिनिधित्व: अक्षरमाला) -> VMValue {
+    यदि प्रतिनिधित्व == "true" वा प्रतिनिधित्व == "false" { प्रत्यानय VMValue("सत्यता", प्रतिनिधित्व); }
+    यदि is_int_repr(प्रतिनिधित्व) { प्रत्यानय make_int(parse_int_repr(प्रतिनिधित्व)); }
+    यदि प्रतिनिधित्व == "unit" वा प्रतिनिधित्व == "null" { प्रत्यानय make_unit(); }
+    प्रत्यानय make_str(प्रतिनिधित्व);
+}
+कार्य vm_invoke(mod: VMModule, नाम: अक्षरमाला, तर्कावली: सूची<VMValue>, stats: VMStats) -> VMResult {
+    यदि stats.गभीरता >= stats.अधिकतमआह्वानगभीरता {
+        प्रत्यानय VMResult("resource", "PE4003", "", "call depth exceeded");
+    }
+    स्थापय kary = vm_find_function(mod, नाम);
+    यदि दैर्घ्य(तर्कावली) != kary.पारमिता {
+        प्रत्यानय VMResult("fault", "PE4002", "", "arity mismatch for " + नाम);
+    }
+    // capability gate: each cap declared by आह्वायक must be granted by host
+    स्थापय caps = caps_from_repr(kary.caps_repr);
+    स्थापय परिवर्तनीय ci = ०;
+    यावत् ci < दैर्घ्य(caps) {
+        स्थापय cap = caps.प्राप्नु(ci);
+        यदि न vm_has_cap(stats.अनुदानानि, cap) {
+            प्रत्यानय VMResult("fault", "PE4001", "", "host has not granted capability " + cap);
+        }
+        ci += १;
+    }
+    स्थापय f = new_frame(kary);
+    स्थापय परिवर्तनीय ai = ०;
+    यावत् ai < दैर्घ्य(तर्कावली) {
+        f.स्थानीयाः = स्थानीयस्थापय(f.स्थानीयाः, ai, तर्कावली.प्राप्नु(ai));
+        ai += १;
+    }
+    stats.गभीरता += १;
+    stats.आह्वानानि += १;
+    स्थापय res = vm_execute_frame(f, mod, stats);
+    stats.गभीरता -= १;
+    प्रत्यानय res;
+}
+
 
 // ---------------------------------------------------------------------------
 // Op dispatch — core arithmetic & logic (VMFault → PE4004/PE4005/PE4006)
@@ -268,6 +322,10 @@
             स्थापय t = parse_int_repr(instr.arg0);
             यदि t < ० वा t >= दैर्घ्य(kary.संकेत) { प्रत्यानय "jump लक्ष्य invalid at " + पाठ्यीकरण(i); }
         }
+        यदि instr.op == "CALL" {
+            यदि दैर्घ्य(instr.arg0) == ० { प्रत्यानय "bad CALL आह्वायक at " + पाठ्यीकरण(i); }
+            यदि न is_int_repr(instr.arg1) { प्रत्यानय "bad CALL तर्कसङ्ख्या at " + पाठ्यीकरण(i); }
+        }
         i += १;
     }
     प्रत्यानय "";
@@ -277,7 +335,7 @@
 // Interpreter — single frame, no host I/O beyond मुद्रय stub
 // Returns VMResult with value_repr
 // ---------------------------------------------------------------------------
-कार्य vm_execute_frame(frame: VMFrame, stats: VMStats) -> VMResult {
+कार्य vm_execute_frame(frame: VMFrame, mod: VMModule, stats: VMStats) -> VMResult {
     यावत् frame.सूचक < दैर्घ्य(frame.संकेत) {
         यदि stats.चरणानि >= stats.अधिकतमचरणानि { प्रत्यानय VMResult("resource", "PE4003", "", "step limit exceeded"); }
         stats.चरणानि += १;
@@ -325,6 +383,19 @@
             स्थापय c = frame_pop(frame);
             यदि c.प्रकार != "सत्यता" { प्रत्यानय VMResult("fault", "PE4002", "", "branch condition must be bool"); }
             यदि c.प्रतिनिधित्व == "false" { frame.सूचक = parse_int_repr(instr.arg0); }
+        } अन्यथा यदि instr.op == "CALL" {
+            स्थापय आह्वायक = instr.arg0;
+            स्थापय तर्कसङ्ख्या = parse_int_repr(instr.arg1);
+            स्थापय परिवर्तनीय तर्कावली: सूची<VMValue> = [];
+            स्थापय परिवर्तनीय k = ०;
+            यावत् k < तर्कसङ्ख्या {
+                तर्कावली.योजय(frame_pop(frame));
+                k += १;
+            }
+            तर्कावली.विपर्यय();
+            स्थापय res = vm_invoke(mod, आह्वायक, तर्कावली, stats);
+            यदि res.प्रकार != "ok" { प्रत्यानय res; }
+            frame_push(frame, value_from_repr(res.value_repr));
         } अन्यथा यदि instr.op == "RET" {
             यदि instr.arg0 == "1" {
                 स्थापय v = frame_pop(frame);
@@ -381,15 +452,15 @@
     vm_emit(fn1, "PUSH_CONST", "7", "", ""); vm_emit(fn1, "PUSH_CONST", "3", "", ""); vm_emit(fn1, "BINOP", "-", "", ""); vm_emit(fn1, "STORE_SLOT", "1", "", "");
     vm_emit(fn1, "PUSH_SLOT", "0", "", ""); vm_emit(fn1, "RET", "1", "", "");
     निश्चिनु(vm_verify_function(fn1) == "");
-    स्थापय fr1 = new_frame(fn1); स्थापय st1 = VMStats(०, ०, ०, १०००, ६४, १०००);
-    स्थापय r1 = vm_execute_frame(fr1, st1);
+    स्थापय fr1 = new_frame(fn1); स्थापय st1 = new_vm_stats();
+    स्थापय dummy1 = new_vm_module("dummy"); vm_module_add_function(dummy1, fn1); स्थापय r1 = vm_execute_frame(fr1, dummy1, st1);
     निश्चिनु(r1.प्रकार == "ok" तथा r1.value_repr == "10"); cases += १;
 
     // 2. division / overflow fault
     स्थापय fn2 = new_vm_function("divzero", ०, १, "");
     vm_emit(fn2, "PUSH_CONST", "1", "", ""); vm_emit(fn2, "PUSH_CONST", "0", "", ""); vm_emit(fn2, "BINOP", "/", "", ""); vm_emit(fn2, "STORE_SLOT", "0", "", ""); vm_emit(fn2, "RET", "0", "", "");
-    स्थापय fr2 = new_frame(fn2); स्थापय st2 = VMStats(०, ०, ०, १०००, ६४, १०००);
-    स्थापय r2 = vm_execute_frame(fr2, st2);
+    स्थापय fr2 = new_frame(fn2); स्थापय st2 = new_vm_stats();
+    स्थापय dummy2 = new_vm_module("dummy"); vm_module_add_function(dummy2, fn2); स्थापय r2 = vm_execute_frame(fr2, dummy2, st2);
     निश्चिनु(r2.प्रकार == "fault");
     cases += १;
 
@@ -398,8 +469,8 @@
     vm_emit(fn3, "PUSH_CONST", "true", "", ""); vm_emit(fn3, "JUMP_IF_FALSE", "4", "", "");
     vm_emit(fn3, "PUSH_CONST", "1", "", ""); vm_emit(fn3, "JUMP", "5", "", "");
     vm_emit(fn3, "PUSH_CONST", "2", "", ""); vm_emit(fn3, "STORE_SLOT", "0", "", ""); vm_emit(fn3, "PUSH_SLOT", "0", "", ""); vm_emit(fn3, "RET", "1", "", "");
-    स्थापय fr3 = new_frame(fn3); स्थापय st3 = VMStats(०, ०, ०, १०००, ६४, १०००);
-    स्थापय r3 = vm_execute_frame(fr3, st3); निश्चिनु(r3.value_repr == "1"); cases += १;
+    स्थापय fr3 = new_frame(fn3); स्थापय st3 = new_vm_stats();
+    स्थापय dummy3 = new_vm_module("dummy"); vm_module_add_function(dummy3, fn3); स्थापय r3 = vm_execute_frame(fr3, dummy3, st3); निश्चिनु(r3.value_repr == "1"); cases += १;
 
     // 4. while via jump (count to 3)
     स्थापय fn4 = new_vm_function("loop", ०, २, "");
@@ -411,10 +482,25 @@
     vm_emit(fn4, "PUSH_SLOT", "1", "", ""); vm_emit(fn4, "PUSH_CONST", "1", "", ""); vm_emit(fn4, "BINOP", "+", "", ""); vm_emit(fn4, "STORE_SLOT", "1", "", "");
     vm_emit(fn4, "JUMP", "4", "", "");
     vm_emit(fn4, "PUSH_SLOT", "0", "", ""); vm_emit(fn4, "RET", "1", "", "");
-    स्थापय fr4 = new_frame(fn4); स्थापय st4 = VMStats(०, ०, ०, १०००, ६४, १०००);
-    स्थापय r4 = vm_execute_frame(fr4, st4); निश्चिनु(r4.value_repr == "3"); cases += १;
+    स्थापय fr4 = new_frame(fn4); स्थापय st4 = new_vm_stats();
+    स्थापय dummy4 = new_vm_module("dummy"); vm_module_add_function(dummy4, fn4); स्थापय r4 = vm_execute_frame(fr4, dummy4, st4); निश्चिनु(r4.value_repr == "3"); cases += १;
 
-    // 5. verified module digest non-empty
+    // 5. recursion via CALL (factorial 5! = 120)
+    स्थापय mod_fact = new_vm_module("fact_test");
+    स्थापय fn_fact = new_vm_function("fact", १, २, "");
+    vm_emit(fn_fact, "PUSH_SLOT", "0", "", ""); vm_emit(fn_fact, "PUSH_CONST", "0", "", ""); vm_emit(fn_fact, "BINOP", "==", "", ""); vm_emit(fn_fact, "JUMP_IF_FALSE", "6", "", "");
+    vm_emit(fn_fact, "PUSH_CONST", "1", "", ""); vm_emit(fn_fact, "RET", "1", "", "");
+    vm_emit(fn_fact, "PUSH_SLOT", "0", "", ""); vm_emit(fn_fact, "PUSH_SLOT", "0", "", ""); vm_emit(fn_fact, "PUSH_CONST", "1", "", ""); vm_emit(fn_fact, "BINOP", "-", "", ""); vm_emit(fn_fact, "CALL", "fact", "1", ""); vm_emit(fn_fact, "BINOP", "*", "", ""); vm_emit(fn_fact, "RET", "1", "", "");
+    vm_module_add_function(mod_fact, fn_fact);
+    स्थापय fn_main = new_vm_function("मुख्य", ०, १, "");
+    vm_emit(fn_main, "PUSH_CONST", "5", "", ""); vm_emit(fn_main, "CALL", "fact", "1", ""); vm_emit(fn_main, "STORE_SLOT", "0", "", ""); vm_emit(fn_main, "PUSH_SLOT", "0", "", ""); vm_emit(fn_main, "RET", "1", "", "");
+    vm_module_add_function(mod_fact, fn_main);
+    निश्चिनु(vm_verify_module(mod_fact) == "");
+    स्थापय fr_main = new_frame(fn_main); स्थापय st_fact = new_vm_stats();
+    स्थापय r_fact = vm_execute_frame(fr_main, mod_fact, st_fact);
+    निश्चिनु(r_fact.value_repr == "120"); cases += १;
+
+    // 6. verified module digest non-empty
     स्थापय mod = new_vm_module("demo"); vm_module_add_use(mod, "गणना"); vm_module_add_function(mod, fn1);
     निश्चिनु(vm_verify_module(mod) == ""); निश्चिनु(vm_module_digest(mod) != ""); cases += १;
 

@@ -3,11 +3,11 @@
 Mirrors selfhost_optimizer.py / selfhost_bytecode.py but for
 peacock/runtime/vm.py + selfhost/vm.सूत्र.
 
-Stage-5a: kernel (selfhost/vm.सूत्र) implements checked 64-bit arithmetic,
-stack/slot/jump/RET/TRY/CATCH verifier and single-frame interpreter with
-6 builtin checks. Differential parity is validated as lenient digest
-non-empty on the 16-file IR corpus; strict equality is deferred until
-the full multi-frame + host dispatch is staged.
+Stage-5b: kernel (selfhost/vm.सूत्र) implements checked 64-bit arithmetic,
+stack/slot/jump/RET/TRY/CATCH + CALL recursion (fact 5!=120), call-depth
+and host-grant budgets with 7 builtin checks. Differential parity is
+validated as lenient digest non-empty on the 17-file corpus; strict
+native dispatch + FINALLY supersession are staged next.
 
 The oracle is peacock/runtime/vm.py (VM + HostPolicy); the PEACOCK kernel
 is selfhost/vm.सूत्र (VMValue/VMModule/vm_execute_frame).
@@ -107,6 +107,24 @@ def _emit_vm_module(image: dict) -> list[str]:
                 lines.append(f'    vm_emit(kary_{fname.replace(".","_")}, \"JUMP\", {_quote(str(args[0]))}, \"\", \"\");')
             elif op in ("JUMP_IF_FALSE", "BRANCH", "JUMP_IF_TRUE"):
                 lines.append(f'    vm_emit(kary_{fname.replace(".","_")}, \"JUMP_IF_FALSE\", {_quote(str(args[0]))}, \"\", \"\");')
+            elif op in ("CALL", "CALL_NATIVE"):
+                callee = _surface_name(str(args[0])) if args else ""
+                # bytecode CALL: [op, name, argc]; but some have args as list length
+                argc = str(args[1]) if len(args) > 1 else "0"
+                # normalize argc to int repr
+                if argc.isdigit() or (argc.startswith("-") and argc[1:].isdigit()):
+                    pass
+                else:
+                    # fallback: if args[1] is list, use len
+                    try:
+                        argc = str(len(args[1]))
+                    except:
+                        argc = "0"
+                lines.append(f'    vm_emit(kary_{fname.replace(".","_")}, \"CALL\", {_quote(callee)}, {_quote(argc)}, \"\");')
+            elif op == "METHOD":
+                callee = _surface_name(str(args[0])) if args else ""
+                argc = str(len(args[2])) + 1 if len(args) > 2 and args[2] else "1"
+                lines.append(f'    vm_emit(kary_{fname.replace(".","_")}, \"CALL\", {_quote(callee)}, {_quote(argc)}, \"\");')
             elif op in ("RET", "RETURN"):
                 # RET arg0: 1 if has value else 0
                 has_val = "1" if args and args[0] not in (None, -1, "null") else "0"

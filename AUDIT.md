@@ -1,117 +1,77 @@
-# Repository audit (base snapshot, 2026-10-17)
+# PEACOCK Repository Audit — 2026-11-02
 
-> **Snapshot note:** the findings and branch/history metadata below describe an
-> earlier audit snapshot. The current follow-on verification is recorded at the
-> end of this file; `STATUS.md`, `ROADMAP.md` and `DEPENDENCIES.md` are the
-> canonical up-to-date component status and migration plan.
+Branch: `arena/00db4706-peacock` (641 tests OK, skipped=2; all 8 selfhost kernels OK)
 
-## Executive finding
+This file fulfills **Phase A — Audit** of the self-hosting migration strategy.
 
-This checkout is substantially more than a proposal: it contains an original, executable PEACOCK language subset, a Python-hosted lexer/parser/type checker/IR/optimiser/bytecode compiler and VM, working CPU tensor/autodiff/training primitives, and a 2D software graphics stack. The `.सूत्र` examples are genuine PEACOCK syntax, not renamed Python. End-to-end execution and a bytecode artifact were verified during this audit. It is nevertheless **not an independently bootstrapped/self-hosting implementation**: the production toolchain and supporting engines remain Python. Native platform backends, 3D/GPU/UI framework and broad language features remain absent. Existing documentation is unusually detailed and mostly candid; this audit adds a point-in-time evidence index rather than replacing that documentation.
+## 1. Python Dependency Graph
 
-## Scope and method
+### Compiler & Language Front-end (authoritative, to be replaced by PEACOCK)
+| Python module | LOC | Responsibility | Self-host replacement | Status |
+|---|---|---|---|---|
+| `peacock/compiler/lexer.py` | 412 | Unicode lexer, NFC, Devanagari digits, diagnostics | `selfhost/tokenizer.सूत्र` 235L + `selfhost/parser.सूत्र` 1142L lex stage | **done** — parity-tested, `selfhost/tokenizer.सूत्र` `OK` |
+| `peacock/compiler/parser.py` | 766 | Recursive-descent parser, recovery | `selfhost/parser.सूत्र` 1142L | **done** — 15-file AST digest, strict errors (no recovery) |
+| `peacock/compiler/tokens.py` | 159 | Token tables, `KNOWN_CAPABILITIES` | `selfhost/type_model` + `peacock/sanskrit.py` | **partial** — capability list duplicated in `host.py` |
+| `peacock/compiler/types.py` | 206 | `PrimitiveType`, `Tensor<dtype,shape>` | `selfhost/type_model.सूत्र` 563L | **experimental** — typed AST probes, Python authoritative |
+| `peacock/compiler/semantic.py` | 2110 | Scopes, return/capability/type checking, `अन्ते` unwind | `selfhost/type_model.सूत्र` | **partial** — covers `यत्न/गृह्ण/अन्ते` but not every native/member/model rule |
+| `peacock/compiler/ir.py` | 873 | PIR: slots + virtual `regs`, labels/jumps | `selfhost/ir.सूत्र` 774L | **done** — 53 fns, 6376 instrs, 8 checks, 16-file digest |
+| `peacock/compiler/bytecode.py` | 431 | Stack bytecode, `STORE_SLOT/BINOP/CALL/.../FINALLY`, `verify_image` | `selfhost/bytecode.सूत्र` 635L | **done** — 83 fns, 4702 instrs, 8 checks, 9+3 file digest |
+| `peacock/compiler/optimizer.py` | 355 | 5-pass: const-fold, branch-fold, unreachable, peephole, DCE | `selfhost/optimizer.सूत्र` 650L | **done** — 28 fns, 8516 instrs, 6 checks, lenient IR digest (16 files) |
+| `peacock/compiler/diagnostics.py` | 200 | `PE1xxx–PE6xxx` spans, `add_trace` | mirrored in PEACOCK via `क्षिप` + `VMFault` | **partial** — PEACOCK diagnostics not yet native |
+| `peacock/compiler/pipeline.py` | 305 | `compile_source` orchestration | to be `peacock/tools/compile.सूत्र` | **missing** — still Python-only |
+| `peacock/compiler/selfhost_*.py` | 287+407+253+197 | Differential oracles (IR/bytecode/optimizer/VM) | — | **done** — Python oracle, PEACOCK kernel under test |
+| `peacock/sanskrit.py` | — | `INTERNAL_TO_SOURCE`, `LEGACY_KEYWORDS`, `surface` | needs PEACOCK lexer tables | **partial** |
+| `peacock/tools/formatter.py` | — | `peacock fmt` | `selfhost/formatter.सूत्र` 169L | **done** — 8 fns, 1011 instrs |
 
-Inspected tracked tree, manifests, executable wrappers, source and test layout, compiler/runtime package boundaries, examples, research and platform docs, `.gitattributes`, Linguist proposal, VS Code package, logo files, and available Git history. Ran the project test command, standard-library unittest discovery, and CLI smoke tests. At HEAD, history is a single **grafted** merge commit (`374a75b`); the available clone does not expose meaningful earlier project history or other development branches. The current working branch is `arena/3d38bd9d-peacock`; `main` and `origin/main` resolve to that same base commit. No local changes existed at audit start.
+### Runtime & VM (to be independent of Python objects)
+| Module | LOC | Responsibility | Native boundary |
+|---|---|---|---|
+| `peacock/runtime/vm.py` | 745 | Stack VM, `Handler/Completion/Cleanup`, `Frame`, `CALL`, `TRY/CATCH/FINALLY`, `RET`, budgets (`max_steps=2M`, `max_call_depth=128`, `max_output=1M`), `HostPolicy` caps/fs | **PEACOCK kernel `selfhost/vm.सूत्र` 431→517L** — now 40 fns, 5990 instrs, **7 checks** (arith/FAULT/branch/loop/recursive CALLfact5!=120/module/overflow), single→multi-frame, `vm_host_has_grant`, `vm_invoke`, depth `गभीरता`, grants `अनुदानानि` |
+| `peacock/runtime/host.py` | ~120 | `HostPolicy` (grants/root/max_tensor/max_dataset/max_epochs/max_file, `presenter`, `llm_runner`, `server_handles`) | C11 sandbox (`root` resolve, symlink TOCTOU best-effort) remains |
+| `peacock/runtime/native.py` | 1664 | `NativeContext`, `call_native/call_method/get_property`, `native_capability/method_capability`, capability mapping per native, tensor/model/LLM/colour/canvas/scene dispatch | **staged** — PEACOCK VM stubs `CALL` only; full `native.py` still Python |
+| `peacock/runtime/values.py` | — | `UNIT`, `RangeValue`, `StructInstance`, `Tensor` | Python objects as value repr (doc’d temporary) |
+| `peacock/runtime/artifact.py` | — | `.बीज` verify/serialize | Python `verify_image` still authoritative |
+| `peacock/runtime/errors.py` | — | `VMFault`, `PanicError`, `ResourceLimitError`, `CapabilityError` | PEACOCK `क्षिप` + `PE4xxx` |
+| `peacock/intelligence/*` | — | `tensor.py` (broadcast, autodiff), `layers.py`/`training.py` (Dense/SGD/Adam, `.ज्ञान`), `gpu.py` (CPU/OpenCL), `llm.py`, `agent.py` | CPython-only; no PEACOCK tensor kernel yet |
+| `peacock/frontend/*` | — | `colour.py` (sRGB/XYZ/Lab/Oklab/Oklch, CIEDE2000, gamut), `canvas.py`, `scene3d.py`, `ui.py`, `physics.py`, `spring.py`, etc. | Working but CPython; PEACOCK colour/3D APIs exist but not self-hosted |
+| `peacock/platforms/*` | — | `headless.py`, `httpd.py`, `server.py`, `window.py`, `web.py` | Python hosts; PEACOCK `present.सूत्र` etc. use them |
+| `peacock/native/*` | — | `builder.py`/`codegen.py` → deterministic C11, `peacock_run` ABI | C11 boundary allowed; VM-identical output verified |
+| `peacock/cli.py` | — | `init/new/build/run/test/check/fmt/lint/package/install/doc/debug/train/infer/agent/scene/colour` | Python `argparse`; PEACOCK CLI staged |
+| `peacock/vyakarana/*` | — | 3,983 sūtra texts, `sandhi.py` (20), `sutra_engine.py` (46), `dhatu/samasa/karaka/shabda/validator` | Executable coverage 46/3983; grammar is searchable corpus, not full executable Aṣṭādhyāyī |
+| `peacock/tools/package.py` | — | package manager, `peacock install` | Python; PEACOCK manager missing |
 
-A tracked-file extension count is not a byte-weighted GitHub Linguist computation. The checkout has 80 tracked `.py`, 22 `.सूत्र`, 28 `.md`, one `.tex`-extension count absent (zero tracked TeX), plus small config/assets. The user-provided repository overview is approximately 93.6% Python / 6.4% TeX. The Python share is explained by the actual bootstrap/compiler/runtime/test implementation being Python; `.सूत्र` is genuine but presently a minority of source files. The reported TeX cannot be attributed to any tracked `.tex` file in this snapshot: re-check Linguist's current per-file output on GitHub and inspect any untracked/ignored or subsequently changed files. Neither language statistics nor current Linguist classification were queried from GitHub's repository API during this local audit. `.gitattributes` explicitly labels `.सूत्र` as Peacock and detectable; that repository-local hint is not upstream recognition.
+**Zero external pip dependencies** (`pyproject.toml dependencies = []`). Optional native hosts need C compiler, X11/OpenCL drivers, Android SDK/Xcode — all platform boundaries, not pip.
 
-## Subsystem findings
+## 2. Completed / Partial / Missing
 
-| Subsystem | Honest status | Evidence / limitation |
-|---|---|---|
-| `.सूत्र` language identity and examples | Working and tested (subset) | `SPECIFICATION.md`; eight `examples/*.सूत्र`; examples compile, several execute. `.pk` and `.peacock` are rejected as source suffixes. |
-| Lexer, diagnostics, parser, AST | Working and tested (Python bootstrap) | `peacock/compiler/{lexer,tokens,parser,ast_nodes,diagnostics}.py`; lexical/parser tests; self-host tokenizer and parser parity fixtures. |
-| Name resolution, scopes, types, semantic checks | Working and tested (subset) | `semantic.py`, `types.py`; unknown names, invalid types and capabilities have tests. No general generics, inference, modules/imports or advanced type features. |
-| IR, optimisation, backend | Working and tested (limited) | Typed linear IR, verifier, optimisation passes, custom bytecode compiler and `.बीज` artifact. No native machine-code/WASM/GPU backend. |
-| Runtime | Working and tested (Python VM) | Custom stack VM, checked arithmetic, errors, budgets, host natives; Python process owns memory; no PEACOCK GC. |
-| CLI | Working and tested | `run`, `check`, `build`, `disasm`, `audit`, `tokens`, `ast`, `bench`, `fuzz`, `test`, `version`. Audit found `--version` was not accepted although a conventional flag is expected; added an alias and regression test in this change. |
-| Module system / stdlib | Partial | Single-file programs, built-in namespaces, flat program value namespace. No user-file imports/package manager. |
-| AI / numerical | Working and tested, CPU/small-scale | Pure-Python tensors, broadcasting, rank-2 matmul, reverse-mode autodiff, dense layers, losses/SGD/Adam, small datasets, training, metrics, serialization/quantisation. No GPU, attention/CNN, large-scale training, hardware kernels or training platform. |
-| Frontend / graphics | Partial but real | Colour conversions and 2D software rasterizer/PNG, gradients, motion/layout/AABB physics; examples and tests. No interactive UI toolkit, text shaping/accessibility, 3D, GPU, live input/vsync. |
-| Security | Partial / best-effort | Static declaration + VM checks + host grants/resource budgets and tests. Host path policy has documented TOCTOU limits; not an OS sandbox or formal guarantee. |
-| Targets | Partial | Linux/headless, static web export and HTTP frame presentation adapters have tests. Desktop, Android, iOS and WASM builds absent. iOS requires macOS/Xcode/signing and is not verifiable here. |
-| Self-hosting | Partial, not self-hosted | PEACOCK `.सूत्र` tokenizer and full grammar parser are tested for parity; type analysis, IR, bytecode, VM remain Python. No bootstrap compiler compiles itself. |
-| Tests / CI | Working locally; CI presence unverified | 490 tests passed using both `./bin/peacock test` and `python -m unittest discover -v`. No workflow files occur in the inspected tree. `pytest` is not installed; project tests use `unittest`. |
-| Dependencies | Python 3.11+ stdlib only at runtime | `pyproject.toml`: empty dependencies, setuptools build backend. No NumPy/PyTorch/TensorFlow/LLVM or UI framework. Packaging/build installation itself was not tested. |
-| Research | Present; use with source verification | 162 bibliography entries, literature review, open questions, ADRs and benchmark methodology are documented. Research README itself says bibliography identifiers were not machine-verified and the survey is not comprehensive. |
-| Logo | Present and locally verified | `assets/peacock.svg`, `assets/peacock-256.png`, editor icon; test decodes a 256×256 transparent PNG. SVG was not independently rendered in this audit. |
-| VS Code tooling | Prepared, unpublished | TextMate grammar, file config and package metadata exist; no LSP, diagnostics integration, publication or editor integration test. |
-| GitHub Linguist | Prepared only; not eligible/accepted | Proposed language entry, grammar, samples exist. No Linguist source checkout/official classifier tests or upstream PR. The current upstream contribution guide requires evidence of widespread usage (2,000 files/year for common extensions, 200 for one-per-repo files, across a reasonable distribution), so the new/hobby-language proposal currently lacks evident acceptance evidence. |
+**Working & tested (evidence in STATUS.md):**
+- Lexer/parser with recovery diagnostics (641 tests), typed PIR + optimiser + bytecode + VM `अन्ते` (nested unwinding), native AOT deterministic C, bounded agents (rule/Dijkstra + LLM/tool loopback), CPU/OpenCL tensor ops (OpenCL hardware skip), colour science + 2D/3D, UI/layout/events, HTTP frame server, desktop shell.
 
-## Build and runtime evidence
+**Partially completed:**
+- Self-host: tokenizer ✅, parser ✅ (no recovery), `type_model` ⚠️ experimental, IR ✅, bytecode ✅, optimizer ✅ (lenient), **VM ✅ Stage-5b** (checked arithmetic, slots/jumps/RET/TRY, **CALL + recursion + depth + host grants**, 7 checks, 16-file lenient digest; full `HOST`, `FINALLY`, `STRUCT/FIELD/INDEX/LIST/RANGE/LEN/ASSERT/THROW` and tensor/model native dispatch still Python), formatter ✅.
+- CLI: `fmt/new/init/lint/doc` now have PEACOCK `formatter.सूत्र` backing, but `cli.py` itself and `check/test/build/package` still Python.
+- Grammar: 3,983 searchable + 20 sandhi + 46 transforms; declension/conjugation/samāsa/kāraka ordered-rule interaction remain open.
 
-Commands run from the repository root:
+**Broken / Missing (roadmap):**
+- No PEACOCK-native `pipeline.सूत्र`, `host.सूत्र`, `native.सूत्र`, tensor/autodiff/LLM, UI/3D engine, `agent.सूत्र` runtime; no user modules, generics, closures, pattern matching, `map`, iterators, async/concurrency, GC, reflection, macros.
+- Python retirement **not started** — correct per Phase D gate. `verify_image`, `NativeContext`, `HostPolicy` root resolve, `.बीज`/`.ज्ञान` remain Python.
+- Strict VM digest equality not yet: Python bytecode `code len` vs PEACOCK `vm_module_digest` literal `\\n` are lenient.
 
-- `python -m pytest -q` — **not run**: environment has no `pytest` module (`No module named pytest`).
-- `python -m unittest discover -v` — **PASS, 490 tests** in 39.924 s.
-- `./bin/peacock test` — **PASS, 490 tests** in 40.248 s.
-- `./bin/peacock version` — reports PEACOCK AI 0.1.0, `.सूत्र`, `.बीज`, Python 3.11.2 and explicitly “NOT self-hosting”.
-- `./bin/peacock check examples/hello.सूत्र` — **PASS**, 1 function, 6 instructions.
-- `./bin/peacock run examples/hello.सूत्र` — **PASS**, prints `Hello from PEACOCK`.
-- `./bin/peacock build examples/hello.सूत्र -o <temporary .बीज>` followed by `run` of the artifact — **PASS**, 598-byte image, checksum printed, same expected output.
-- `./bin/peacock --version` — **FAIL before fix** (`unknown command '--version'`). Fixed in this change and added a regression test; post-fix targeted verification is recorded in the session report.
+## 3. Duplicates & Inconsistencies
 
-The test suite includes lexer/parser/semantic/type/IR/VM cases; invalid syntax, unknown identifiers, runtime failures, security checks; examples; tensor gradients and training; graphics/colour/platform and documentation checks. The above is observed output, not a blanket security or production-readiness assertion.
+- `ir.सूत्र` types duplicated in `optimizer.सूत्र` and `bytecode.सूत्र` (intentional bootstrap, to be unified in `type_model.सूत्र`).
+- `KNOWN_CAPABILITIES` defined in both `peacock/compiler/tokens.py` and `peacock/runtime/host.py` (frozenset mirror).
+- `README` honest-status vs `STATUS` verified counts reconciled 2026-11-02 (641 tests, 3,983 sūtra, 7 VM checks).
+- `.सूत्र` is Linguist hint only; GitHub does not recognise PEACOCK yet (submission prepared not accepted).
 
-## Project history and maintenance context
+## 4. Test Coverage Gaps
 
-The available Git object graph is shallow/grafted at `374a75b`, so this audit cannot infer how features evolved or validate prior claims from earlier commits. Only `arena/3d38bd9d-peacock`, `main`, and `origin/main` were visible; this repository view shows no additional local feature branches. There is no `.github/workflows` directory in the inspected tracked file list. CI coverage, PR acceptance, real user uptake and hosted language statistics therefore remain unverified.
+- 641 tests cover lexer/parser/semantic/IR/VM/`अन्ते`/capabilities/tensor/training/colour/3D/UI/platforms/native/grammar.
+- Skipped: real OpenCL device parity, real X11 `DISPLAY` open.
+- Not covered: self-host VM CALL/native, `FINALLY` differential (8/8 `test_finally` still Python VM), multi-tenant TOCTOU, HDR/wide-gamut, Android/iOS/X11 hardware, LLM provider live, tensor GPU vs CPU parity, full Aṣṭādhyāyī derivation/ambiguity.
 
-## Linguist investigation
+## 5. Migration Path Forward
 
-The local metadata proposes `Peacock`, `.सूत्र`, `source.peacock`, programming type and an Ace `text` mode, with a TextMate-compatible grammar. The grammar and VS Code copy are JSON and have consistency tests; the samples compile through the real compiler. The current official [`github-linguist/linguist` contribution guide](https://github.com/github-linguist/linguist/blob/main/CONTRIBUTING.md), inspected 2026-10-17, describes language entry metadata, a licensed grammar added using Linguist's tooling, representative non-tutorial samples, and usage evidence. It currently calls for 2,000 indexed files/year for extensions expected to be used multiple times per repo, or 200 for one-per-repo names, excluding forks, plus reasonable distribution across unique user/repo combinations. `.सूत्र` is not demonstrated here to meet that bar. The upstream language database was not cloned to check all current extension conflicts, and the prepared sample files are project-authored examples, not evidence of independent in-the-wild usage. No remote submission was attempted; upstream recognition is not claimed.
+**Phase B next:** finish `vm.सूत्र` FINALLY/Cleanup supersession, `STRUCT/FIELD/INDEX/MAKE_LIST/RANGE/LEN`, `native.सूत्र` stubs, `pipeline.सूत्र`; then **Phase C bootstrap** (compile `selfhost/*.सूत्र` with PEACOCK compiler, compare `.बीज`, fixed-point test); only then Phase D Python retirement.
 
-## Files reviewed
-
-Configuration/build: `pyproject.toml`, `.gitignore`, `.gitattributes`, `bin/peacock`, `bin/peacock.cmd`.
-Language/implementation: all tracked `.सूत्र` examples/selfhost fixtures plus compiler, runtime, AI, frontend, platform and CLI packages.
-Quality/docs: all test modules; README and specification/architecture/status/roadmap/security; docs tree; research review, questions, ADRs, methods and bibliography.
-Identity/tooling: `assets/`, `editors/vscode/`, `linguist/`.
-
-## Earlier follow-up migration increment (historical snapshot)
-
-The type-algebra work is no longer only a standalone demonstration: the compiler
-API supports opt-in `semantic_mode="shadow"`. After parsing actual source
-function/struct declaration annotations, the adapter generates relation checks
-and executes them in the `.सूत्र` kernel. Python computes expected assignability
-and tensor broadcast outcomes; Python semantic analysis still decides compilation
-and diagnostics. Tests compare diagnostics and accept/reject for a small corpus.
-This remains experimental relation-level shadow validation, not full semantic
-parity, a default CLI mode, or self-hosting. After the bridge and its regression
-tests were added, `python -m compileall -q peacock tests` succeeded and
-`./bin/peacock test` passed **495 tests** in 39.858 s on 2026-10-17. This is a
-new observed result; the earlier 490-test baseline above describes the audit's
-initial checkout state.
-
-## Earlier engineering priorities (superseded by the current roadmap)
-
-1. Extend the shadow protocol to compound types and real expression/assignment sites; implement name/scope semantics and typed-AST diagnostics in PEACOCK before considering promotion.
-2. Add a lightweight CI matrix running `unittest`, examples, package install/entry point, syntax metadata and reproducible security/fuzz smoke tests.
-3. Keep unsupported native/web/mobile/3D/GPU capabilities explicitly unclaimed; improve host boundaries and benchmark/visual test coverage before expanding their promises.
-
-## Current follow-on verification (0.4, 2026-10-22)
-
-This section supersedes the historical snapshots above for the current working
-tree on `arena/e6263f04-peacock`, based on merged 0.3 commit
-`e1157efaaa5af35d396f8bda91000ed7825059c4`. The complete suite passes **611
-tests in 47.223 s, with two environment-dependent skips** (real OpenCL and real
-X11). Documentation tests pass 7/7; deterministic fuzzing handles 1,000 lexer,
-1,000 parser, 1,000 artifact and 666 model cases without a crash; `git diff
---check` is clean.
-
-The 0.4 tree adds verified `अन्ते` cleanup unwinding and self-host syntax parity;
-a deterministic native C executable/shared-library subset with recoverable
-embedding faults; bounded LLM/tool agents; CPU and OpenCL tensor operations;
-browser/X11 UI events; PEACOCK-owned bounded HTTP servers; and native desktop,
-Android and iOS shell sources. The Linux native/desktop paths execute with
-VM-identical output. Android/iOS and actual OpenCL/X11 hardware remain
-unverified. Native AOT, OpenCL, UI and servers are documented subsets, not
-whole-ecosystem completion or production multi-tenancy.
-
-The grammar package still contains 3,983 sūtra texts but only four executable
-sandhi rules. Bounded agents are not AGI. Python remains the authoritative
-bootstrap; the compiler is not self-hosting. GitHub recognition remains local
-preparation, not upstream Linguist acceptance. A pinned CPython inspection at
-`ab2c947f435748d2b8e6d4ea550168a4cff473e5` and its remaining capability gaps are
-recorded in `docs/CPYTHON_AUDIT.md`. See `STATUS.md` for the current measured
-results and `ROADMAP.md` for remaining work.
+> “Do not hide Python behind another interface. Make PEACOCK genuinely independent.” — C11 remains allowed for OS/hardware, but compiler/semantics/runtime/AI/stdlib must become PEACOCK-native.
