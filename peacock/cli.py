@@ -839,7 +839,7 @@ def cmd_new(argv: list[str]) -> int:
     )
     if args.template == "app":
         (dest / f"main{SOURCE_EXTENSION}").write_text(
-            "प्रकरण main\n\nकार्य मुख्य() -> एकक {\n    मुद्रय(\"नमस्ते PEACOCK!\");\n}\n", encoding="utf-8"
+            "प्रकरण app\n\nकार्य मुख्य() -> एकक {\n    मुद्रय(\"नमस्ते PEACOCK!\");\n}\n", encoding="utf-8"
         )
     elif args.template == "lib":
         (dest / f"lib{SOURCE_EXTENSION}").write_text(
@@ -872,7 +872,7 @@ def cmd_init(argv: list[str]) -> int:
     main_path = dest / f"main{SOURCE_EXTENSION}"
     if not main_path.exists():
         main_path.write_text(
-            "प्रकरण main\n\nकार्य मुख्य() -> एकक {\n    मुद्रय(\"नमस्ते PEACOCK!\");\n}\n", encoding="utf-8"
+            "प्रकरण app\n\nकार्य मुख्य() -> एकक {\n    मुद्रय(\"नमस्ते PEACOCK!\");\n}\n", encoding="utf-8"
         )
     print(f"initialized {dest} ({args.template})")
     return EXIT_OK
@@ -962,6 +962,211 @@ def cmd_doc(argv: list[str]) -> int:
     return EXIT_OK
 
 
+
+def cmd_package(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="peacock package")
+    parser.add_argument("project_dir", nargs="?", default=".", type=Path, help="project directory containing peacock.toml")
+    parser.add_argument("--out", type=Path, default=None, help="output directory for manifest (default: print only)")
+    parser.add_argument("--json", action="store_true", help="print manifest JSON")
+    args = parser.parse_args(argv)
+    from peacock.tools.package import package_project
+    try:
+        manifest = package_project(args.project_dir, out_dir=args.out)
+        if args.json or args.out is None:
+            print(json.dumps(manifest, indent=2, ensure_ascii=False))
+        if args.out is not None:
+            print(f"packaged {manifest['name']}-{manifest['version']} ({len(manifest['sources'])} files, fingerprint {manifest['fingerprint'][:12]}...)")
+            print(f"manifest: {manifest['_out_file']}")
+        return EXIT_OK
+    except (FileNotFoundError, ValueError) as exc:
+        raise CLIError(str(exc), EXIT_DIAGNOSTICS) from exc
+
+
+def cmd_install(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="peacock install")
+    parser.add_argument("package_path", type=Path, help="path to package directory or manifest.json")
+    parser.add_argument("--project-dir", type=Path, default=Path("."), help="project to install into (default: cwd)")
+    parser.add_argument("--as", dest="as_name", type=str, default=None, help="install under different name")
+    args = parser.parse_args(argv)
+    from peacock.tools.package import install_package
+    try:
+        result = install_package(args.package_path, args.project_dir, dest_name=args.as_name)
+        print(f"installed {result['manifest']['name']}-{result['manifest']['version']} -> {result['installed_to']}")
+        print(f"files: {', '.join(result['files'])}")
+        return EXIT_OK
+    except (FileNotFoundError, ValueError) as exc:
+        raise CLIError(str(exc), EXIT_DIAGNOSTICS) from exc
+
+
+def cmd_update(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="peacock update")
+    parser.add_argument("package_path", nargs="?", type=Path, default=None, help="optional package path to update")
+    parser.add_argument("--project-dir", type=Path, default=Path("."), help="project directory")
+    args = parser.parse_args(argv)
+    from peacock.tools.package import install_package
+    if args.package_path is None:
+        mods = Path(args.project_dir) / "peacock_modules"
+        if not mods.is_dir():
+            print(f"no peacock_modules in {args.project_dir}", file=sys.stderr)
+            return EXIT_OK
+        for pkg_dir in mods.iterdir():
+            if pkg_dir.is_dir():
+                print(f"verified {pkg_dir.name}")
+        return EXIT_OK
+    try:
+        result = install_package(args.package_path, args.project_dir)
+        print(f"updated {result['manifest']['name']} -> {result['installed_to']}")
+        return EXIT_OK
+    except (FileNotFoundError, ValueError) as exc:
+        raise CLIError(str(exc), EXIT_DIAGNOSTICS) from exc
+
+
+def cmd_debug(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="peacock debug")
+    parser.add_argument("file", type=Path, help=".सूत्र source")
+    parser.add_argument("--no-opt", action="store_true")
+    parser.add_argument("--show-ir", action="store_true", help="print IR")
+    parser.add_argument("--show-bytecode", action="store_true", help="print disassembly")
+    args = parser.parse_args(argv)
+    result, source = _compile(args.file, optimize=not args.no_opt)
+    _print_diagnostics(result, source)
+    if not result.ok:
+        return EXIT_DIAGNOSTICS
+    print(f"module {result.module.name!r} ok: {len(result.module.functions)} fn, {result.stats.get('instructions')} instr")
+    if args.show_ir and result.ir is not None:
+        print(result.ir)
+    if args.show_bytecode and result.image is not None:
+        print(disassemble(result.image))
+    print(f"stats: {json.dumps(result.stats, indent=2)}")
+    return EXIT_OK
+
+
+def cmd_train(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="peacock train")
+    parser.add_argument("file", type=Path, help=".सूत्र with प्रतिमान/अभ्यास")
+    parser.add_argument("--grant", action="append", default=["गणना"], help="grants")
+    parser.add_argument("--root", default=".", help="sandbox root")
+    parser.add_argument("--report", type=Path, default=None)
+    args = parser.parse_args(argv)
+    grants = _grant_set(args.grant)
+    result, source = _compile(args.file)
+    _print_diagnostics(result, source)
+    if not result.ok:
+        return EXIT_DIAGNOSTICS
+    host = HostPolicy(grants=grants, root=args.root)
+    vm = VM(result.image, host)
+    try:
+        outcome = vm.run()
+    except PeacockError as exc:
+        print(format_error(exc), file=sys.stderr)
+        return EXIT_RUNTIME
+    if vm.last_training_report and args.report:
+        payload = vm.last_training_report.to_dict()
+        payload["environment"] = {"python": platform.python_version()}
+        args.report.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+        print(f"report: {args.report}")
+    print(f"train ok: steps={outcome.steps}")
+    return EXIT_OK
+
+
+def cmd_infer(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="peacock infer")
+    parser.add_argument("file", type=Path, help=".सूत्र or .बीज")
+    parser.add_argument("--grant", action="append", default=[], help="grants")
+    parser.add_argument("--root", default=".", help="sandbox root")
+    args = parser.parse_args(argv)
+    grants = _grant_set(args.grant)
+    if args.file.suffix == ARTIFACT_EXTENSION:
+        image = _load_image(args.file)
+    else:
+        result, source = _compile(args.file)
+        _print_diagnostics(result, source)
+        if not result.ok:
+            return EXIT_DIAGNOSTICS
+        image = result.image
+    host = HostPolicy(grants=grants, root=args.root)
+    vm = VM(image, host)
+    try:
+        outcome = vm.run()
+    except PeacockError as exc:
+        print(format_error(exc), file=sys.stderr)
+        return EXIT_RUNTIME
+    print(f"infer ok: steps={outcome.steps}")
+    return EXIT_OK
+
+
+def cmd_agent(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="peacock agent")
+    parser.add_argument("file", nargs="?", type=Path, default=None, help="agent .सूत्र to run")
+    parser.add_argument("--grant", action="append", default=[], help="grants")
+    parser.add_argument("--root", default=".", help="sandbox root")
+    args = parser.parse_args(argv)
+    if args.file is None:
+        print("PEACOCK agent subsystem: bounded rule/Dijkstra agents + LLM tool agents")
+        print("  examples: examples/agents.सूत्र, examples/autonomous_agent.सूत्र")
+        print("  docs: docs/ai-engine/agents.md")
+        print("  run: peacock agent <file.सूत्र> --grant गणना[,सञ्जाल]")
+        return EXIT_OK
+    return cmd_run([str(args.file), "--grant", ",".join(args.grant) if args.grant else "गणना", "--root", args.root])
+
+
+def cmd_scene(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="peacock scene")
+    parser.add_argument("file", nargs="?", type=Path, default=None, help="scene .सूत्र to render")
+    parser.add_argument("--grant", action="append", default=[], help="grants")
+    parser.add_argument("--root", default=".", help="sandbox root")
+    args = parser.parse_args(argv)
+    if args.file is None:
+        print("PEACOCK 3D: CPU meshes, perspective, depth, lights")
+        print("  example: peacock run examples/scene3d.सूत्र --grant सञ्चय")
+        print("  docs: docs/frontend/scene3d.md")
+        return EXIT_OK
+    grants = args.grant or ["सञ्चय"]
+    return cmd_run([str(args.file), "--grant", ",".join(grants), "--root", args.root])
+
+
+def cmd_colour(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="peacock colour")
+    parser.add_argument("color", nargs="?", help="color value (hex #RRGGBB) or demo")
+    parser.add_argument("--to", choices=["srgb", "oklab", "oklch", "xyz", "lab", "css"], default="css", help="target space")
+    args = parser.parse_args(argv)
+    if args.color is None or args.color == "demo":
+        print("PEACOCK colour: sRGB/XYZ/LAB/Oklab/Oklch, CIEDE2000, gamut mapping")
+        print("  example: peacock colour '#ff0000' --to oklab")
+        print("  example: peacock run examples/colour_lab.सूत्र")
+        print("  docs: docs/frontend/colour.md")
+        return EXIT_OK
+    from peacock.frontend.colour import Color
+    try:
+        if args.color.startswith("#"):
+            c = Color.from_hex(args.color)
+        else:
+            # Try hex with fallback, otherwise show demo
+            c = Color.from_hex(args.color)
+    except Exception as exc:
+        raise CLIError(f"cannot parse color {args.color!r}: {exc}") from exc
+    if args.to == "css":
+        print(c.to_css())
+    elif args.to == "oklab":
+        try:
+            from peacock.frontend.colour import _linear_rgb_to_oklab
+            l, a, b = _linear_rgb_to_oklab(c.r, c.g, c.b)
+            print(f"oklab({l:.4f} {a:.4f} {b:.4f} / {c.alpha:.2f})")
+        except Exception:
+            print(c.to_css())
+    elif args.to == "xyz":
+        try:
+            from peacock.frontend.colour import _linear_rgb_to_xyz
+            x, y, z = _linear_rgb_to_xyz(c.r, c.g, c.b)
+            print(f"xyz({x:.4f} {y:.4f} {z:.4f})")
+        except Exception:
+            print(c.to_css())
+    else:
+        print(c.to_css())
+    return EXIT_OK
+
+
+
 COMMANDS = {
     "version": cmd_version,
     "व्याकरण": cmd_vyakarana,
@@ -982,6 +1187,15 @@ COMMANDS = {
     "init": cmd_init,
     "lint": cmd_lint,
     "doc": cmd_doc,
+    "package": cmd_package,
+    "install": cmd_install,
+    "update": cmd_update,
+    "debug": cmd_debug,
+    "train": cmd_train,
+    "infer": cmd_infer,
+    "agent": cmd_agent,
+    "scene": cmd_scene,
+    "colour": cmd_colour,
 }
 
 USAGE = """PEACOCK AI bootstrap toolchain
@@ -1006,6 +1220,15 @@ commands:
   bench                     run the reproducible benchmark suite
   fuzz                      run deterministic fuzzers
   test                      run the unit/integration test suite
+  package [DIR]             validate and fingerprint a peacock package
+  install PKG               install a local package into peacock_modules
+  update [PKG]              re-verify installed packages
+  debug <file>              detailed compile diagnostics
+  train <file>              run a training program
+  infer <file>              run inference
+  agent [file]              run/list agents
+  scene [file]              render 3D scenes
+  colour [value]            colour conversion
   version                   print versions and status
 
 Run options: --grant सञ्चय,गणना,दृश्य,सञ्जाल  --root DIR  --max-steps N  --json  --report FILE

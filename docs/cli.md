@@ -22,6 +22,15 @@ peacock <command> [options]
 | `bench` | reproducible benchmark suite; `--json PATH`, `--quick` |
 | `fuzz` | deterministic fuzzers; `--iterations`, `--seed`, `--json` |
 | `test` | run the unittest suite; `-p PATTERN`, `--quiet` |
+| `package [DIR]` | validate sources and emit deterministic manifest; `--out DIR`, `--json` |
+| `install PKG` | install local package into `peacock_modules/`; `--project-dir DIR`, `--as NAME` |
+| `update [PKG]` | re-verify or re-install packages |
+| `debug <file>` | detailed diagnostics; `--show-ir`, `--show-bytecode` |
+| `train <file>` | run training (grant गणना by default) |
+| `infer <file>` | run inference |
+| `agent [file]` | list or run agents |
+| `scene [file]` | list or run 3D scenes |
+| `colour [value]` | colour parsing and conversion |
 
 ## Sanskrit grammar operations
 

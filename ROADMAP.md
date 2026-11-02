@@ -236,9 +236,9 @@ document says **not self-hosting**.
 
 ## Phase 10 — Ecosystem and research tooling — **partial**
 
-Delivered: deterministic `peacock fmt`/`पुनःस्वरूपय` (Python bootstrap + PEACOCK-native `selfhost/formatter.सूत्र` 1011-instr shadow, brace-depth + operator-spacing, idempotent, `--check` gate), `peacock lint` (check+fmt), `peacock new`/`peacock init` project scaffolds (`peacock.toml`, `main.सूत्र`, `.gitignore` templates: app/lib/site), `peacock doc` markdown generator from typed AST, and expanded `peacock tools.formatter` library. Editor TextMate/VS Code grammars remain prepared-but-unpublished; language server, package manager and full experiment runner are still planned.
+Delivered: deterministic `peacock fmt`/`पुनःस्वरूपय` (Python bootstrap + PEACOCK-native `selfhost/formatter.सूत्र` 1011-instr shadow, brace-depth + operator-spacing, idempotent, `--check` gate), `peacock lint` (check+fmt), `peacock new`/`peacock init` project scaffolds (`peacock.toml`, `main.सूत्र`, `.gitignore` templates: app/lib/site), `peacock doc` markdown generator from typed AST, `peacock package` with deterministic sha256 fingerprinting and validation, `peacock install`/`update` into `peacock_modules/` with provenance (`peacock.install.json`), plus `peacock debug`/`train`/`infer`/`agent`/`scene`/`colour` developer commands, and expanded `peacock tools.formatter`/`package` libraries. Editor TextMate/VS Code grammars remain prepared-but-unpublished; language server and full experiment runner are still planned.
 
-Still required: language server, package manager with deterministic installs, reproducible experiment runner, dataset/model registries.
+Still required: language server, deterministic package version resolution, reproducible experiment runner, dataset/model registries.
 
 AGI research tooling is scoped as infrastructure for experiments (tensor
 programs, deterministic runs, evaluation, provenance), **not** as a claim that
