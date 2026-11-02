@@ -776,6 +776,192 @@ def cmd_vyakarana(argv: list[str]) -> int:
     return EXIT_OK
 
 
+def cmd_fmt(argv: list[str]) -> int:
+    """Format .सूत्र sources deterministically (PEACOCK-native formatter, Python bootstrap)."""
+    parser = argparse.ArgumentParser(prog="peacock fmt")
+    parser.add_argument("paths", nargs="*", type=Path, help=".सूत्र files or directories")
+    parser.add_argument("--check", action="store_true", help="do not write, exit 1 if unformatted")
+    parser.add_argument("--recursive", action="store_true", help="recurse into directories")
+    args = parser.parse_args(argv)
+    if not args.paths:
+        raise CLIError("peacock fmt requires at least one path")
+    from peacock.tools.formatter import format_file
+
+    targets: list[Path] = []
+    for p in args.paths:
+        if p.is_dir():
+            if args.recursive:
+                targets.extend(p.rglob(f"*{SOURCE_EXTENSION}"))
+                # also check for .सूत्र via explicit pattern (rglob handles unicode)
+                if not targets:
+                    targets.extend([x for x in p.rglob("*") if x.suffix == SOURCE_EXTENSION])
+            else:
+                raise CLIError(f"'{p}' is a directory; use --recursive")
+        elif p.is_file():
+            if p.suffix != SOURCE_EXTENSION:
+                print(f"warning: skipping non-.सूत्र file '{p}'", file=sys.stderr)
+                continue
+            targets.append(p)
+        else:
+            raise CLIError(f"path not found: '{p}'")
+    if not targets:
+        print("nothing to format", file=sys.stderr)
+        return EXIT_OK
+    changed_any = False
+    for path in sorted(set(targets)):
+        try:
+            changed, _, _ = format_file(path, write=not args.check)
+            status = "would format" if args.check and changed else ("formatted" if changed else "ok")
+            print(f"{status}: {path}")
+            if changed:
+                changed_any = True
+        except Exception as exc:
+            print(f"error formatting {path}: {exc}", file=sys.stderr)
+            return EXIT_INTERNAL
+    if args.check and changed_any:
+        return EXIT_DIAGNOSTICS
+    return EXIT_OK
+
+
+def cmd_new(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="peacock new")
+    parser.add_argument("name", help="project directory name")
+    parser.add_argument("--template", choices=["app", "lib", "site"], default="app")
+    args = parser.parse_args(argv)
+    dest = Path(args.name)
+    if dest.exists():
+        raise CLIError(f"destination '{dest}' already exists")
+    dest.mkdir(parents=True)
+    # Minimal peacock project scaffold
+    (dest / ".gitignore").write_text("out/\n*.बीज\n*.ज्ञान\n__pycache__/\n", encoding="utf-8")
+    (dest / "peacock.toml").write_text(
+        f'[package]\nname = "{dest.name}"\nversion = "0.1.0"\nlanguage = "0.4"\n\n[build]\nmain = "main.सूत्र"\n', encoding="utf-8"
+    )
+    if args.template == "app":
+        (dest / f"main{SOURCE_EXTENSION}").write_text(
+            "प्रकरण main\n\nकार्य मुख्य() -> एकक {\n    मुद्रय(\"नमस्ते PEACOCK!\");\n}\n", encoding="utf-8"
+        )
+    elif args.template == "lib":
+        (dest / f"lib{SOURCE_EXTENSION}").write_text(
+            "प्रकरण lib\n\nकार्य योग(a: पूर्णाङ्क, b: पूर्णाङ्क) -> पूर्णाङ्क {\n    प्रत्यानय a + b;\n}\n", encoding="utf-8"
+        )
+    elif args.template == "site":
+        (dest / f"site{SOURCE_EXTENSION}").write_text(
+            "प्रकरण site\n\nउपयोग दृश्य\n\nकार्य मुख्य() -> एकक {\n    स्थापय doc = दृश्य.सृज(शीर्षक: \"नूतन\", विस्तार: ८००, औन्नत्य: ६००, पृष्ठवर्ण: \"#ffffff\");\n    दृश्य.प्रदर्शय(doc);\n}\n", encoding="utf-8"
+        )
+    print(f"created {dest} ({args.template})")
+    print(f"  next: cd {dest} && peacock run main{SOURCE_EXTENSION}")
+    return EXIT_OK
+
+
+def cmd_init(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="peacock init")
+    parser.add_argument("dir", nargs="?", default=".", type=Path)
+    parser.add_argument("--template", choices=["app", "lib", "site"], default="app")
+    args = parser.parse_args(argv)
+    dest: Path = args.dir
+    dest.mkdir(parents=True, exist_ok=True)
+    if (dest / "peacock.toml").exists():
+        raise CLIError(f"'{dest}/peacock.toml' already exists; not overwriting")
+    # Reuse new logic but without creating subdir
+    tmp_name = dest.name if dest.name != "." else "app"
+    (dest / ".gitignore").write_text("out/\n*.बीज\n*.ज्ञान\n__pycache__/\n", encoding="utf-8")
+    (dest / "peacock.toml").write_text(
+        f'[package]\nname = "{tmp_name}"\nversion = "0.1.0"\nlanguage = "0.4"\n\n[build]\nmain = "main.सूत्र"\n', encoding="utf-8"
+    )
+    main_path = dest / f"main{SOURCE_EXTENSION}"
+    if not main_path.exists():
+        main_path.write_text(
+            "प्रकरण main\n\nकार्य मुख्य() -> एकक {\n    मुद्रय(\"नमस्ते PEACOCK!\");\n}\n", encoding="utf-8"
+        )
+    print(f"initialized {dest} ({args.template})")
+    return EXIT_OK
+
+
+def cmd_lint(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="peacock lint")
+    parser.add_argument("file", type=Path)
+    parser.add_argument("--json", action="store_true")
+    args = parser.parse_args(argv)
+    # lint is check + fmt --check
+    result, source = _compile(args.file)
+    from peacock.tools.formatter import format_source
+
+    formatted = format_source(source)
+    fmt_ok = formatted == source
+    if args.json:
+        payload = {
+            "check_ok": result.ok,
+            "fmt_ok": fmt_ok,
+            "diagnostics": [
+                {"code": d.code, "severity": d.severity.value, "message": d.message, "line": d.span.line, "column": d.span.column}
+                for d in result.diagnostics
+            ],
+        }
+        print(json.dumps(payload, indent=2))
+    else:
+        _print_diagnostics(result, source)
+        if not fmt_ok:
+            print(f"lint: {args.file} would be reformatted by 'peacock fmt'", file=sys.stderr)
+        elif result.ok:
+            print(f"lint ok: {args.file}")
+    if not result.ok or not fmt_ok:
+        return EXIT_DIAGNOSTICS
+    return EXIT_OK
+
+
+def cmd_doc(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(prog="peacock doc")
+    parser.add_argument("file", type=Path, help=".सूत्र source")
+    parser.add_argument("-o", "--output", type=Path, default=None)
+    args = parser.parse_args(argv)
+    source = _read_source(args.file)
+    tokens, lex_diag = lex(source, str(args.file))
+    if lex_diag.has_errors:
+        print(lex_diag.render_all(source), file=sys.stderr)
+        return EXIT_DIAGNOSTICS
+    module, parse_diag = parse(tokens, source, str(args.file))
+    combined = DiagnosticBag()
+    combined.extend(lex_diag)
+    combined.extend(parse_diag)
+    if combined.has_errors:
+        print(combined.render_all(source), file=sys.stderr)
+        return EXIT_DIAGNOSTICS
+    # Simple markdown generation from AST
+    lines = [f"# {args.file.stem}", "", f"Source: `{args.file}`", ""]
+    if module.name:
+        lines.append(f"प्रकरण: `{module.name}`")
+        lines.append("")
+    for use in module.uses:
+        lines.append(f"- उपयोग `{use}`")
+    if module.uses:
+        lines.append("")
+    for fn in module.functions:
+        lines.append(f"## कार्य `{fn.name}`({', '.join(p.name for p in fn.params)}) -> {fn.return_type}")
+        if getattr(fn, "capabilities", None):
+            lines.append(f"अधिकार: {', '.join(fn.capabilities)}")
+        lines.append(f"slots: {fn.slot_count if hasattr(fn, 'slot_count') else '?'}")
+        lines.append("")
+    for st in module.structs:
+        lines.append(f"## संघटन `{st.name}`")
+        for field in st.fields:
+            lines.append(f"- {field.name}: {field.type}")
+        lines.append("")
+    for m in module.models:
+        lines.append(f"## प्रतिमान `{m.name}`")
+        lines.append("")
+    for t in module.trainings:
+        lines.append(f"## अभ्यास `{t.name}`")
+        lines.append("")
+    output = "\n".join(lines)
+    if args.output:
+        args.output.write_text(output, encoding="utf-8")
+        print(f"wrote {args.output}")
+    else:
+        print(output)
+    return EXIT_OK
+
+
 COMMANDS = {
     "version": cmd_version,
     "व्याकरण": cmd_vyakarana,
@@ -790,6 +976,12 @@ COMMANDS = {
     "test": cmd_test,
     "tokens": cmd_tokens,
     "ast": cmd_ast,
+    "fmt": cmd_fmt,
+    "पुनःस्वरूपय": cmd_fmt,
+    "new": cmd_new,
+    "init": cmd_init,
+    "lint": cmd_lint,
+    "doc": cmd_doc,
 }
 
 USAGE = """PEACOCK AI bootstrap toolchain
@@ -803,6 +995,11 @@ commands:
   native <file.सूत्र> -o BIN  AOT-compile the supported subset to an executable/library
   disasm <file>             disassemble a source file or artifact
   audit <file.सूत्र>          static capability audit
+  fmt <file>                format .सूत्र sources (also पुनःस्वरूपय)
+  new <name>                scaffold a new project
+  init [dir]                initialise a project in place
+  lint <file>               check + fmt --check
+  doc <file>                generate markdown docs from .सूत्र
   व्याकरण <operation>        sūtra lookup, search, pratyāhāra and sandhi
   tokens <file.सूत्र>         dump the token stream (debugging)
   ast <file.सूत्र>            dump the syntax tree (debugging)

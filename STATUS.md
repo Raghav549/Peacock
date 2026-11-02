@@ -1,6 +1,6 @@
 # PEACOCK Status
 
-Last verified: **2026-10-22** on `arena/e6263f04-peacock` (working tree;
+Last verified: **2026-11-02** on `arena/00db4706-peacock` (working tree;
 not a released/tagged upstream version). Re-run the commands before relying on
 any number. Canonical source extension: `.सूत्र`. The compiler is **not
 self-hosting**. GitHub does **not** yet recognise PEACOCK; local Linguist
@@ -12,7 +12,7 @@ metadata and the prepared submission are not upstream acceptance.
 
 ```bash
 python -m unittest discover -s tests -q
-# Ran 611 tests in 47.223s
+# Ran 628 tests in 47.281s
 # OK (skipped=2)
 ```
 
@@ -104,11 +104,16 @@ byte-for-byte. Android/iOS were not built.
   port query and host cleanup. Real Sanskrit POST/201 and raw-socket negative
   tests pass.
 * **Grammar:** attributed offline corpus of all 3,983 Aṣṭādhyāyī sūtra texts,
-  inheritance/anuvṛtti display, generic Māheśvara pratyāhāra expansion and four
-  explicitly traced vowel-sandhi rules (`6.1.77`, `6.1.87`, `6.1.88`, `6.1.101`).
-* **Self-host components:** PEACOCK-written tokenizer and full-grammar parser
-  with AST-digest parity; experimental VM-executed semantic-shadow probes.
-  Python remains authoritative for production semantics, IR, bytecode and VM.
+  inheritance/anuvṛtti display, generic Māheśvara pratyāhāra expansion, 16
+  executable sandhi rules with varṇa/paribhāṣā/adhikāra ordering and derivation
+  traces, plus śabda/dhātu/samāsa/kāraka/validator (`6.1.77`, `6.1.78`, `6.1.87`,
+  `6.1.88`, `6.1.101`, `6.1.109`, `6.1.113`, `8.2.39`, `8.3.15`, `8.3.23`, `8.3.34`,
+  `8.4.40` etc.; 26 executable transforms).
+* **Self-host components:** PEACOCK-written tokenizer, full-grammar parser
+  with AST-digest parity, and deterministic `formatter.सूत्र` (brace-depth,
+  operator spacing, comment-preserving, idempotent; Python/PEACOCK parity);
+  experimental VM-executed semantic-shadow probes. Python remains authoritative
+  for production semantics, IR, bytecode and VM.
 * **Applications/tooling:** twelve-route PEACOCK-authored static website,
   examples, CLI compiler/VM/native/grammar/audit/bench/fuzz/test commands,
   generated Linguist/VS Code grammars and linked subsystem manuals.

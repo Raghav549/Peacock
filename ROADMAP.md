@@ -230,11 +230,11 @@ produced by the bootstrap compiler, stage 2 by stage 1, and stage 1/stage 2 agre
 on output; the bootstrap is not required to run the tests. Until then, every
 document says **not self-hosting**.
 
-## Phase 10 — Ecosystem and research tooling — **planned**
+## Phase 10 — Ecosystem and research tooling — **partial**
 
-Deliverables: package/module system, formatter, linter, language server, editor
-plugins, documentation generator, reproducible experiment runner, dataset and
-model registries with licence checks, publication-quality evaluation harness.
+Delivered: deterministic `peacock fmt`/`पुनःस्वरूपय` (Python bootstrap + PEACOCK-native `selfhost/formatter.सूत्र` 1011-instr shadow, brace-depth + operator-spacing, idempotent, `--check` gate), `peacock lint` (check+fmt), `peacock new`/`peacock init` project scaffolds (`peacock.toml`, `main.सूत्र`, `.gitignore` templates: app/lib/site), `peacock doc` markdown generator from typed AST, and expanded `peacock tools.formatter` library. Editor TextMate/VS Code grammars remain prepared-but-unpublished; language server, package manager and full experiment runner are still planned.
+
+Still required: language server, package manager with deterministic installs, reproducible experiment runner, dataset/model registries.
 
 AGI research tooling is scoped as infrastructure for experiments (tensor
 programs, deterministic runs, evaluation, provenance), **not** as a claim that
@@ -251,10 +251,11 @@ Acceptance criteria:
 
 Delivered: an attributed, offline package of all 3,983 Aṣṭādhyāyī sūtra texts;
 validated lookup/search, inheritance references and anuvṛtti display; generic
-Māheśvara pratyāhāra expansion; four executable vowel-sandhi rules with rule
-IDs; coverage reporting; native `.सूत्र` calls and a Sanskrit CLI. Provenance and
-the distinction between textual and executable coverage are recorded in
-`peacock/vyakarana/data/` and `docs/language/vyakarana.md`.
+Māheśvara pratyāhāra expansion; 16 executable sandhi rules with varṇa/paribhāṣā
+and ordered interaction, plus śabda/dhātu/samāsa/kāraka/derivation/validator with
+derivation traces and 32 native `.सूत्र` calls and a Sanskrit CLI (26 executable
+transforms). Provenance and the distinction between textual and executable
+coverage are recorded in `peacock/vyakarana/data/` and `docs/language/vyakarana.md`.
 
 Still required: a rule representation for environments, transformations and
 anuvṛtti; ordered interaction and conflict resolution; derivation traces;
