@@ -14,16 +14,21 @@ metadata and the prepared submission are not upstream acceptance.
 
 ```bash
 python -m unittest discover -s tests -q
-# Ran 650 tests in ~57s (644 prior + 6 LayerNorm)
+# Ran 668 tests in ~57s (644 prior + 6 LayerNorm + 18 Attention/Transformer)
 # OK (skipped=2)
 ```
 
-New in 2026-11-02: **LayerNorm (सामान्यीकरण)** — transformer foundation.
-`peacock/intelligence/tensor.py:layer_norm` and `peacock/intelligence/layers.py:LayerNorm`
-implement per-last-dim normalization with learnable γ/β, correct backward (verified by
-finite differences), and `Sequential`/`build_model` support for `Dense→LayerNorm→Dense`.
-The PEACOCK DSL now accepts `सामान्यीकरण(सामान्यमान: N, सहिष्णुता: eps)` and trains on
-XOR to 1.0 accuracy; see `tests/ai/test_layernorm.py` and `examples/layernorm_demo.सूत्र`.
+New in 2026-11-02: **Transformer stack — LayerNorm, Attention, TransformerBlock.**
+* `peacock/intelligence/tensor.py:layer_norm` and `peacock/intelligence/layers.py:LayerNorm`
+  per-last-dim normalization with learnable γ/β (finite-difference verified).
+* `peacock/intelligence/tensor.py:scaled_dot_product_attention` + batched `matmul`
+  (rank N-D) and `peacock/intelligence/layers.py:MultiHeadAttention`/
+  `TransformerBlock`/`positional_encoding` — full encoder with residual+norm+FFN,
+  872 params per block, 18 new tests.
+* PEACOCK DSL now accepts `सामान्यीकरण(सामान्यमान: N, सहिष्णुता: eps)`,
+  `एकाग्रता(प्रारूपविस्तार: M, शीर्षसंख्या: H)` and
+  `रूपान्तरक(प्रारूपविस्तार: M, शीर्षसंख्या: H, अग्रविस्तार: F)`;
+  see `tests/ai/test_attention.py`, `examples/transformer_demo.सूत्र`.
 
 The two skips are explicit environment gates: the real OpenCL device parity
 test and the real X11 open/draw/close test. CPU fallbacks, source-only mobile

@@ -5,14 +5,17 @@
 * **Storage:** flat Python lists plus a shape tuple. Dtypes: Bool, Int32,
   Float32, Float64. Float32 rounds on construction/storage; arithmetic uses
   binary64 before storage (documented deviation).
-* **Ops:** broadcasting, elementwise arithmetic, matmul (rank 2), reductions,
-  reshape, transpose, select rows, softmax/log-softmax, activations.
+* **Ops:** broadcasting, elementwise arithmetic, matmul (rank 2 and batched
+  N-D), reductions, reshape, transpose (including last-2 transpose), select rows,
+  softmax/log-softmax, activations, scaled dot-product attention.
 * **Autodiff:** reverse-mode; each op records parents and a backward closure.
   `backward()` topologically sorts the graph and accumulates gradients;
   `zero_grad()` clears them. Non-scalar outputs need an explicit gradient.
-* **Training:** Dense/Sequential/Model, SGD (optional momentum) and Adam,
-  mini-batches, cross-entropy/MSE, finite-loss checks, deterministic seeding,
-  per-epoch losses/accuracies and a report with dataset provenance.
+* **Training:** Dense/Sequential/Model, LayerNorm, MultiHeadAttention,
+  TransformerBlock, SGD (optional momentum) and Adam, mini-batches,
+  cross-entropy/MSE, finite-loss checks, deterministic seeding, per-epoch
+  losses/accuracies and a report with dataset provenance. Positional encoding
+  (`positional_encoding`) and batched matmul enable sequence models.
 * **Evaluation:** accuracy, confusion matrix, per-class precision/recall/F1.
 * **Serialisation:** `.ज्ञान` v1 with a versioned header, parameter table, float32
   payload, metadata and SHA-256; `quantize_tensor`/`quantization_report` provide
@@ -23,8 +26,11 @@ Gradient checks: tests compare analytic gradients to central finite differences
 for matmul/softmax/MSE and a small MLP, with tolerances appropriate to Float32.
 That is numerical evidence, not a proof.
 
-Limits: one input/output per declared model, Dense layers only, small datasets,
-and no convolution/attention layers. Trainable tensors require the `गणना`
+Limits: one input/output per declared model, small datasets, and no
+convolution layers yet. Attention and transformer are now implemented (see
+`MultiHeadAttention`/`TransformerBlock` and the Sanskrit `एकाग्रता`/`रूपान्तरक`
+layers) but cross-attention and causal masking remain optional. Trainable
+tensors require the `गणना`
 capability. Accelerated operations below are separate from autodiff/training and
 do not provide GPU gradients or GPU model execution.
 

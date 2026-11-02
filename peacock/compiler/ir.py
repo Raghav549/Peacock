@@ -632,6 +632,24 @@ def build_ir(program: TypedProgram, source: str = "", source_path: str = "<sourc
                 layers.append(
                     {"type": "layernorm", "normalized_dim": layer.normalized_dim, "eps": layer.eps}
                 )
+            elif layer.kind == "Attention":
+                layers.append(
+                    {
+                        "type": "attention",
+                        "input_dim": layer.input_dim,
+                        "d_model": layer.d_model,
+                        "num_heads": layer.num_heads,
+                    }
+                )
+            elif layer.kind == "Transformer":
+                entry: dict = {
+                    "type": "transformer",
+                    "d_model": layer.d_model,
+                    "num_heads": layer.num_heads,
+                }
+                if layer.d_ff is not None:
+                    entry["d_ff"] = layer.d_ff
+                layers.append(entry)
             else:
                 layers.append({"type": "dense", "units": layer.units, "activation": layer.activation})
         models[name] = ModelSpec(

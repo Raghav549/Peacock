@@ -78,9 +78,18 @@ def disassemble(image: dict) -> str:
             parts = []
             for entry in spec["layers"]:
                 if isinstance(entry, dict):
-                    if entry.get("type") == "layernorm":
+                    t = entry.get("type")
+                    if t == "layernorm":
                         parts.append(
                             f"{surface('LayerNorm')}({entry.get('normalized_dim')})"
+                        )
+                    elif t == "attention":
+                        parts.append(
+                            f"{surface('Attention')}({entry.get('d_model')},{entry.get('num_heads')})"
+                        )
+                    elif t == "transformer":
+                        parts.append(
+                            f"{surface('Transformer')}({entry.get('d_model')},{entry.get('num_heads')})"
                         )
                     else:
                         parts.append(

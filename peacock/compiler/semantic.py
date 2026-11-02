@@ -125,6 +125,10 @@ class ResolvedLayer:
     activation: str | None = None
     normalized_dim: int | None = None
     eps: float | None = None
+    input_dim: int | None = None
+    d_model: int | None = None
+    num_heads: int | None = None
+    d_ff: int | None = None
 
 
 @dataclass
@@ -562,6 +566,45 @@ class SemanticAnalyzer:
                         )
                         ok = False
                     # LayerNorm preserves dimension, current stays same
+                elif layer.kind == "Attention":
+                    # input_dim defaults to current if not specified
+                    if layer.input_dim is None:
+                        layer.input_dim = current
+                    if layer.input_dim != current:
+                        self.diag.error(
+                            "PE3009",
+                            f"अवधान निवेशविस्तार {layer.input_dim} does not match previous layer output {current}",
+                            decl.span,
+                        )
+                        ok = False
+                    if layer.d_model is None or layer.num_heads is None:
+                        self.diag.error("PE3009", "अवधान requires प्रारूपविस्तार and शीर्षसंख्या", decl.span)
+                        ok = False
+                    elif layer.d_model % layer.num_heads != 0:
+                        self.diag.error(
+                            "PE3009",
+                            f"अवधान प्रारूपविस्तार {layer.d_model} must be divisible by शीर्षसंख्या {layer.num_heads}",
+                            decl.span,
+                        )
+                        ok = False
+                    else:
+                        current = layer.d_model
+                elif layer.kind == "Transformer":
+                    if layer.d_model != current:
+                        self.diag.error(
+                            "PE3009",
+                            f"परिवर्तक प्रारूपविस्तार {layer.d_model} does not match previous layer output {current}",
+                            decl.span,
+                        )
+                        ok = False
+                    if layer.d_model % layer.num_heads != 0:
+                        self.diag.error(
+                            "PE3009",
+                            f"परिवर्तक प्रारूपविस्तार {layer.d_model} must be divisible by शीर्षसंख्या {layer.num_heads}",
+                            decl.span,
+                        )
+                        ok = False
+                    # preserves dimension
                 else:
                     current = layer.units
             if current is not None and outputs[0].shape and outputs[0].shape[-1] != current:
@@ -666,12 +709,97 @@ class SemanticAnalyzer:
                 self.diag.error("PE3009", "सामान्यीकरण layer requires 'सामान्यमान'", layer.span)
                 return None
             return ResolvedLayer("LayerNorm", normalized_dim=normalized_dim, eps=eps_val)
+        elif layer.name == "Attention":
+            seen: set[str] = set()
+            input_dim = None
+            d_model = None
+            num_heads = None
+            for arg in layer.args:
+                if arg.name in seen:
+                    self.diag.error("PE3009", f"duplicate layer argument '{surface(arg.name)}'", arg.span)
+                    continue
+                seen.add(arg.name)
+                if arg.name == "input_dim":
+                    if not isinstance(arg.value, IntLit):
+                        self.diag.error("PE3009", "अवधान 'निवेशविस्तार' must be an integer literal", arg.span)
+                        continue
+                    input_dim = arg.value.value
+                    if input_dim <= 0:
+                        self.diag.error("PE3009", "अवधान 'निवेशविस्तार' must be positive", arg.span)
+                elif arg.name == "d_model":
+                    if not isinstance(arg.value, IntLit):
+                        self.diag.error("PE3009", "अवधान 'प्रारूपविस्तार' must be an integer literal", arg.span)
+                        continue
+                    d_model = arg.value.value
+                    if d_model <= 0:
+                        self.diag.error("PE3009", "अवधान 'प्रारूपविस्तार' must be positive", arg.span)
+                elif arg.name == "num_heads":
+                    if not isinstance(arg.value, IntLit):
+                        self.diag.error("PE3009", "अवधान 'शीर्षसंख्या' must be an integer literal", arg.span)
+                        continue
+                    num_heads = arg.value.value
+                    if num_heads <= 0:
+                        self.diag.error("PE3009", "अवधान 'शीर्षसंख्या' must be positive", arg.span)
+                else:
+                    self.diag.error(
+                        "PE3009",
+                        f"unknown अवधान argument '{surface(arg.name)}'",
+                        arg.span,
+                        hint="supported arguments: निवेशविस्तार, प्रारूपविस्तार, शीर्षसंख्या",
+                    )
+            if d_model is None or num_heads is None:
+                self.diag.error("PE3009", "अवधान layer requires 'प्रारूपविस्तार' and 'शीर्षसंख्या'", layer.span)
+                return None
+            # input_dim defaults to previous layer's output; validated later in _analyse_model, but set here if not provided
+            return ResolvedLayer("Attention", input_dim=input_dim, d_model=d_model, num_heads=num_heads)
+        elif layer.name == "Transformer":
+            seen: set[str] = set()
+            d_model = None
+            num_heads = None
+            d_ff = None
+            for arg in layer.args:
+                if arg.name in seen:
+                    self.diag.error("PE3009", f"duplicate layer argument '{surface(arg.name)}'", arg.span)
+                    continue
+                seen.add(arg.name)
+                if arg.name == "d_model":
+                    if not isinstance(arg.value, IntLit):
+                        self.diag.error("PE3009", "परिवर्तक 'प्रारूपविस्तार' must be an integer literal", arg.span)
+                        continue
+                    d_model = arg.value.value
+                    if d_model <= 0:
+                        self.diag.error("PE3009", "परिवर्तक 'प्रारूपविस्तार' must be positive", arg.span)
+                elif arg.name == "num_heads":
+                    if not isinstance(arg.value, IntLit):
+                        self.diag.error("PE3009", "परिवर्तक 'शीर्षसंख्या' must be an integer literal", arg.span)
+                        continue
+                    num_heads = arg.value.value
+                    if num_heads <= 0:
+                        self.diag.error("PE3009", "परिवर्तक 'शीर्षसंख्या' must be positive", arg.span)
+                elif arg.name == "d_ff":
+                    if not isinstance(arg.value, IntLit):
+                        self.diag.error("PE3009", "परिवर्तक 'अग्रविस्तार' must be an integer literal", arg.span)
+                        continue
+                    d_ff = arg.value.value
+                    if d_ff <= 0:
+                        self.diag.error("PE3009", "परिवर्तक 'अग्रविस्तार' must be positive", arg.span)
+                else:
+                    self.diag.error(
+                        "PE3009",
+                        f"unknown परिवर्तक argument '{surface(arg.name)}'",
+                        arg.span,
+                        hint="supported arguments: प्रारूपविस्तार, शीर्षसंख्या, अग्रविस्तार",
+                    )
+            if d_model is None or num_heads is None:
+                self.diag.error("PE3009", "परिवर्तक layer requires 'प्रारूपविस्तार' and 'शीर्षसंख्या'", layer.span)
+                return None
+            return ResolvedLayer("Transformer", d_model=d_model, num_heads=num_heads, d_ff=d_ff)
         else:
             self.diag.error(
                 "PE3009",
                 f"unknown layer '{surface(layer.name)}'",
                 layer.span,
-                hint="supported: सघन(एककानि: N, सक्रियण: ...), सामान्यीकरण(सामान्यमान: N, सहिष्णुता: eps)",
+                hint="supported: सघन(एककानि: N, ...), सामान्यीकरण(सामान्यमान: N, ...), अवधान(प्रारूपविस्तार: N, शीर्षसंख्या: H), परिवर्तक(प्रारूपविस्तार: N, शीर्षसंख्या: H)",
             )
             return None
 
