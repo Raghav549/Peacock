@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from .bytecode import BytecodeError, BytecodeResult, compile_bytecode, verify_image
@@ -17,6 +18,7 @@ from .lexer import lex
 from .optimizer import optimize
 from .parser import parse
 from .semantic import SemanticAnalyzer, TypedProgram
+from peacock.sanskrit import SOURCE_EXTENSION
 
 
 class InternalCompilerError(Exception):
@@ -72,6 +74,19 @@ def compile_source(
         result.stats["total_ms"] = (time.perf_counter() - start_total) * 1000.0
         return result
 
+    # Resolve user-file imports (उपयोग mylib;) before semantic analysis.
+    # This keeps the Python bootstrap authoritative but enables genuine
+    # multi-file PEACOCK programs and is the foundation for self-hosting
+    # the compiler. Builtin namespaces (fs/net/ui etc.) are preserved;
+    # file imports are merged flat (their top-level decls become available).
+    try:
+        _resolve_file_imports(module, path, result)
+    except Exception as exc:
+        raise InternalCompilerError(f"import resolution failed: {exc}") from exc
+    if result.diagnostics.has_errors:
+        result.stats["total_ms"] = (time.perf_counter() - start_total) * 1000.0
+        return result
+
     t0 = time.perf_counter()
     typed = SemanticAnalyzer(module, result.diagnostics).analyze()
     result.stats["semantic_ms"] = (time.perf_counter() - t0) * 1000.0
@@ -118,6 +133,139 @@ def compile_source(
     result.stats["functions"] = len(ir.functions)
     result.stats["total_ms"] = (time.perf_counter() - start_total) * 1000.0
     return result
+
+
+def _find_import_file(base_path: str, import_path: list[str]) -> Path | None:
+    """Locate a file for `use a.b;` as a/b.सूत्र relative to base_path.
+
+    Handles both internal (e.g. 'math') and surface (e.g. 'गणित') names
+    for Devanagari file names, and supports dotted paths.
+    """
+    if base_path == "<source>" or not base_path:
+        return None
+    from peacock.sanskrit import surface as sans_surface
+
+    base_dir = Path(base_path).parent
+    # Build both internal and surface variants for robustness
+    internal_rel = Path("/".join(import_path)).with_suffix(SOURCE_EXTENSION)
+    # Surface variant: map each internal component to its Sanskrit surface if possible
+    surface_parts = [sans_surface(p) for p in import_path]
+    surface_rel = Path("/".join(surface_parts)).with_suffix(SOURCE_EXTENSION)
+    candidates: list[Path | None] = [
+        base_dir / internal_rel,
+        base_dir / surface_rel,
+        base_dir / (import_path[0] + SOURCE_EXTENSION) if len(import_path) == 1 else None,
+        base_dir / (surface_parts[0] + SOURCE_EXTENSION) if len(import_path) == 1 else None,
+        base_dir / "peacock_modules" / internal_rel,
+        base_dir / "peacock_modules" / surface_rel,
+        base_dir.parent / internal_rel if base_dir != Path(".") else None,
+        base_dir.parent / surface_rel if base_dir != Path(".") else None,
+    ]
+    for cand in candidates:
+        if cand is None:
+            continue
+        if cand.is_file():
+            return cand
+    return None
+
+
+def _resolve_file_imports(module, base_path: str, result: CompileResult) -> None:
+    """Merge file-based `use` imports into `module` in-place.
+
+    Only `use` entries whose first component is not a known builtin namespace
+    are considered file imports. For each such import we locate the .सूत्र file,
+    lex/parse it, recursively resolve its own imports, and merge its top-level
+    declarations. The original `use` is removed so the semantic analyser does
+    not emit an 'unknown module' error. If the file cannot be found we keep
+    the use so the existing diagnostic is preserved. Circular imports are
+    detected via a visited set.
+    """
+    from . import builtins as B
+
+    visited: set[str] = set()
+
+    def _merge_import(imported_path: Path, parent_module) -> None:
+        key = str(imported_path.resolve())
+        if key in visited:
+            result.diagnostics.error(
+                "PE3001",
+                f"circular import of '{imported_path}'",
+                parent_module.span if hasattr(parent_module, "span") else None,
+            )
+            return
+        visited.add(key)
+        try:
+            src = imported_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            result.diagnostics.error("PE3006", f"cannot read import '{imported_path}': {exc}", parent_module.span if hasattr(parent_module, "span") else None)
+            return
+        toks, lex_diag = lex(src, str(imported_path))
+        result.diagnostics.extend(lex_diag)
+        if lex_diag.has_errors:
+            return
+        imported_mod, parse_diag = parse(toks, src, str(imported_path))
+        result.diagnostics.extend(parse_diag)
+        if parse_diag.has_errors:
+            return
+        # Recurse for nested imports first
+        _resolve_file_imports_inner(imported_mod, str(imported_path), result, visited)
+        # Merge declarations, checking for collisions
+        existing_funcs = {f.name for f in parent_module.functions}
+        existing_structs = {s.name for s in parent_module.structs}
+        existing_models = {m.name for m in parent_module.models}
+        existing_trainings = {t.name for t in parent_module.trainings}
+        for fn in imported_mod.functions:
+            if fn.name in existing_funcs:
+                result.diagnostics.error("PE3001", f"duplicate function '{fn.name}' from import '{imported_path}'", fn.name_span)
+                continue
+            parent_module.functions.append(fn)
+            existing_funcs.add(fn.name)
+        for st in imported_mod.structs:
+            if st.name in existing_structs:
+                result.diagnostics.error("PE3001", f"duplicate struct '{st.name}' from import '{imported_path}'", st.name_span)
+                continue
+            parent_module.structs.append(st)
+            existing_structs.add(st.name)
+        for m in imported_mod.models:
+            if m.name in existing_models:
+                result.diagnostics.error("PE3001", f"duplicate model '{m.name}' from import '{imported_path}'", m.name_span)
+                continue
+            parent_module.models.append(m)
+        for tr in imported_mod.trainings:
+            if tr.name in existing_trainings:
+                result.diagnostics.error("PE3001", f"duplicate training '{tr.name}' from import '{imported_path}'", tr.name_span)
+                continue
+            parent_module.trainings.append(tr)
+        # Merge builtin uses from imported module
+        for u in imported_mod.uses:
+            # Only propagate builtin uses; file uses are already resolved
+            if u.path and u.path[0] in B.NAMESPACES and u not in parent_module.uses:
+                parent_module.uses.append(u)
+
+    def _resolve_file_imports_inner(mod, mod_path: str, res: CompileResult, seen: set[str]) -> None:
+        # Work on a snapshot so we can mutate mod.uses
+        remaining = []
+        for use in list(mod.uses):
+            if not use.path:
+                remaining.append(use)
+                continue
+            first = use.path[0]
+            if first in B.NAMESPACES and len(use.path) == 1:
+                remaining.append(use)
+                continue
+            # Attempt file import
+            found = _find_import_file(mod_path, use.path)
+            if found is None:
+                # Keep for semantic error reporting (unknown module)
+                remaining.append(use)
+                continue
+            # File found: do not keep the use, instead merge
+            _merge_import(found, mod)
+            # Record successful file import for stats
+            res.stats["modules_loaded"] = res.stats.get("modules_loaded", 0) + 1
+        mod.uses = remaining
+
+    _resolve_file_imports_inner(module, base_path, result, visited)
 
 
 def parse_source(source: str, path: str = "<source>") -> tuple[Any, DiagnosticBag, list]:

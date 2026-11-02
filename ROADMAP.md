@@ -35,7 +35,10 @@ Acceptance criteria:
 * spans and caret diagnostics are correct on multiline input;
 * reserved keywords fail with targeted messages.
 
-Remaining for a future language version: user modules, generics, enums, pattern
+Delivered incrementally: basic file imports (`उपयोग <file>;` with dotted paths,
+same-directory and `peacock_modules/` search, recursive merge, circular detection,
+633-test gate; see `docs/language/modules.md` and `examples/modules/`). Remaining
+for a future version: qualified imports, `रूपेण` aliases, generics, enums, pattern
 matching, closures, traits, concurrency.
 
 ## Phase 2 — Compiler and bytecode — **done**

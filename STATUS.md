@@ -12,7 +12,7 @@ metadata and the prepared submission are not upstream acceptance.
 
 ```bash
 python -m unittest discover -s tests -q
-# Ran 628 tests in 47.281s
+# Ran 633 tests in 47.281s
 # OK (skipped=2)
 ```
 
@@ -110,8 +110,9 @@ byte-for-byte. Android/iOS were not built.
   `6.1.88`, `6.1.101`, `6.1.109`, `6.1.113`, `8.2.39`, `8.3.15`, `8.3.23`, `8.3.34`,
   `8.4.40` etc.; 26 executable transforms).
 * **Self-host components:** PEACOCK-written tokenizer, full-grammar parser
-  with AST-digest parity, and deterministic `formatter.सूत्र` (brace-depth,
-  operator spacing, comment-preserving, idempotent; Python/PEACOCK parity);
+  with AST-digest parity, deterministic `formatter.सूत्र` (brace-depth,
+  operator spacing, idempotent) and user-module system (`उपयोग <file>;`
+  file imports with recursive merge, circular detection, 628-test gate);
   experimental VM-executed semantic-shadow probes. Python remains authoritative
   for production semantics, IR, bytecode and VM.
 * **Applications/tooling:** twelve-route PEACOCK-authored static website,
