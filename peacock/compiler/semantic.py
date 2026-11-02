@@ -157,7 +157,7 @@ class TypedProgram:
 
 
 class SemanticAnalyzer:
-    def __init__(self, module, diag: DiagnosticBag | None = None):
+    def __init__(self, module, diag: DiagnosticBag | None = None, file_modules: dict[str, Any] | None = None):
         self.module = module
         self.diag = diag if diag is not None else DiagnosticBag()
         self.functions: dict[str, FunctionSymbol] = {}
@@ -165,6 +165,10 @@ class SemanticAnalyzer:
         self.models: dict[str, ModelSymbol] = {}
         self.trainings: dict[str, TrainingSymbol] = {}
         self.namespaces: set[str] = set()
+        self.file_modules: dict[str, Any] = file_modules or {}
+        # For qualified access: map from short import name -> its FunctionSymbol/StructSymbol dicts
+        self.file_module_funcs: dict[str, dict[str, FunctionSymbol]] = {}
+        self.file_module_structs: dict[str, dict[str, StructSymbol]] = {}
         self.scopes: list[dict[str, LocalSymbol]] = []
         self.current_function: FunctionSymbol | None = None
         self.next_slot = 0
@@ -250,6 +254,21 @@ class SemanticAnalyzer:
     def _check_uses(self) -> None:
         seen: set[str] = set()
         for use in self.module.uses:
+            # File imports (उपयोग सहायक;) are kept as valid namespaces for qualified calls.
+            # They may be dotted (pkg.गणित) where last component is the short name.
+            short_name = use.path[-1] if use.path else ""
+            if short_name in self.file_modules or (use.path and use.path[0] in self.file_modules):
+                key = use.path[0]
+                if key in seen:
+                    self.diag.error("PE3001", f"module '{surface(key)}' is imported more than once", use.span)
+                    continue
+                seen.add(key)
+                self.namespaces.add(key)
+                # Remember file module for qualified lookup (store by short name and full)
+                if short_name not in self.file_module_funcs:
+                    self.file_module_funcs[short_name] = {}
+                    self.file_module_structs[short_name] = {}
+                continue
             if len(use.path) != 1:
                 self.diag.error(
                     "PE3006",
@@ -260,7 +279,7 @@ class SemanticAnalyzer:
                 continue
             ns = use.path[0]
             if ns not in B.NAMESPACES:
-                suggestion = self._suggest(ns, B.NAMESPACES)
+                suggestion = self._suggest(ns, list(B.NAMESPACES.keys()) + list(self.file_modules.keys()))
                 self.diag.error(
                     "PE3006",
                     f"unknown module '{ns}'",
@@ -1256,6 +1275,8 @@ class SemanticAnalyzer:
             return "training", self.trainings[name.ident]
         if name.ident in B.NAMESPACES:
             return "namespace", name.ident
+        if name.ident in self.file_modules:
+            return "file_module", name.ident
         if name.ident in B.GLOBAL_NATIVES:
             return "native", B.GLOBAL_NATIVES[name.ident]
         return "unknown", None
@@ -1911,6 +1932,44 @@ class SemanticAnalyzer:
                     )
                 field.field_kind = "namespace_member"
                 return self._check_native_call(call, full_name, B.NATIVES[full_name])
+            if kind == "file_module":
+                mod_name = base.ident
+                imported_mod = self.file_modules.get(mod_name)
+                if imported_mod is None:
+                    for arg in call.args:
+                        self._check_expr(arg)
+                    return self._error("PE3002", f"unknown file module '{mod_name}'", base.span)
+                # Check for function in file module
+                for fn_decl in imported_mod.functions:
+                    if fn_decl.name == field.name:
+                        # Find the FunctionSymbol for this decl (merged flat, so it exists in self.functions)
+                        fn_sym = self.functions.get(fn_decl.name)
+                        if fn_sym is None:
+                            # Create a temporary symbol if not found (should not happen with flat merge)
+                            for arg in call.args:
+                                self._check_expr(arg)
+                            return self._error("PE3002", f"function '{field.name}' not found in module '{mod_name}'", field.name_span)
+                        field.field_kind = "file_module_member"
+                        return self._check_user_call(call, fn_sym)
+                # Check for struct constructor in file module
+                for st_decl in imported_mod.structs:
+                    if st_decl.name == field.name:
+                        struct_sym = self.structs.get(st_decl.name)
+                        if struct_sym is None:
+                            for arg in call.args:
+                                self._check_expr(arg)
+                            return self._error("PE3002", f"struct '{field.name}' not found in module '{mod_name}'", field.name_span)
+                        field.field_kind = "file_module_member"
+                        return self._check_struct_constructor(call, struct_sym)
+                # Not found in file module
+                for arg in call.args:
+                    self._check_expr(arg)
+                return self._error(
+                    "PE3006",
+                    f"module '{surface(mod_name)}' has no member '{field.name}'",
+                    field.name_span,
+                    hint=f"available in file module: {', '.join(fn.name for fn in imported_mod.functions)}",
+                )
             if kind == "model":
                 base.ty = T.ModelDeclType(base.ident)
                 return self._check_decl_method(call, symbol, B.MODEL_DECL_METHODS, "model")

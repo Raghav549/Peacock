@@ -41,12 +41,24 @@ examples/modules/
 # वर्ग ५ = 25
 ```
 
+## Qualified access
+
+Both forms work:
+
+```peacock
+उपयोग सहायक
+कार्य मुख्य() -> एकक {
+    वर्ग(५);           // unqualified (flat merge)
+    सहायक.वर्ग(५);     // qualified
+    सहायक.बिन्दु(१,२); // struct via module
+}
+```
+
 ## Limitations (0.4)
 
-* Flat merge only: `सहायक.वर्ग` qualified calls are not yet supported;
-  imported symbols are available unqualified.
+* Flat merge + qualified `module.func`/`module.Struct` now implemented.
 * No `रूपेण` aliases.
 * No package versioning; `peacock_modules/` is conventional, not enforced.
 
-This is an incremental foundation; future phases will add qualified imports,
-re-exports and a deterministic package manager.
+This is an incremental foundation; future phases will add re-exports,
+visibility control and a deterministic package manager.

@@ -88,7 +88,8 @@ def compile_source(
         return result
 
     t0 = time.perf_counter()
-    typed = SemanticAnalyzer(module, result.diagnostics).analyze()
+    file_mods = getattr(module, "file_modules", {})
+    typed = SemanticAnalyzer(module, result.diagnostics, file_modules=file_mods).analyze()
     result.stats["semantic_ms"] = (time.perf_counter() - t0) * 1000.0
     result.typed = typed
 
@@ -175,16 +176,19 @@ def _resolve_file_imports(module, base_path: str, result: CompileResult) -> None
     Only `use` entries whose first component is not a known builtin namespace
     are considered file imports. For each such import we locate the .सूत्र file,
     lex/parse it, recursively resolve its own imports, and merge its top-level
-    declarations. The original `use` is removed so the semantic analyser does
-    not emit an 'unknown module' error. If the file cannot be found we keep
-    the use so the existing diagnostic is preserved. Circular imports are
-    detected via a visited set.
+    declarations. File imports are kept as valid uses for qualified
+    `सहायक.वर्ग` calls, and also merged flat for unqualified calls.
+    If the file cannot be found we keep the use so the existing diagnostic is
+    preserved. Circular imports are detected via a visited set.
     """
     from . import builtins as B
 
     visited: set[str] = set()
+    # file_modules maps short import name (e.g. 'सहायक' internal) -> imported Module
+    if not hasattr(module, "file_modules"):
+        module.file_modules = {}
 
-    def _merge_import(imported_path: Path, parent_module) -> None:
+    def _merge_import(imported_path: Path, parent_module, import_name: str) -> None:
         key = str(imported_path.resolve())
         if key in visited:
             result.diagnostics.error(
@@ -209,7 +213,14 @@ def _resolve_file_imports(module, base_path: str, result: CompileResult) -> None
             return
         # Recurse for nested imports first
         _resolve_file_imports_inner(imported_mod, str(imported_path), result, visited)
-        # Merge declarations, checking for collisions
+        # Record for qualified access (by short name, e.g. last component of dotted import)
+        parent_module.file_modules[import_name] = imported_mod
+        # Also propagate its file_modules for transitive qualified? (e.g. a imports b, b imports c)
+        if hasattr(imported_mod, "file_modules"):
+            for k, v in imported_mod.file_modules.items():
+                if k not in parent_module.file_modules:
+                    parent_module.file_modules[k] = v
+        # Merge declarations flat for unqualified access, checking for collisions
         existing_funcs = {f.name for f in parent_module.functions}
         existing_structs = {s.name for s in parent_module.structs}
         existing_models = {m.name for m in parent_module.models}
@@ -238,11 +249,13 @@ def _resolve_file_imports(module, base_path: str, result: CompileResult) -> None
             parent_module.trainings.append(tr)
         # Merge builtin uses from imported module
         for u in imported_mod.uses:
-            # Only propagate builtin uses; file uses are already resolved
+            # Only propagate builtin uses; file uses are already resolved and kept as file_modules
             if u.path and u.path[0] in B.NAMESPACES and u not in parent_module.uses:
                 parent_module.uses.append(u)
 
     def _resolve_file_imports_inner(mod, mod_path: str, res: CompileResult, seen: set[str]) -> None:
+        if not hasattr(mod, "file_modules"):
+            mod.file_modules = {}
         # Work on a snapshot so we can mutate mod.uses
         remaining = []
         for use in list(mod.uses):
@@ -253,14 +266,16 @@ def _resolve_file_imports(module, base_path: str, result: CompileResult) -> None
             if first in B.NAMESPACES and len(use.path) == 1:
                 remaining.append(use)
                 continue
-            # Attempt file import
+            # Attempt file import (handle dotted path, last component is short name)
             found = _find_import_file(mod_path, use.path)
             if found is None:
                 # Keep for semantic error reporting (unknown module)
                 remaining.append(use)
                 continue
-            # File found: do not keep the use, instead merge
-            _merge_import(found, mod)
+            # File found: keep the use as file-module namespace for qualified calls
+            remaining.append(use)
+            short_name = use.path[-1]
+            _merge_import(found, mod, short_name)
             # Record successful file import for stats
             res.stats["modules_loaded"] = res.stats.get("modules_loaded", 0) + 1
         mod.uses = remaining
