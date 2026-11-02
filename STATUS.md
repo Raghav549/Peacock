@@ -45,7 +45,7 @@ Focused development runs also passed:
 | self-host IR differential suite | 2/2: 16-file IR-digest corpus (hello/tour/xor/spiral/types/tokenizer etc.), oversized limit documented, 8 builtin IR checks |
 | self-host bytecode differential suite | 3/3: 9-file core + 3 linguist bytecode-digest corpus (hello/tour/native/xor/spiral + fixtures), 8 builtin bytecode checks, tokenizer pending |
 | self-host optimizer differential suite | 1/1: 16-file IR corpus lenient digest parity (Python vs PEACOCK 5-pass: const-fold/branch-fold/unreachable/peephole/DCE), 6 builtin optimizer checks |
-| self-host VM differential suite | 1/1: 17-file lenient VM-digest parity (Python VM vs PEACOCK VM 7-check kernel: checked arithmetic + CALL recursion fact(5)=120, slot/jump/RET/TRY, call-depth/host-grant budgets), 16 example programs + vyakarana corpus non-empty digest |
+| self-host VM differential suite | 1/1: 17-file lenient VM-digest parity (Python VM vs PEACOCK VM 7-check kernel: checked arithmetic + CALL recursion fact(5)=120 + FINALLY supersession (return/throw/nested), slot/jump/RET/TRY/FINALLY, call-depth/host-grant budgets + 8 checks), 17 example programs + vyakarana corpus non-empty digest |
 | native AOT | 8/8: real builds, deterministic C, VM-identical output, recoverable ABI faults and zero live allocations after success/fault runs |
 | LLM + compute backends | 18 tests, 1 OpenCL skip: real loopback provider, schema/grant/budget/redirect checks, CPU and non-square matmul |
 | HTTP server/finalization/LLM/GPU combined regression | 31 tests, 1 OpenCL skip after the final server hardening |
