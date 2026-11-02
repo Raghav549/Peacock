@@ -115,7 +115,7 @@ byte-for-byte. Android/iOS were not built.
   with AST-digest parity, deterministic `formatter.सूत्र` (brace-depth,
   operator spacing, idempotent) and user-module system (`उपयोग <file>;`
   file imports with recursive merge, qualified `module.func`, `रूपेण` aliases for file and builtin namespaces, circular detection, 233 compiler tests);
-  experimental VM-executed semantic-shadow probes, `selfhost/ir.सूत्र` PIR builder (765 lines, 8 builtin checks, IR-digest parity on 16-file corpus including xor/spiral) and `selfhost/bytecode.सूत्र` bytecode emitter (628 lines, 8 checks, 9-file core + 3 linguist parity — `parser.सूत्र`/`type_model.सूत्र` exceed 256-slot VM limit). Python remains authoritative
+  experimental VM-executed semantic-shadow probes, `selfhost/ir.सूत्र` PIR builder (765 lines, 8 checks, 16-file parity) and `selfhost/bytecode.सूत्र` bytecode emitter (628 lines, 8 checks, 9-file core + 3 linguist parity) and `selfhost/optimizer.सूत्र` optimiser (467 lines, 6 checks, constant/branch/peephole — `parser.सूत्र`/`type_model.सूत्र` exceed 256-slot VM limit). Python remains authoritative
   for production semantics, IR, bytecode and VM.
 * **Applications/tooling:** twelve-route PEACOCK-authored static website,
   examples, CLI compiler/VM/native/grammar/audit/bench/fuzz/test commands,

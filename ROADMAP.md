@@ -225,7 +225,7 @@ Stages:
    expressions, scope/name/assignment/call/return/condition/iterable rules are
    probed; diagnostics, fields/methods, native overloads and model/training
    analysis are not ported; Python remains authoritative;
-4. IR/optimiser/bytecode emitter — **partial**: PIR builder/verifier (`ir.सूत्र` 765L, 16-file parity) + bytecode emitter/verifier (`bytecode.सूत्र` 628L, 9-file core + 3 linguist parity, 8 checks; tokenizer string-escape pending; parser/type_model exceed 256-slot limit); optimiser still planned;
+4. IR/optimiser/bytecode emitter — **partial**: PIR builder/verifier (`ir.सूत्र` 765L, 16-file parity) + bytecode emitter/verifier (`bytecode.सूत्र` 628L, 9-file core + 3 linguist parity, 8 checks) + optimiser (`optimizer.सूत्र` 467L, 6 checks, constant/branch/peephole; full DCE/reachability pending);
 5. VM in PEACOCK with a minimal host ABI — planned;
 6. fixed point: the PEACOCK compiler compiles itself, and the resulting image
    passes the full suite.
