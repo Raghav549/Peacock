@@ -12,7 +12,7 @@ metadata and the prepared submission are not upstream acceptance.
 
 ```bash
 python -m unittest discover -s tests -q
-# Ran 638 tests in 53.283s
+# Ran 641 tests in 56.719s
 # OK (skipped=2)
 ```
 
@@ -43,6 +43,7 @@ Focused development runs also passed:
 | `tests/integration/test_finally.py` | 8/8: normal/catch/throw, return, break/continue, nested cleanup, supersession, optimizer parity and disassembly |
 | self-host parser differential suite | 2/2: 15-file AST-digest corpus, finalization fixture, tokenizer/parser self-parse |
 | self-host IR differential suite | 2/2: 16-file IR-digest corpus (hello/tour/xor/spiral/types/tokenizer etc.), oversized limit documented, 8 builtin IR checks |
+| self-host bytecode differential suite | 3/3: 9-file core + 3 linguist bytecode-digest corpus (hello/tour/native/xor/spiral + fixtures), 8 builtin bytecode checks, tokenizer pending |
 | native AOT | 8/8: real builds, deterministic C, VM-identical output, recoverable ABI faults and zero live allocations after success/fault runs |
 | LLM + compute backends | 18 tests, 1 OpenCL skip: real loopback provider, schema/grant/budget/redirect checks, CPU and non-square matmul |
 | HTTP server/finalization/LLM/GPU combined regression | 31 tests, 1 OpenCL skip after the final server hardening |
@@ -114,7 +115,7 @@ byte-for-byte. Android/iOS were not built.
   with AST-digest parity, deterministic `formatter.सूत्र` (brace-depth,
   operator spacing, idempotent) and user-module system (`उपयोग <file>;`
   file imports with recursive merge, qualified `module.func`, `रूपेण` aliases for file and builtin namespaces, circular detection, 233 compiler tests);
-  experimental VM-executed semantic-shadow probes and `selfhost/ir.सूत्र` PIR builder (765 lines, 8 builtin checks, IR-digest parity on 16-file corpus including xor/spiral — `parser.सूत्र`/`type_model.सूत्र` exceed 256-slot VM limit). Python remains authoritative
+  experimental VM-executed semantic-shadow probes, `selfhost/ir.सूत्र` PIR builder (765 lines, 8 builtin checks, IR-digest parity on 16-file corpus including xor/spiral) and `selfhost/bytecode.सूत्र` bytecode emitter (628 lines, 8 checks, 9-file core + 3 linguist parity — `parser.सूत्र`/`type_model.सूत्र` exceed 256-slot VM limit). Python remains authoritative
   for production semantics, IR, bytecode and VM.
 * **Applications/tooling:** twelve-route PEACOCK-authored static website,
   examples, CLI compiler/VM/native/grammar/audit/bench/fuzz/test commands,
