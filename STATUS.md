@@ -1,9 +1,11 @@
 # PEACOCK Status
 
-Last verified: **2026-11-02** on `arena/00db4706-peacock` (working tree;
+Last verified: **2026-11-02** on `arena/c0fe52eb-peacock` (working tree;
 not a released/tagged upstream version). Re-run the commands before relying on
 any number. Canonical source extension: `.सूत्र`. The compiler is **not
-self-hosting**. GitHub does **not** yet recognise PEACOCK; local Linguist
+self-hosting** (bootstrap is pipeline-digest parity via `peacock.tools.bootstrap`;
+`pipeline.सूत्र` now wires all 7 selfhost kernels with chunked literals and
+hash/len parity). GitHub does **not** yet recognise PEACOCK; local Linguist
 metadata and the prepared submission are not upstream acceptance.
 
 ## 1. Current verification
@@ -46,7 +48,7 @@ Focused development runs also passed:
 | self-host bytecode differential suite | 3/3: 9-file core + 3 linguist bytecode-digest corpus (hello/tour/native/xor/spiral + fixtures), 8 builtin bytecode checks, tokenizer pending |
 | self-host optimizer differential suite | 1/1: 16-file IR corpus lenient digest parity (Python vs PEACOCK 5-pass: const-fold/branch-fold/unreachable/peephole/DCE), 6 builtin optimizer checks |
 | self-host VM differential suite | 1/1: 17-file lenient VM-digest parity (Python VM vs PEACOCK VM 7-check kernel: checked arithmetic + CALL recursion fact(5)=120 + FINALLY supersession + STRUCT/LIST ops (MAKE_LIST/LEN/INDEX/STRUCT_NEW/FIELD), slot/jump/RET/TRY/FINALLY, call-depth/host-grant budgets + 9 checks + native/pipeline stubs), 10 selfhost kernels, 17 example programs |
-| bootstrap fixed-point | 3/3: Python fixed-point (10 selfhost programs → .बीज deterministic, 53k instr, artifact round-trip SHA-256), PEACOCK pipeline lenient digest (via VM), `peacock.tools.bootstrap --write` emits `build/bootstrap/*.बीज` |
+| bootstrap fixed-point | 3/3: Python fixed-point (10 selfhost programs → `.बीज` deterministic, 54,940 instr, artifact round-trip SHA-256), PEACOCK pipeline **strict** digest (via VM, **chunked literals** `CHUNK_SIZE=500` + **hash/len parity** `sha256[:16]+len`), `peacock.tools.bootstrap --write` emits `build/bootstrap/*.बीज` (`pipeline.सूत्र` now 4,460 instr/18 fns, 12 checks via wired `lex/parse/type/ir/bytecode/opt/vm` kernels) |
 | native AOT | 8/8: real builds, deterministic C, VM-identical output, recoverable ABI faults and zero live allocations after success/fault runs |
 | LLM + compute backends | 18 tests, 1 OpenCL skip: real loopback provider, schema/grant/budget/redirect checks, CPU and non-square matmul |
 | HTTP server/finalization/LLM/GPU combined regression | 31 tests, 1 OpenCL skip after the final server hardening |
@@ -81,7 +83,8 @@ byte-for-byte. Android/iOS were not built.
 * **Sanskrit language/core:** hand-written Unicode lexer, recursive-descent
   parser and recovery diagnostics; NFC identifiers and Devanagari digits;
   static types/scopes/returns; capability checking; typed PIR, verification and
-  optimisation; verified `.बीज` artifacts and disassembly.
+  optimisation; verified `.बीज` artifacts and disassembly; `अक्षरमाला.विपर्यय()`
+  (string reverse, `examples/viparyaya.सूत्र` smoke-test) and `सूची.विपर्यय()`.
 * **Runtime:** checked 64-bit arithmetic, lists/strings/structs/ranges, catchable
   faults, uncatchable panic/resource exits, nested `यत्न`/`गृह्ण`/`अन्ते`
   unwinding and cleanup supersession. `अन्ते` is included in the self-hosted
