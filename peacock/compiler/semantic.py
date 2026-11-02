@@ -121,8 +121,10 @@ class StructSymbol:
 @dataclass
 class ResolvedLayer:
     kind: str
-    units: int
-    activation: str
+    units: int | None = None
+    activation: str | None = None
+    normalized_dim: int | None = None
+    eps: float | None = None
 
 
 @dataclass
@@ -549,7 +551,19 @@ class SemanticAnalyzer:
         if ok and inputs and outputs and layers:
             current = inputs[0].shape[-1] if inputs[0].shape else None
             for layer in layers:
-                current = layer.units
+                if layer.kind == "Dense":
+                    current = layer.units
+                elif layer.kind == "LayerNorm":
+                    if layer.normalized_dim != current:
+                        self.diag.error(
+                            "PE3009",
+                            f"सामान्यीकरण सामान्यमान {layer.normalized_dim} does not match previous layer output {current}",
+                            decl.span,
+                        )
+                        ok = False
+                    # LayerNorm preserves dimension, current stays same
+                else:
+                    current = layer.units
             if current is not None and outputs[0].shape and outputs[0].shape[-1] != current:
                 self.diag.error(
                     "PE3009",
@@ -564,62 +578,102 @@ class SemanticAnalyzer:
         return ModelSymbol(decl.name, decl, inputs[0], outputs[0], layers)
 
     def _analyse_layer(self, layer: LayerDecl) -> ResolvedLayer | None:
-        if layer.name != "Dense":
+        if layer.name == "Dense":
+            seen: set[str] = set()
+            units: int | None = None
+            activation = "linear"
+            for arg in layer.args:
+                if arg.name in seen:
+                    self.diag.error("PE3009", f"duplicate layer argument '{surface(arg.name)}'", arg.span)
+                    continue
+                seen.add(arg.name)
+                if arg.name == "units":
+                    if not isinstance(arg.value, IntLit):
+                        self.diag.error(
+                            "PE3009", "सघन 'एककानि' must be an integer literal in 0.3", arg.span
+                        )
+                        continue
+                    units = arg.value.value
+                    if units <= 0:
+                        self.diag.error("PE3009", "सघन 'एककानि' must be positive", arg.span)
+                elif arg.name == "activation":
+                    if arg.symbol is not None:
+                        activation = arg.symbol
+                    elif isinstance(arg.value, StringLit):
+                        activation = arg.value.value
+                    else:
+                        self.diag.error(
+                            "PE3009",
+                            "सघन 'सक्रियण' must be a bare name or string literal",
+                            arg.span,
+                            hint="सक्रियण: धनाङ्क",
+                        )
+                    activation = internalise_enum(activation)
+                    if activation not in _ACTIVATIONS:
+                        self.diag.error(
+                            "PE3009",
+                            f"unknown activation '{surface_enum(activation)}'",
+                            arg.span,
+                            hint=f"supported: {', '.join(sorted(surface_enum(v) for v in _ACTIVATIONS))}",
+                        )
+                else:
+                    self.diag.error(
+                        "PE3009",
+                        f"unknown सघन argument '{surface(arg.name)}'",
+                        arg.span,
+                        hint="supported arguments: एककानि, सक्रियण",
+                    )
+            if units is None:
+                self.diag.error("PE3009", "सघन layer requires 'एककानि'", layer.span)
+                return None
+            return ResolvedLayer("Dense", units=units, activation=activation)
+        elif layer.name == "LayerNorm":
+            seen: set[str] = set()
+            normalized_dim: int | None = None
+            eps: float | None = None
+            eps_val: float = 1e-5
+            for arg in layer.args:
+                if arg.name in seen:
+                    self.diag.error("PE3009", f"duplicate layer argument '{surface(arg.name)}'", arg.span)
+                    continue
+                seen.add(arg.name)
+                if arg.name == "normalized_dim":
+                    if not isinstance(arg.value, IntLit):
+                        self.diag.error("PE3009", "सामान्यीकरण 'सामान्यमान' must be an integer literal", arg.span)
+                        continue
+                    normalized_dim = arg.value.value
+                    if normalized_dim <= 0:
+                        self.diag.error("PE3009", "सामान्यीकरण 'सामान्यमान' must be positive", arg.span)
+                elif arg.name == "eps":
+                    # सहिष्णुता - can be float or int literal
+                    if isinstance(arg.value, FloatLit):
+                        eps_val = float(arg.value.value)
+                    elif isinstance(arg.value, IntLit):
+                        eps_val = float(arg.value.value)
+                    else:
+                        self.diag.error("PE3009", "सामान्यीकरण 'सहिष्णुता' must be a numeric literal", arg.span)
+                        continue
+                    if eps_val <= 0:
+                        self.diag.error("PE3009", "सामान्यीकरण 'सहिष्णुता' must be positive", arg.span)
+                else:
+                    self.diag.error(
+                        "PE3009",
+                        f"unknown सामान्यीकरण argument '{surface(arg.name)}'",
+                        arg.span,
+                        hint="supported arguments: सामान्यमान, सहिष्णुता",
+                    )
+            if normalized_dim is None:
+                self.diag.error("PE3009", "सामान्यीकरण layer requires 'सामान्यमान'", layer.span)
+                return None
+            return ResolvedLayer("LayerNorm", normalized_dim=normalized_dim, eps=eps_val)
+        else:
             self.diag.error(
                 "PE3009",
                 f"unknown layer '{surface(layer.name)}'",
                 layer.span,
-                hint="0.3 supports only सघन(एककानि: N, सक्रियण: धनाङ्क|वक्रसीमा|अतिस्पर्शज्या|कोमलाधिकतम|रैखिक)",
+                hint="supported: सघन(एककानि: N, सक्रियण: ...), सामान्यीकरण(सामान्यमान: N, सहिष्णुता: eps)",
             )
             return None
-        seen: set[str] = set()
-        units: int | None = None
-        activation = "linear"
-        for arg in layer.args:
-            if arg.name in seen:
-                self.diag.error("PE3009", f"duplicate layer argument '{surface(arg.name)}'", arg.span)
-                continue
-            seen.add(arg.name)
-            if arg.name == "units":
-                if not isinstance(arg.value, IntLit):
-                    self.diag.error(
-                        "PE3009", "सघन 'एककानि' must be an integer literal in 0.3", arg.span
-                    )
-                    continue
-                units = arg.value.value
-                if units <= 0:
-                    self.diag.error("PE3009", "सघन 'एककानि' must be positive", arg.span)
-            elif arg.name == "activation":
-                if arg.symbol is not None:
-                    activation = arg.symbol
-                elif isinstance(arg.value, StringLit):
-                    activation = arg.value.value
-                else:
-                    self.diag.error(
-                        "PE3009",
-                        "सघन 'सक्रियण' must be a bare name or string literal",
-                        arg.span,
-                        hint="सक्रियण: धनाङ्क",
-                    )
-                activation = internalise_enum(activation)
-                if activation not in _ACTIVATIONS:
-                    self.diag.error(
-                        "PE3009",
-                        f"unknown activation '{surface_enum(activation)}'",
-                        arg.span,
-                        hint=f"supported: {', '.join(sorted(surface_enum(v) for v in _ACTIVATIONS))}",
-                    )
-            else:
-                self.diag.error(
-                    "PE3009",
-                    f"unknown सघन argument '{surface(arg.name)}'",
-                    arg.span,
-                    hint="supported arguments: एककानि, सक्रियण",
-                )
-        if units is None:
-            self.diag.error("PE3009", "सघन layer requires 'एककानि'", layer.span)
-            return None
-        return ResolvedLayer("Dense", units, activation)
 
     def _declare_trainings(self) -> None:
         for decl in self.module.trainings:

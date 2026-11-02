@@ -90,7 +90,7 @@ class ModelSpec:
     input_shape: tuple[int, ...]
     output_dtype: str
     output_shape: tuple[int, ...]
-    layers: list[tuple[int, str]]  # (units, activation)
+    layers: list[dict]  # {type: dense/layernorm, ...}
 
 
 @dataclass
@@ -624,13 +624,23 @@ def build_ir(program: TypedProgram, source: str = "", source_path: str = "<sourc
         input_t = model.input_type
         output_t = model.output_type
         assert input_t.shape is not None and output_t.shape is not None
+        layers = []
+        for layer in model.layers:
+            if layer.kind == "Dense":
+                layers.append({"type": "dense", "units": layer.units, "activation": layer.activation})
+            elif layer.kind == "LayerNorm":
+                layers.append(
+                    {"type": "layernorm", "normalized_dim": layer.normalized_dim, "eps": layer.eps}
+                )
+            else:
+                layers.append({"type": "dense", "units": layer.units, "activation": layer.activation})
         models[name] = ModelSpec(
             name,
             input_t.dtype,
             input_t.shape,
             output_t.dtype,
             output_t.shape,
-            [(layer.units, layer.activation) for layer in model.layers],
+            layers,
         )
     trainings = {name: dict(sym.config) for name, sym in program.trainings.items()}
     return IRModule(

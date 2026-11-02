@@ -75,10 +75,21 @@ def disassemble(image: dict) -> str:
     if models:
         lines.append("models:")
         for name, spec in sorted(models.items()):
-            layers = " -> ".join(
-                f"{surface('Dense')}({units},{surface_enum(activation)})"
-                for units, activation in spec["layers"]
-            )
+            parts = []
+            for entry in spec["layers"]:
+                if isinstance(entry, dict):
+                    if entry.get("type") == "layernorm":
+                        parts.append(
+                            f"{surface('LayerNorm')}({entry.get('normalized_dim')})"
+                        )
+                    else:
+                        parts.append(
+                            f"{surface('Dense')}({entry.get('units')},{surface_enum(entry.get('activation', 'linear'))})"
+                        )
+                else:
+                    units, activation = entry
+                    parts.append(f"{surface('Dense')}({units},{surface_enum(activation)})")
+            layers = " -> ".join(parts)
             lines.append(
                 f"  {surface(name)}: [{surface_type(spec['input_dtype'])}{spec['input_shape']}] -> "
                 f"[{surface_type(spec['output_dtype'])}{spec['output_shape']}] {layers}"

@@ -14,9 +14,16 @@ metadata and the prepared submission are not upstream acceptance.
 
 ```bash
 python -m unittest discover -s tests -q
-# Ran 644 tests in ~57s
+# Ran 650 tests in ~57s (644 prior + 6 LayerNorm)
 # OK (skipped=2)
 ```
+
+New in 2026-11-02: **LayerNorm (सामान्यीकरण)** — transformer foundation.
+`peacock/intelligence/tensor.py:layer_norm` and `peacock/intelligence/layers.py:LayerNorm`
+implement per-last-dim normalization with learnable γ/β, correct backward (verified by
+finite differences), and `Sequential`/`build_model` support for `Dense→LayerNorm→Dense`.
+The PEACOCK DSL now accepts `सामान्यीकरण(सामान्यमान: N, सहिष्णुता: eps)` and trains on
+XOR to 1.0 accuracy; see `tests/ai/test_layernorm.py` and `examples/layernorm_demo.सूत्र`.
 
 The two skips are explicit environment gates: the real OpenCL device parity
 test and the real X11 open/draw/close test. CPU fallbacks, source-only mobile

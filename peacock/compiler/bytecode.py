@@ -83,7 +83,7 @@ class BytecodeCompiler:
                 "input_shape": list(spec.input_shape),
                 "output_dtype": spec.output_dtype,
                 "output_shape": list(spec.output_shape),
-                "layers": [[units, activation] for units, activation in spec.layers],
+                "layers": spec.layers,
             }
             for name, spec in self.module.models.items()
         }

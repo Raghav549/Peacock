@@ -746,6 +746,79 @@ def log_softmax(t: Tensor, axis: int = -1) -> Tensor:
     return Tensor._wrap(out, t.shape, _float_result_dtype(t), requires, (t,), backward, "log_softmax")
 
 
+def layer_norm(x: Tensor, gamma: Tensor, beta: Tensor, eps: float = 1e-5) -> Tensor:
+    """Layer normalization over the last dimension: y = gamma * (x - mean)/sqrt(var+eps) + beta.
+
+    x is (..., D), gamma/beta are (D,). Normalized per last-axis group.
+    """
+    x = ensure_tensor(x)
+    gamma = ensure_tensor(gamma)
+    beta = ensure_tensor(beta)
+    if x.rank < 1:
+        raise TensorError("layer_norm requires rank >= 1")
+    n = x.shape[-1]
+    if gamma.shape != (n,) or beta.shape != (n,):
+        raise TensorError(f"layer_norm gamma/beta must be ({n},) for input last dim {n}, got {gamma.shape} and {beta.shape}")
+    # Use last-axis grouping: outer = prod(shape[:-1]), inner=1
+    axis, outer, inner, n2 = _axis_groups(x.shape, -1)
+    assert n2 == n and inner == 1
+    out = [0.0] * x.size
+    # Cache for backward: means, inv_stds, x_hats per group
+    means: list[float] = [0.0] * outer
+    inv_stds: list[float] = [0.0] * outer
+    x_hats: list[float] = [0.0] * x.size
+    for o in range(outer):
+        base = o * n
+        vals = x.data[base: base + n]
+        m = sum(vals) / n
+        means[o] = m
+        var = sum((v - m) ** 2 for v in vals) / n
+        inv_std = 1.0 / math.sqrt(var + eps)
+        inv_stds[o] = inv_std
+        for k in range(n):
+            x_hat = (vals[k] - m) * inv_std
+            x_hats[base + k] = x_hat
+            out[base + k] = gamma.data[k] * x_hat + beta.data[k]
+    requires = x.requires_grad or gamma.requires_grad or beta.requires_grad
+    backward = None
+    if requires:
+        def backward(g: Tensor):
+            gd = g.data
+            if x.requires_grad:
+                gx = [0.0] * x.size
+                for o in range(outer):
+                    base = o * n
+                    inv_std = inv_stds[o]
+                    # sum(g * gamma) and sum(g * gamma * x_hat)
+                    sum_g_gamma = 0.0
+                    sum_g_gamma_xhat = 0.0
+                    for k in range(n):
+                        gv = gd[base + k]
+                        sum_g_gamma += gv * gamma.data[k]
+                        sum_g_gamma_xhat += gv * gamma.data[k] * x_hats[base + k]
+                    for k in range(n):
+                        gv = gd[base + k]
+                        # Standard layer_norm backward for x
+                        gx[base + k] += (1.0 / n) * inv_std * (n * gv * gamma.data[k] - sum_g_gamma - x_hats[base + k] * sum_g_gamma_xhat)
+                _accumulate(x, Tensor._wrap(gx, x.shape, x.dtype))
+            if gamma.requires_grad:
+                gg = [0.0] * n
+                for o in range(outer):
+                    base = o * n
+                    for k in range(n):
+                        gg[k] += gd[base + k] * x_hats[base + k]
+                _accumulate(gamma, Tensor._wrap(gg, gamma.shape, gamma.dtype))
+            if beta.requires_grad:
+                gb = [0.0] * n
+                for o in range(outer):
+                    base = o * n
+                    for k in range(n):
+                        gb[k] += gd[base + k]
+                _accumulate(beta, Tensor._wrap(gb, beta.shape, beta.dtype))
+
+    return Tensor._wrap(out, x.shape, _float_result_dtype(x), requires, (x, gamma, beta), backward, "layer_norm")
+
+
 # ---------------------------------------------------------------------------
 # Reductions
 # ---------------------------------------------------------------------------

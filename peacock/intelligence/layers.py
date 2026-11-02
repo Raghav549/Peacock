@@ -122,21 +122,78 @@ class Dense(Module):
         return f"Dense({self.input_dim}->{self.units}, {self.activation})"
 
 
+class LayerNorm(Module):
+    """Layer normalization over the last dimension with learnable scale and shift."""
+
+    def __init__(
+        self,
+        normalized_dim: int,
+        eps: float = 1e-5,
+        dtype: str = "Float32",
+    ):
+        if not isinstance(normalized_dim, int) or normalized_dim <= 0:
+            raise TensorError("LayerNorm normalized_dim must be a positive integer")
+        if dtype not in ("Float32", "Float64"):
+            raise TensorError("LayerNorm parameters must use a floating dtype")
+        self.normalized_dim = normalized_dim
+        self.eps = float(eps)
+        self.dtype = dtype
+        self.gamma = Tensor.ones((normalized_dim,), dtype, requires_grad=True)
+        self.beta = Tensor.zeros((normalized_dim,), dtype, requires_grad=True)
+
+    def forward(self, x: Tensor) -> Tensor:
+        from .tensor import layer_norm as _layer_norm
+
+        if not isinstance(x, Tensor):
+            raise TensorError("LayerNorm expects a Tensor input")
+        if x.shape[-1] != self.normalized_dim:
+            raise TensorError(
+                f"LayerNorm expects last dim {self.normalized_dim}, got {x.shape[-1]} in shape {list(x.shape)}"
+            )
+        return _layer_norm(x, self.gamma, self.beta, self.eps)
+
+    def parameters(self) -> list[Tensor]:
+        return [self.gamma, self.beta]
+
+    def named_parameters(self, prefix: str = "") -> list[tuple[str, Tensor]]:
+        p = f"{prefix}." if prefix else ""
+        return [(f"{p}gamma", self.gamma), (f"{p}beta", self.beta)]
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"LayerNorm({self.normalized_dim}, eps={self.eps})"
+
+
 class Sequential(Module):
-    def __init__(self, layers: Sequence[Dense], input_dim: int | None = None):
+    def __init__(self, layers: Sequence[Module], input_dim: int | None = None):
         if not layers:
             raise TensorError("Sequential requires at least one layer")
         self.layers = list(layers)
+
+        def _out_dim(m: Module) -> int:
+            if isinstance(m, Dense):
+                return m.units
+            if isinstance(m, LayerNorm):
+                return m.normalized_dim
+            raise TensorError(f"unknown layer type {type(m).__name__}")
+
+        def _in_dim(m: Module) -> int:
+            if isinstance(m, Dense):
+                return m.input_dim
+            if isinstance(m, LayerNorm):
+                return m.normalized_dim
+            raise TensorError(f"unknown layer type {type(m).__name__}")
+
         for i in range(1, len(self.layers)):
             prev, cur = self.layers[i - 1], self.layers[i]
-            if cur.input_dim != prev.units:
+            if _in_dim(cur) != _out_dim(prev):
                 raise TensorError(
-                    f"layer {i} expects {cur.input_dim} inputs but layer {i - 1} produces {prev.units}"
+                    f"layer {i} expects {_in_dim(cur)} inputs but layer {i - 1} produces {_out_dim(prev)}"
                 )
-        self.input_dim = input_dim if input_dim is not None else self.layers[0].input_dim
-        if self.input_dim != self.layers[0].input_dim:
+        first_in = _in_dim(self.layers[0])
+        self.input_dim = input_dim if input_dim is not None else first_in
+        if self.input_dim != first_in:
             raise TensorError("Sequential input_dim does not match its first layer")
-        self.output_dim = self.layers[-1].units
+        self.output_dim = _out_dim(self.layers[-1])
 
     def forward(self, x: Tensor) -> Tensor:
         for layer in self.layers:
@@ -228,13 +285,18 @@ class Model:
 
     # -- serialisation -----------------------------------------------------
     def architecture(self) -> dict:
+        layers = []
+        for layer in self.network.layers:
+            if isinstance(layer, Dense):
+                layers.append({"type": "dense", "units": layer.units, "activation": layer.activation})
+            elif isinstance(layer, LayerNorm):
+                layers.append({"type": "layernorm", "normalized_dim": layer.normalized_dim, "eps": layer.eps})
+            else:
+                raise TensorError(f"unknown layer type {type(layer).__name__}")
         return {
             "input_shape": list(self.input_shape),
             "output_shape": list(self.output_shape),
-            "layers": [
-                {"units": layer.units, "activation": layer.activation}
-                for layer in self.network.layers
-            ],
+            "layers": layers,
             "input_dim": self.network.input_dim,
         }
 
@@ -251,35 +313,49 @@ def build_model(
 ) -> Model:
     """Build a model from a language declaration.
 
-    ``layers`` items may be ``(units, activation)`` tuples or dicts with keys
-    ``units`` and ``activation``.
+    ``layers`` items may be ``(units, activation)`` tuples, dicts with
+    ``type``/``units``/``activation`` for dense, or ``type: layernorm``
+    with ``normalized_dim``/``eps`` for LayerNorm.
     """
     input_shape = tuple(int(d) for d in input_shape)
     output_shape = tuple(int(d) for d in output_shape)
     if not input_shape or not output_shape:
         raise TensorError("model shapes must have rank >= 1")
-    specs = []
+    rng = RNG(seed)
+    built: list[Module] = []
+    current = input_shape[-1]
     for item in layers:
         if isinstance(item, dict):
-            specs.append((int(item["units"]), str(item.get("activation", "linear"))))
+            t = str(item.get("type", "dense"))
+            if t == "layernorm":
+                nd = int(item.get("normalized_dim", item.get("units", current)))
+                eps = float(item.get("eps", 1e-5))
+                if nd != current:
+                    raise TensorError(f"LayerNorm expects {current} features, got {nd}")
+                built.append(LayerNorm(nd, eps=eps, dtype=dtype))
+            else:  # dense
+                units = int(item["units"])
+                activation = str(item.get("activation", "linear"))
+                if units <= 0:
+                    raise TensorError("Dense units must be positive")
+                built.append(Dense(current, units, activation, rng=rng, dtype=dtype))
+                current = units
         else:
+            # legacy tuple (units, activation) -> dense
             units, activation = item
-            specs.append((int(units), str(activation)))
-    if not specs:
+            units = int(units)
+            activation = str(activation)
+            if units <= 0:
+                raise TensorError("Dense units must be positive")
+            built.append(Dense(current, units, activation, rng=rng, dtype=dtype))
+            current = units
+    if not built:
         raise TensorError("model has no layers")
-    rng = RNG(seed)
-    dense: list[Dense] = []
-    current = input_shape[-1]
-    for i, (units, activation) in enumerate(specs):
-        if units <= 0:
-            raise TensorError("Dense units must be positive")
-        dense.append(Dense(current, units, activation, rng=rng, dtype=dtype))
-        current = units
     if current != output_shape[-1]:
         raise TensorError(
             f"model stack produces {current} outputs but the declared output last dimension is {output_shape[-1]}"
         )
-    network = Sequential(dense, input_dim=input_shape[-1])
+    network = Sequential(built, input_dim=input_shape[-1])
     return Model(network, input_shape, output_shape)
 
 
