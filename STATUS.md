@@ -12,7 +12,7 @@ metadata and the prepared submission are not upstream acceptance.
 
 ```bash
 python -m unittest discover -s tests -q
-# Ran 641 tests in 56.719s
+# Ran 644 tests in ~57s
 # OK (skipped=2)
 ```
 
@@ -46,6 +46,7 @@ Focused development runs also passed:
 | self-host bytecode differential suite | 3/3: 9-file core + 3 linguist bytecode-digest corpus (hello/tour/native/xor/spiral + fixtures), 8 builtin bytecode checks, tokenizer pending |
 | self-host optimizer differential suite | 1/1: 16-file IR corpus lenient digest parity (Python vs PEACOCK 5-pass: const-fold/branch-fold/unreachable/peephole/DCE), 6 builtin optimizer checks |
 | self-host VM differential suite | 1/1: 17-file lenient VM-digest parity (Python VM vs PEACOCK VM 7-check kernel: checked arithmetic + CALL recursion fact(5)=120 + FINALLY supersession + STRUCT/LIST ops (MAKE_LIST/LEN/INDEX/STRUCT_NEW/FIELD), slot/jump/RET/TRY/FINALLY, call-depth/host-grant budgets + 9 checks + native/pipeline stubs), 10 selfhost kernels, 17 example programs |
+| bootstrap fixed-point | 3/3: Python fixed-point (10 selfhost programs → .बीज deterministic, 53k instr, artifact round-trip SHA-256), PEACOCK pipeline lenient digest (via VM), `peacock.tools.bootstrap --write` emits `build/bootstrap/*.बीज` |
 | native AOT | 8/8: real builds, deterministic C, VM-identical output, recoverable ABI faults and zero live allocations after success/fault runs |
 | LLM + compute backends | 18 tests, 1 OpenCL skip: real loopback provider, schema/grant/budget/redirect checks, CPU and non-square matmul |
 | HTTP server/finalization/LLM/GPU combined regression | 31 tests, 1 OpenCL skip after the final server hardening |

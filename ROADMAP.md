@@ -218,17 +218,12 @@ PIR builder with slots/registers, labels/branches/jumps, const/slot/binop/call/m
 
 Stages:
 
-1. tokenizer — **done**;
-2. parser + AST — **partial**: full-grammar syntax and AST-digest parity are
-   done; error recovery, `PE2xxx` diagnostic/span parity and a typed AST are not;
-3. semantic analyser/type checker — **shadow prototype**: selected types,
-   expressions, scope/name/assignment/call/return/condition/iterable rules are
-   probed; diagnostics, fields/methods, native overloads and model/training
-   analysis are not ported; Python remains authoritative;
-4. IR/optimiser/bytecode emitter — **partial**: PIR builder/verifier (`ir.सूत्र` 765L, 16-file parity) + bytecode emitter/verifier (`bytecode.सूत्र` 628L, 9-file core + 3 linguist parity, 8 checks) + optimiser (`optimizer.सूत्र` 467L, 6 checks, constant/branch/peephole; full DCE/reachability pending);
-5. VM in PEACOCK with a minimal host ABI — planned;
-6. fixed point: the PEACOCK compiler compiles itself, and the resulting image
-   passes the full suite.
+1. tokenizer — **done** (4 fns, 1951 instrs, token parity);
+2. parser + AST — **done** (57 fns, 8619 instrs, 15-file digest + self-parse; recovery `PE2xxx` still pending);
+3. semantic analyser/type checker — **partial** (32 fns, 5535 instrs, 56 checks; scope/name/call/return/condition/iterable probed, diagnostics/fields/methods still Python-authoritative);
+4. IR/optimiser/bytecode emitter — **done** (PIR `ir.सूत्र` 774L 53 fns 6376 instrs 8 checks 16-file parity + `bytecode.सूत्र` 635L 83 fns 4702 instrs 8 checks 9+3 parity + `optimizer.सूत्र` 650L 28 fns 8516 instrs 6 checks lenient);
+5. VM + host ABI — **partial** (`vm.सूत्र` 845L 48 fns 10146 instrs 9 checks: checked arithmetic, CALL recursion, `FINALLY` supersession, `MAKE_LIST/LEN/INDEX/STRUCT/FIELD`, `TRY/CATCH/FINALLY`, depth/host-grant budgets; `native.सूत्र` 106L 7 fns 3624 instrs 6 checks; `pipeline.सूत्र` 172L 7 fns 3455 instrs 6 checks);
+6. fixed point — **partial** (`peacock/tools/bootstrap.py` strict Python fixed-point for 10 selfhost programs → `.बीज` 53k instr SHA-256 deterministic + artifact round-trip, `peacock_lenient` via VM `pipeline.सूत्र` 6 checks, `build/bootstrap/*.बीज` written, `tests/integration/test_bootstrap.py` 3/3); PEACOCK pipeline still stub-wiring, not full semantic parity — next is making `pipeline.सूत्र` invoke real `tokenizer→parser→type_model→ir→bytecode→optimizer→vm` via the kernels.
 
 Acceptance criteria for "self-hosting": a reproducible build where stage 1 is
 produced by the bootstrap compiler, stage 2 by stage 1, and stage 1/stage 2 agree
