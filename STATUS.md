@@ -106,16 +106,16 @@ byte-for-byte. Android/iOS were not built.
   port query and host cleanup. Real Sanskrit POST/201 and raw-socket negative
   tests pass.
 * **Grammar:** attributed offline corpus of all 3,983 Aṣṭādhyāyī sūtra texts,
-  inheritance/anuvṛtti display, generic Māheśvara pratyāhāra expansion, 16
+  inheritance/anuvṛtti display, generic Māheśvara pratyāhāra expansion, 20
   executable sandhi rules with varṇa/paribhāṣā/adhikāra ordering and derivation
-  traces, plus śabda/dhātu/samāsa/kāraka/validator (`6.1.77`, `6.1.78`, `6.1.87`,
+  traces, plus śabda (12 paradigms)/dhātu (12 dhātus)/samāsa (17)/kāraka (9 sentences)/validator and 10 vyutpatti prakriyās (`6.1.77`, `6.1.78`, `6.1.87`,
   `6.1.88`, `6.1.101`, `6.1.109`, `6.1.113`, `8.2.39`, `8.3.15`, `8.3.23`, `8.3.34`,
-  `8.4.40` etc.; 26 executable transforms).
+  `8.4.40` etc.; 46 executable transforms).
 * **Self-host components:** PEACOCK-written tokenizer, full-grammar parser
   with AST-digest parity, deterministic `formatter.सूत्र` (brace-depth,
   operator spacing, idempotent) and user-module system (`उपयोग <file>;`
   file imports with recursive merge, qualified `module.func`, `रूपेण` aliases for file and builtin namespaces, circular detection, 233 compiler tests);
-  experimental VM-executed semantic-shadow probes, `selfhost/ir.सूत्र` PIR builder (765 lines, 8 checks, 16-file parity) and `selfhost/bytecode.सूत्र` bytecode emitter (628 lines, 8 checks, 9-file core + 3 linguist parity) and `selfhost/optimizer.सूत्र` optimiser (467 lines, 6 checks, constant/branch/peephole — `parser.सूत्र`/`type_model.सूत्र` exceed 256-slot VM limit). Python remains authoritative
+  experimental VM-executed semantic-shadow probes, `selfhost/ir.सूत्र` PIR builder (765 lines, 8 checks, 16-file parity) and `selfhost/bytecode.सूत्र` bytecode emitter (628 lines, 8 checks, 9-file core + 3 linguist parity) and `selfhost/optimizer.सूत्र` optimiser (650 lines, 6 checks, constant/branch/unreachable/peephole/DCE with 5-pass pipeline — `parser.सूत्र`/`type_model.सूत्र` exceed 256-slot VM limit). Python remains authoritative
   for production semantics, IR, bytecode and VM.
 * **Applications/tooling:** twelve-route PEACOCK-authored static website,
   examples, CLI compiler/VM/native/grammar/audit/bench/fuzz/test commands,
@@ -143,7 +143,7 @@ byte-for-byte. Android/iOS were not built.
   TLS, multi-tenant isolation, chunked requests, pipelining, binary bodies or
   concurrent request dispatch. Loopback is the CLI default; exposure needs OS
   isolation and a hardened proxy.
-* **Grammar:** 3,983 searchable texts are not 3,983 executable transformations.
+* **Grammar:** 3,983 searchable texts; 46 executable transformations (20 sandhi + 26 paribhāṣā/kāraka/śabda/dhātu/samāsa). Executable coverage is measured separately from textual corpus.
   Declension, conjugation, samāsa, kāraka, ordered rule interaction and complete
   executable Pāṇini remain open. Connected-literature entries are a catalogue,
   not bundled full texts.

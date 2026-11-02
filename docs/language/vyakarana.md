@@ -1,6 +1,6 @@
 # Native व्याकरण tools — executable Aṣṭādhyāyī
 
-The `व्याकरण` namespace and `peacock/vyakarana/` package provide a **complete offline corpus and executable Pāṇinian derivation engine**. All 3,983 sūtra texts are vendored, 26 sūtra transformations are directly executable (16 sandhi + varṇa/paribhāṣā), and 3983 rules are ordered with conflict resolution, adhikāra tracking and derivation logging. No network, no Python/JS injection.
+The `व्याकरण` namespace and `peacock/vyakarana/` package provide a **complete offline corpus and executable Pāṇinian derivation engine**. All 3,983 sūtra texts are vendored, 46 sūtra transformations are directly executable (20 sandhi + varṇa/paribhāṣā/kāraka/samāsa/śabda/dhātu), and 3983 rules are ordered with conflict resolution, adhikāra tracking and derivation logging. No network, no Python/JS injection.
 
 ## Complete sūtra text corpus
 
@@ -16,7 +16,7 @@ Source: [`ashtadhyayi-com/data`](https://github.com/ashtadhyayi-com/data) commit
 | `व्याकरण.अनुवृत्ति(परिचय)` | inherited terms |
 | `व्याकरण.अधिकारविवरण(परिचय)` | adhikāra chain |
 | `व्याकरण.साहित्य()` | connected works (local vs catalogue-only) |
-| `व्याकरण.आच्छादन()` | number of directly executable sandhi rules (16) |
+| `व्याकरण.आच्छादन()` | number of directly executable sandhi rules (20) |
 | `व्याकरण.सूत्रविवरण(परिचय)` | full sutra_engine detail (kind, adhikāra, anuvṛtti, domain) |
 | `व्याकरण.नियमप्रयोग(प्रवेश, नियमाः)` | ordered derivation trace with conflict log |
 | `व्याकरण.अधिकारविस्तार(पद)` | all sūtras under an adhikāra |
@@ -27,7 +27,7 @@ Source: [`ashtadhyayi-com/data`](https://github.com/ashtadhyayi-com/data) commit
 
 - **3983 ordered rules** — numeric ID order with section-aware tripādī vs sapāda domains.
 - **5 paribhāṣā**: `1.4.2` विप्रतिषेधे परं कार्यम् (conflict → later wins), `1.4.1` उत्सर्गापवाद, `1.1.66` तस्मिन्निति निर्दिष्टे पूर्वस्य, `1.1.11 ईदूदेद्द्विवचनं प्रगृह्यम्`, plus asiddha.
-- **Executive types**: 26 `executable_transformations` (sandhi/varṇa/paribhāṣā) wired to `EXECUTABLE_RULE_IDS`.
+- **Executive types**: 46 `executable_transformations` (sandhi/varṇa/paribhāṣā/kāraka/samāsa/śabda/dhātu) wired to `EXECUTABLE_RULE_IDS`.
 - **Derivation tracking**: `DerivationResult` logs per-rule step text, conflicts array, `trace_text()`.
 - CLI: `peacock व्याकरण सूत्रविवरण 6.1.101`, `नियमप्रयोग राम+इन्द्रः 6.1.87,6.1.101`.
 
@@ -35,7 +35,7 @@ Source: [`ashtadhyayi-com/data`](https://github.com/ashtadhyayi-com/data) commit
 
 `peacock/vyakarana/varna.py` — 42 varṇas classified as `अच्/हल्`, `अल्`, `ह्रस्व/दीर्घ/प्लुत`, `उदात्त/अनुदात्त/स्वरित`, `स्थान` (kaṇṭhya etc.), `करण`, `घोष/अघोष`. CLI: `वर्णभेद अ` → `अच्`. Exposed as `व्याकरण.वर्णभेद(वर्ण)`.
 
-## Executable sandhi — 16 rules
+## Executable sandhi — 20 rules
 
 `व्याकरण.संधि(वाम, दक्षिण)` with explicit boundary, virāma/visarga/anusvāra handling, viccheda validation.
 
@@ -62,7 +62,7 @@ Unsupported/ambiguous boundaries raise `SandhiError` — no invented forms. Inve
 
 ## Śabda — declension
 
-`peacock/vyakarana/shabda.py` — 8 vibhaktis × 3 vacanas, a-kāra/i-kāra/u-kāra paradigms, `सुँ`-lopa, ru→visarga.
+`peacock/vyakarana/shabda.py` — 12 paradigmas (अ/आ/इ/ई/उ/ऋ/न/च + सर्व/अस्मद्/युष्मद्), 8 vibhaktis × 3 vacanas = 24 forms each, `सुँ`-lopa, ru→visarga, णत्व, जश्त्व.
 
 | Native | Example |
 |---|---|
@@ -74,7 +74,7 @@ CLI: `विभक्तिरूप राम प्रथमा एकवच�
 
 ## Dhātu — conjugation
 
-`peacock/vyakarana/dhatu.py` — ~200 dhātus with gaṇa/artha, laṭ/lṛṭ/laṅ/luṅ/luṭ tables, puruṣa-vacana, tin-anta analysis.
+`peacock/vyakarana/dhatu.py` — 12 dhātus (भू/गम्/पठ्/कृ/अस्/दृश्/स्था/पच्/लिख्/नम्/सेव्/दा) with gaṇa/artha, laṭ/lṛṭ/laṅ/luṅ/luṭ tables, puruṣa-vacana, tin-anta analysis.
 
 | Native | Example |
 |---|---|
@@ -87,7 +87,7 @@ CLI: `धातुरूप भू लट् प्रथम एकवचनम�
 
 ## Samāsa
 
-`peacock/vyakarana/samasa.py` — tatpuruṣa, bahuvrīhi, dvandva, avyayībhāva with vigraha.
+`peacock/vyakarana/samasa.py` — 17 compounds: tatpuruṣa, karmadhāraya/dvigu, bahuvrīhi, dvandva, avyayībhāva with vigraha and sūtra citations (2.1.5–2.2.29).
 
 | Native | Example |
 |---|---|
@@ -99,7 +99,7 @@ CLI: `समास राजपुरुषः`, `विग्रह नील�
 
 ## Kāraka
 
-`peacock/vyakarana/karaka.py` — 6 kārakas + adhikaraṇa/sambandha; `kartā/karman/karaṇa/sampradāna/apādāna/adhikaraṇa` with sūtra refs (`1.4.54`, `1.4.49` etc.), sentence-level tagging.
+`peacock/vyakarana/karaka.py` — 6 kārakas + adhikaraṇa/sambandha; 9 example sentences with `kartā/karman/karaṇa/sampradāna/apādāna/adhikaraṇa` and sūtra refs (`1.4.54`, `1.4.49` etc.), sentence-level tagging and heuristic fallback.
 
 | Native | Example |
 |---|---|
@@ -111,7 +111,7 @@ CLI: `कारक "रामः ग्रामं गच्छति"`, `क�
 
 ## Vyutpatti & prakṛti-pratyaya
 
-`peacock/vyakarana/derivation.py` — traces `prakṛti + pratyaya → siddha`, it-saṃjñā, anubandha-lopa, siddha validation.
+`peacock/vyakarana/derivation.py` — 10 hand-verified prakriyās (रामः/रामेण/गच्छति/भवति/महापुरुषः/राजपुरुषः/नीलकमलम्/रामस्य/गच्छन्ति/विद्यालयः) tracing `prakṛti + pratyaya → siddha`, it-saṃjñā, anubandha-lopa, guṇa/vṛddhi/ṇatva/jaśtva.
 
 | Native | Example |
 |---|---|
@@ -170,7 +170,7 @@ Examples:
 
 Literature catalogue (Kāśikā, Mahābhāṣya, Siddhānta-kaumudī, Paribhāṣenduśekhara, Vākyapadīya, Dhātu/Gaṇa/Uṇādi/Liṅgānuśāsana/Śikṣā/Tarkasaṅgraha) links upstream — **catalogue only**, not vendored.
 
-**Executable**: all 3,983 sūtra texts present; 16 sandhi rules + 10 paribhāṣā/varṇa transforms executable (26 `executable_transformations`); śabda/dhātu/samāsa/kāraka/derivation/validator fully executable with derivation tracing and validation. Remaining sūtras are texts with structured metadata (kind/adhikāra/anuvṛtti/domain).
+**Executable**: all 3,983 sūtra texts present; 20 sandhi rules + 26 paribhāṣā/varṇa/kāraka/samāsa/śabda/dhātu transforms executable (46 `executable_transformations`); śabda (12 paradigms)/dhātu (12 dhātus)/samāsa (17)/kāraka (9 sentences)/derivation (10)/validator fully executable with derivation tracing and validation. Remaining sūtras are texts with structured metadata (kind/adhikāra/anuvṛtti/domain).
 
 ## Zero-budget, offline
 
