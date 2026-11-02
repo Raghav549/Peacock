@@ -12,7 +12,7 @@ metadata and the prepared submission are not upstream acceptance.
 
 ```bash
 python -m unittest discover -s tests -q
-# Ran 633 tests in 47.281s
+# Ran 636 tests in 49.513s
 # OK (skipped=2)
 ```
 
@@ -126,8 +126,7 @@ byte-for-byte. Android/iOS were not built.
   and model declarations are not silently
   compiled. Embedded C state is currently process-global, not thread-safe or
   reentrant; the ABI is not stable across versions.
-* **Language:** no user-defined modules/files, generics, closures, enums/match,
-  traits, first-class functions, general concurrency or async/await.
+* **Language:** user modules are file-based `उपयोग` with qualified `module.func` and `रूपेण` aliases (flat+qualified merge, no visibility control or package versioning); generics, closures, enums/match, traits, first-class functions, general concurrency and async/await remain unimplemented.
 * **LLM agents:** bounded iteration over host-registered tools, not AGI,
   unrestricted autonomy or a bundled model. No external hosted-model quality
   evaluation was performed. Tool handlers are cooperative and need their own

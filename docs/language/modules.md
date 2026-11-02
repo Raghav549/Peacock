@@ -45,7 +45,7 @@ examples/modules/
 
 Both forms work:
 
-```peacock
+```text
 उपयोग सहायक
 कार्य मुख्य() -> एकक {
     वर्ग(५);           // unqualified (flat merge)
@@ -58,7 +58,7 @@ Both forms work:
 
 `रूपेण` introduces a local alias; only the alias is visible:
 
-```peacock
+```text
 उपयोग गणित रूपेण g
 उपयोग सहायक रूपेण S
 
