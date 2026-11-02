@@ -633,17 +633,37 @@ def build_ir(program: TypedProgram, source: str = "", source_path: str = "<sourc
                     {"type": "layernorm", "normalized_dim": layer.normalized_dim, "eps": layer.eps}
                 )
             elif layer.kind == "Attention":
+                entry = {
+                    "type": "attention",
+                    "input_dim": layer.input_dim,
+                    "d_model": layer.d_model,
+                    "num_heads": layer.num_heads,
+                }
+                if layer.is_causal:
+                    entry["is_causal"] = True
+                layers.append(entry)
+            elif layer.kind == "Transformer":
+                entry: dict = {
+                    "type": "transformer",
+                    "d_model": layer.d_model,
+                    "num_heads": layer.num_heads,
+                }
+                if layer.d_ff is not None:
+                    entry["d_ff"] = layer.d_ff
+                layers.append(entry)
+            elif layer.kind == "CrossAttention":
                 layers.append(
                     {
-                        "type": "attention",
+                        "type": "cross_attention",
                         "input_dim": layer.input_dim,
+                        "context_dim": layer.context_dim,
                         "d_model": layer.d_model,
                         "num_heads": layer.num_heads,
                     }
                 )
-            elif layer.kind == "Transformer":
-                entry: dict = {
-                    "type": "transformer",
+            elif layer.kind == "Decoder":
+                entry = {
+                    "type": "decoder",
                     "d_model": layer.d_model,
                     "num_heads": layer.num_heads,
                 }

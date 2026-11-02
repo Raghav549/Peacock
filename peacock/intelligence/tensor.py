@@ -1054,8 +1054,22 @@ def _transpose_last2(t: Tensor) -> Tensor:
     return transpose(t, axes)
 
 
+def causal_mask(seq_q: int, seq_k: int, dtype: str = "Float32") -> Tensor:
+    """Create a causal (lower-triangular) mask: 1 where allowed, 0 where masked (future)."""
+    data = [0.0] * (seq_q * seq_k)
+    for i in range(seq_q):
+        for j in range(seq_k):
+            data[i * seq_k + j] = 1.0 if j <= i else 0.0
+    return Tensor(data, (seq_q, seq_k), dtype)
+
+
 def scaled_dot_product_attention(
-    q: Tensor, k: Tensor, v: Tensor, mask: Tensor | None = None, scale: float | None = None
+    q: Tensor,
+    k: Tensor,
+    v: Tensor,
+    mask: Tensor | None = None,
+    scale: float | None = None,
+    is_causal: bool = False,
 ) -> Tensor:
     """
     Scaled dot-product attention: Attention(Q,K,V) = softmax(Q K^T / sqrt(d_k)) V
@@ -1064,6 +1078,7 @@ def scaled_dot_product_attention(
     K: (..., seq_k, d_k)
     V: (..., seq_k, d_v)
     mask: optional broadcastable to (..., seq_q, seq_k) — 0 entries are masked (set to -1e9)
+    is_causal: if True, apply lower-triangular causal mask (autoregressive)
     scale: optional explicit scale; defaults to 1/sqrt(d_k)
     Returns: (..., seq_q, d_v)
     """
@@ -1093,6 +1108,48 @@ def scaled_dot_product_attention(
         # multiply by scalar via broadcast
         scale_t = Tensor.full(scores.shape, scale, dtype=scores.dtype)
         scores = mul(scores, scale_t)
+    # handle causal mask: combine with provided mask or create standalone
+    if is_causal:
+        seq_q = q.shape[-2]
+        seq_k = k.shape[-2]
+        # Build causal mask broadcast to scores shape: 1 where j<=i else 0, tiled over leading dims
+        # scores shape is (..., seq_q, seq_k); create mask of same shape
+        causal_data: list[float] = []
+        # leading batch size
+        outer = scores.size // (seq_q * seq_k) if seq_q * seq_k > 0 else 1
+        # Generate pattern for one (seq_q, seq_k) tile
+        tile = [1.0 if j <= i else 0.0 for i in range(seq_q) for j in range(seq_k)]
+        for _ in range(outer):
+            causal_data.extend(tile)
+        cm_full = Tensor(causal_data, scores.shape, scores.dtype)
+        if mask is None:
+            mask = cm_full
+        else:
+            mask = ensure_tensor(mask)
+            # Broadcast provided mask to scores shape if needed, then multiply
+            if mask.shape != scores.shape:
+                try:
+                    # Use broadcasting via Tensor ops: expand mask to scores shape
+                    # Fallback: manually broadcast if mask has fewer dims
+                    # For now handle simple case: mask is (seq_q, seq_k) or (batch, seq_q, seq_k)
+                    # Try to broadcast by tiling
+                    from peacock.intelligence.tensor import _broadcast_shape as _bs
+                    _bs(mask.shape, scores.shape)
+                    # Simple broadcast: if mask is (seq_q, seq_k), tile over outer
+                    if mask.shape == (seq_q, seq_k):
+                        m_data = []
+                        for _ in range(outer):
+                            m_data.extend(mask.data)
+                        mask = Tensor(m_data, scores.shape, mask.dtype)
+                    else:
+                        # Attempt generic broadcast via elementwise trick: create full mask via where logic
+                        # Fallback to raising with hint
+                        raise TensorError(f"cannot combine causal mask with mask shape {mask.shape}")
+                except TensorError:
+                    raise
+            # Now both same shape: multiply
+            combined = [1.0 if (m and c) else 0.0 for m, c in zip(mask.data, cm_full.data)]
+            mask = Tensor(combined, scores.shape, mask.dtype)
     if mask is not None:
         mask = ensure_tensor(mask)
         # mask should be broadcastable to scores; masked positions (0) set to -1e9

@@ -333,7 +333,26 @@ def cmd_run(argv: list[str]) -> int:
     except PeacockError as exc:
         if capture is not None and capture.getvalue():
             sys.stderr.write(capture.getvalue())
-        print(format_error(exc), file=sys.stderr)
+        msg = format_error(exc)
+        print(msg, file=sys.stderr)
+        # Helpful hint for missing capability grants (PE4001)
+        if "PE4001" in msg or "host has not granted" in msg:
+            # Suggest appropriate grant; compute is common for AI
+            hint_caps = []
+            for fn in image.get("functions", {}).values():
+                for cap in fn.get("caps", []):
+                    if cap not in hint_caps:
+                        hint_caps.append(cap)
+            if image.get("models") or image.get("trainings"):
+                if "compute" not in hint_caps:
+                    hint_caps.append("compute")
+            if not hint_caps:
+                hint_caps = ["गणना"] if "गणना" not in str(msg) else []
+            if hint_caps:
+                # Show both Sanskrit and internal for clarity
+                from peacock.sanskrit import surface as _surf
+                surf_hint = ", ".join(_surf(c) for c in hint_caps)
+                print(f"hint: add --grant {surf_hint} (or {','.join(hint_caps)}) to allow this capability", file=sys.stderr)
         exit_code = EXIT_RUNTIME
     except ArtifactFormatError as exc:
         print(f"invalid program image: {exc}", file=sys.stderr)

@@ -195,6 +195,7 @@ class MultiHeadAttention(Module):
         num_heads: int,
         dtype: str = "Float32",
         seed: int = 0,
+        is_causal: bool = False,
     ):
         if not isinstance(input_dim, int) or input_dim <= 0:
             raise TensorError("MultiHeadAttention input_dim must be positive")
@@ -211,6 +212,7 @@ class MultiHeadAttention(Module):
         self.num_heads = num_heads
         self.head_dim = d_model // num_heads
         self.dtype = dtype
+        self.is_causal = bool(is_causal)
         rng = RNG(seed)
         # Xavier uniform for Q, K, V, O
         def _xavier(in_dim: int, out_dim: int) -> list[float]:
@@ -241,14 +243,13 @@ class MultiHeadAttention(Module):
         batch, seq_len = x_t.shape[0], x_t.shape[1]
         return reshape(x_t, (batch, seq_len, self.d_model))
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor, mask: Tensor | None = None, is_causal: bool | None = None) -> Tensor:
         if not isinstance(x, Tensor):
             raise TensorError("MultiHeadAttention expects a Tensor input")
         if x.dtype not in ("Float32", "Float64"):
             raise TensorError("MultiHeadAttention expects a floating-point input tensor")
         # Handle rank 2 (seq_len, input_dim) as batch=1
         squeeze_batch = False
-        orig_rank = x.rank
         if x.rank == 2:
             if x.shape[1] != self.input_dim:
                 raise TensorError(f"MultiHeadAttention expects last dim {self.input_dim}, got {x.shape[1]}")
@@ -261,13 +262,9 @@ class MultiHeadAttention(Module):
             raise TensorError("MultiHeadAttention expects rank-2 (seq_len, input_dim) or rank-3 (batch, seq_len, input_dim)")
         batch, seq_len = x.shape[0], x.shape[1]
         # Linear projections: (batch, seq_len, input_dim) @ (input_dim, d_model) -> (batch, seq_len, d_model)
-        # Use Dense-style logic: flatten batch*seq, matmul, reshape
         def _linear(inp: Tensor, w: Tensor, b: Tensor) -> Tensor:
             flat = reshape(inp, (batch * seq_len, self.input_dim))
             proj = matmul(flat, w)  # (B*S, d_model)
-            # add bias via broadcast: reshape bias to (1, d_model) and add
-            # Use add with broadcasting - need to ensure bias broadcasts correctly
-            # Expand bias to (B*S, d_model) by adding
             proj = add(proj, b)  # b is (d_model,) broadcasts to (B*S, d_model)
             return reshape(proj, (batch, seq_len, self.d_model))
 
@@ -278,8 +275,10 @@ class MultiHeadAttention(Module):
         qh = self._split_heads(q)
         kh = self._split_heads(k)
         vh = self._split_heads(v)
+        if is_causal is None:
+            is_causal = self.is_causal
         # Attention: (batch, heads, seq, head_dim) -> (batch, heads, seq, head_dim)
-        attn_out = scaled_dot_product_attention(qh, kh, vh)
+        attn_out = scaled_dot_product_attention(qh, kh, vh, mask=mask, is_causal=is_causal)
         # Combine heads
         combined = self._combine_heads(attn_out)
         # Output projection
@@ -376,6 +375,161 @@ class TransformerBlock(Module):
         return f"TransformerBlock(d_model={self.d_model}, heads={self.num_heads}, d_ff={self.d_ff})"
 
 
+class CrossAttention(Module):
+    """Cross-attention: Q from decoder, K/V from encoder."""
+
+    def __init__(
+        self,
+        input_dim: int,
+        context_dim: int,
+        d_model: int,
+        num_heads: int,
+        dtype: str = "Float32",
+        seed: int = 0,
+    ):
+        if d_model % num_heads != 0:
+            raise TensorError(f"d_model {d_model} must be divisible by num_heads {num_heads}")
+        self.input_dim = input_dim
+        self.context_dim = context_dim
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.head_dim = d_model // num_heads
+        self.dtype = dtype
+        rng = RNG(seed)
+
+        def _xavier(in_dim: int, out_dim: int) -> list[float]:
+            limit = math.sqrt(6.0 / (in_dim + out_dim))
+            return [rng.uniform(-limit, limit) for _ in range(in_dim * out_dim)]
+
+        self.w_q = Tensor(_xavier(input_dim, d_model), (input_dim, d_model), dtype, requires_grad=True)
+        self.b_q = Tensor.zeros((d_model,), dtype, requires_grad=True)
+        self.w_k = Tensor(_xavier(context_dim, d_model), (context_dim, d_model), dtype, requires_grad=True)
+        self.b_k = Tensor.zeros((d_model,), dtype, requires_grad=True)
+        self.w_v = Tensor(_xavier(context_dim, d_model), (context_dim, d_model), dtype, requires_grad=True)
+        self.b_v = Tensor.zeros((d_model,), dtype, requires_grad=True)
+        self.w_o = Tensor(_xavier(d_model, d_model), (d_model, d_model), dtype, requires_grad=True)
+        self.b_o = Tensor.zeros((d_model,), dtype, requires_grad=True)
+
+    def _split_heads(self, x: Tensor) -> Tensor:
+        batch, seq_len = x.shape[0], x.shape[1]
+        x_4 = reshape(x, (batch, seq_len, self.num_heads, self.head_dim))
+        return transpose(x_4, (0, 2, 1, 3))
+
+    def _combine_heads(self, x: Tensor) -> Tensor:
+        x_t = transpose(x, (0, 2, 1, 3))
+        batch, seq_len = x_t.shape[0], x_t.shape[1]
+        return reshape(x_t, (batch, seq_len, self.d_model))
+
+    def forward(self, x: Tensor, context: Tensor) -> Tensor:
+        if x.shape[0] != context.shape[0]:
+            raise TensorError(f"CrossAttention batch mismatch: {x.shape[0]} vs {context.shape[0]}")
+        batch, seq_q = x.shape[0], x.shape[1]
+        seq_kv = context.shape[1]
+
+        def _linear(inp: Tensor, w: Tensor, b: Tensor, in_dim: int, seq: int) -> Tensor:
+            flat = reshape(inp, (batch * seq, in_dim))
+            proj = matmul(flat, w)
+            proj = add(proj, b)
+            return reshape(proj, (batch, seq, self.d_model))
+
+        q = _linear(x, self.w_q, self.b_q, self.input_dim, seq_q)
+        k = _linear(context, self.w_k, self.b_k, self.context_dim, seq_kv)
+        v = _linear(context, self.w_v, self.b_v, self.context_dim, seq_kv)
+        qh = self._split_heads(q)
+        kh = self._split_heads(k)
+        vh = self._split_heads(v)
+        attn_out = scaled_dot_product_attention(qh, kh, vh)
+        combined = self._combine_heads(attn_out)
+        flat_out = reshape(combined, (batch * seq_q, self.d_model))
+        proj = matmul(flat_out, self.w_o)
+        proj = add(proj, self.b_o)
+        return reshape(proj, (batch, seq_q, self.d_model))
+
+    def parameters(self) -> list[Tensor]:
+        return [self.w_q, self.b_q, self.w_k, self.b_k, self.w_v, self.b_v, self.w_o, self.b_o]
+
+    def named_parameters(self, prefix: str = "") -> list[tuple[str, Tensor]]:
+        p = f"{prefix}." if prefix else ""
+        return [
+            (f"{p}w_q", self.w_q),
+            (f"{p}b_q", self.b_q),
+            (f"{p}w_k", self.w_k),
+            (f"{p}b_k", self.b_k),
+            (f"{p}w_v", self.w_v),
+            (f"{p}b_v", self.b_v),
+            (f"{p}w_o", self.w_o),
+            (f"{p}b_o", self.b_o),
+        ]
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"CrossAttention(input_dim={self.input_dim}, context_dim={self.context_dim}, d_model={self.d_model}, heads={self.num_heads})"
+
+
+class DecoderBlock(Module):
+    """Transformer decoder block: masked self-attn -> cross-attn -> FFN, each with residual+norm."""
+
+    def __init__(
+        self,
+        d_model: int,
+        num_heads: int,
+        d_ff: int | None = None,
+        dtype: str = "Float32",
+        seed: int = 0,
+    ):
+        if d_model <= 0:
+            raise TensorError("DecoderBlock d_model must be positive")
+        d_ff = d_ff or 4 * d_model
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.d_ff = d_ff
+        self.dtype = dtype
+        self.self_attn = MultiHeadAttention(d_model, d_model, num_heads, dtype=dtype, seed=seed)
+        self.cross_attn = CrossAttention(d_model, d_model, d_model, num_heads, dtype=dtype, seed=seed + 10)
+        self.norm1 = LayerNorm(d_model, dtype=dtype)
+        self.norm2 = LayerNorm(d_model, dtype=dtype)
+        self.norm3 = LayerNorm(d_model, dtype=dtype)
+        self.ff1 = Dense(d_model, d_ff, activation="relu", seed=seed + 1, dtype=dtype)
+        self.ff2 = Dense(d_ff, d_model, activation="linear", seed=seed + 2, dtype=dtype)
+
+    def forward(self, x: Tensor, context: Tensor) -> Tensor:
+        from .tensor import add as t_add
+
+        # Masked self-attention
+        self_out = self.self_attn.forward(x, is_causal=True)
+        x = self.norm1.forward(t_add(x, self_out))
+        # Cross-attention to encoder
+        cross_out = self.cross_attn.forward(x, context)
+        x = self.norm2.forward(t_add(x, cross_out))
+        # Feed-forward
+        ff_out = self.ff2.forward(self.ff1.forward(x))
+        x = self.norm3.forward(t_add(x, ff_out))
+        return x
+
+    def parameters(self) -> list[Tensor]:
+        out: list[Tensor] = []
+        for m in [self.self_attn, self.cross_attn, self.norm1, self.norm2, self.norm3, self.ff1, self.ff2]:
+            out.extend(m.parameters())
+        return out
+
+    def named_parameters(self, prefix: str = "") -> list[tuple[str, Tensor]]:
+        out: list[tuple[str, Tensor]] = []
+        for name, mod in [
+            ("self_attn", self.self_attn),
+            ("cross_attn", self.cross_attn),
+            ("norm1", self.norm1),
+            ("norm2", self.norm2),
+            ("norm3", self.norm3),
+            ("ff1", self.ff1),
+            ("ff2", self.ff2),
+        ]:
+            base = f"{prefix}.{name}" if prefix else name
+            out.extend(mod.named_parameters(base))
+        return out
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"DecoderBlock(d_model={self.d_model}, heads={self.num_heads}, d_ff={self.d_ff})"
+
+
 class Sequential(Module):
     def __init__(self, layers: Sequence[Module], input_dim: int | None = None):
         if not layers:
@@ -391,6 +545,10 @@ class Sequential(Module):
                 return m.d_model
             if isinstance(m, TransformerBlock):
                 return m.d_model
+            if isinstance(m, DecoderBlock):
+                return m.d_model
+            if isinstance(m, CrossAttention):
+                return m.d_model
             raise TensorError(f"unknown layer type {type(m).__name__}")
 
         def _in_dim(m: Module) -> int:
@@ -402,6 +560,10 @@ class Sequential(Module):
                 return m.input_dim
             if isinstance(m, TransformerBlock):
                 return m.d_model
+            if isinstance(m, DecoderBlock):
+                return m.d_model
+            if isinstance(m, CrossAttention):
+                return m.input_dim
             raise TensorError(f"unknown layer type {type(m).__name__}")
 
         for i in range(1, len(self.layers)):
@@ -513,14 +675,15 @@ class Model:
             elif isinstance(layer, LayerNorm):
                 layers.append({"type": "layernorm", "normalized_dim": layer.normalized_dim, "eps": layer.eps})
             elif isinstance(layer, MultiHeadAttention):
-                layers.append(
-                    {
-                        "type": "attention",
-                        "input_dim": layer.input_dim,
-                        "d_model": layer.d_model,
-                        "num_heads": layer.num_heads,
-                    }
-                )
+                entry = {
+                    "type": "attention",
+                    "input_dim": layer.input_dim,
+                    "d_model": layer.d_model,
+                    "num_heads": layer.num_heads,
+                }
+                if layer.is_causal:
+                    entry["is_causal"] = True
+                layers.append(entry)
             elif isinstance(layer, TransformerBlock):
                 layers.append(
                     {
@@ -528,6 +691,25 @@ class Model:
                         "d_model": layer.d_model,
                         "num_heads": layer.num_heads,
                         "d_ff": layer.d_ff,
+                    }
+                )
+            elif isinstance(layer, DecoderBlock):
+                layers.append(
+                    {
+                        "type": "decoder",
+                        "d_model": layer.d_model,
+                        "num_heads": layer.num_heads,
+                        "d_ff": layer.d_ff,
+                    }
+                )
+            elif isinstance(layer, CrossAttention):
+                layers.append(
+                    {
+                        "type": "cross_attention",
+                        "input_dim": layer.input_dim,
+                        "context_dim": layer.context_dim,
+                        "d_model": layer.d_model,
+                        "num_heads": layer.num_heads,
                     }
                 )
             else:
@@ -556,8 +738,9 @@ def build_model(
     ``type``/``units``/``activation`` for dense, ``type: layernorm``
     with ``normalized_dim``/``eps`` for LayerNorm, ``type: attention``
     with ``input_dim``/``d_model``/``num_heads`` for MultiHeadAttention,
-    or ``type: transformer`` with ``d_model``/``num_heads``/``d_ff`` for
-    TransformerBlock.
+    ``type: transformer`` with ``d_model``/``num_heads``/``d_ff`` for
+    TransformerBlock, ``type: decoder`` for DecoderBlock, or
+    ``type: cross_attention`` for CrossAttention.
     """
     input_shape = tuple(int(d) for d in input_shape)
     output_shape = tuple(int(d) for d in output_shape)
@@ -579,9 +762,10 @@ def build_model(
                 inp = int(item.get("input_dim", current))
                 dm = int(item.get("d_model", item.get("units", inp)))
                 heads = int(item.get("num_heads", 1))
+                is_causal = bool(item.get("is_causal", item.get("causal", False)))
                 if inp != current:
                     raise TensorError(f"Attention expects {current} features, got {inp}")
-                built.append(MultiHeadAttention(inp, dm, heads, dtype=dtype, seed=rng.next_u64() % (1<<31)))
+                built.append(MultiHeadAttention(inp, dm, heads, dtype=dtype, seed=rng.next_u64() % (1<<31), is_causal=is_causal))
                 current = dm
             elif t == "transformer":
                 dm = int(item.get("d_model", current))
@@ -590,6 +774,23 @@ def build_model(
                 if dm != current:
                     raise TensorError(f"TransformerBlock expects {current} features, got {dm}")
                 built.append(TransformerBlock(dm, heads, d_ff=dff, dtype=dtype, seed=rng.next_u64() % (1<<31)))
+                current = dm
+            elif t == "decoder":
+                dm = int(item.get("d_model", current))
+                heads = int(item.get("num_heads", 1))
+                dff = int(item.get("d_ff", 4 * dm)) if "d_ff" in item else None
+                if dm != current:
+                    raise TensorError(f"DecoderBlock expects {current} features, got {dm}")
+                built.append(DecoderBlock(dm, heads, d_ff=dff, dtype=dtype, seed=rng.next_u64() % (1<<31)))
+                current = dm
+            elif t in ("cross_attention", "crossattention"):
+                inp = int(item.get("input_dim", current))
+                ctx = int(item.get("context_dim", inp))
+                dm = int(item.get("d_model", inp))
+                heads = int(item.get("num_heads", 1))
+                if inp != current:
+                    raise TensorError(f"CrossAttention expects {current} features, got {inp}")
+                built.append(CrossAttention(inp, ctx, dm, heads, dtype=dtype, seed=rng.next_u64() % (1<<31)))
                 current = dm
             else:  # dense
                 units = int(item["units"])

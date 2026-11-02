@@ -84,12 +84,21 @@ def disassemble(image: dict) -> str:
                             f"{surface('LayerNorm')}({entry.get('normalized_dim')})"
                         )
                     elif t == "attention":
+                        causal = ",causal" if entry.get("is_causal") else ""
                         parts.append(
-                            f"{surface('Attention')}({entry.get('d_model')},{entry.get('num_heads')})"
+                            f"{surface('Attention')}({entry.get('d_model')},{entry.get('num_heads')}{causal})"
                         )
                     elif t == "transformer":
                         parts.append(
                             f"{surface('Transformer')}({entry.get('d_model')},{entry.get('num_heads')})"
+                        )
+                    elif t == "decoder":
+                        parts.append(
+                            f"{surface('Decoder')}({entry.get('d_model')},{entry.get('num_heads')})"
+                        )
+                    elif t in ("cross_attention", "crossattention"):
+                        parts.append(
+                            f"{surface('CrossAttention')}({entry.get('d_model')},{entry.get('num_heads')})"
                         )
                     else:
                         parts.append(

@@ -129,6 +129,8 @@ class ResolvedLayer:
     d_model: int | None = None
     num_heads: int | None = None
     d_ff: int | None = None
+    is_causal: bool | None = None
+    context_dim: int | None = None
 
 
 @dataclass
@@ -605,6 +607,21 @@ class SemanticAnalyzer:
                         )
                         ok = False
                     # preserves dimension
+                elif layer.kind == "CrossAttention":
+                    if layer.input_dim is None:
+                        layer.input_dim = current
+                    if layer.input_dim != current:
+                        self.diag.error("PE3009", f"तिर्यगेकाग्रता निवेशविस्तार {layer.input_dim} != {current}", decl.span)
+                        ok = False
+                    else:
+                        current = layer.d_model if layer.d_model else current
+                elif layer.kind == "Decoder":
+                    if layer.d_model != current:
+                        self.diag.error("PE3009", f"विसंकेतक प्रारूपविस्तार {layer.d_model} != {current}", decl.span)
+                        ok = False
+                    if layer.d_model % layer.num_heads != 0:
+                        self.diag.error("PE3009", f"विसंकेतक {layer.d_model} must be divisible by {layer.num_heads}", decl.span)
+                        ok = False
                 else:
                     current = layer.units
             if current is not None and outputs[0].shape and outputs[0].shape[-1] != current:
@@ -714,6 +731,7 @@ class SemanticAnalyzer:
             input_dim = None
             d_model = None
             num_heads = None
+            is_causal = False
             for arg in layer.args:
                 if arg.name in seen:
                     self.diag.error("PE3009", f"duplicate layer argument '{surface(arg.name)}'", arg.span)
@@ -740,18 +758,22 @@ class SemanticAnalyzer:
                     num_heads = arg.value.value
                     if num_heads <= 0:
                         self.diag.error("PE3009", "अवधान 'शीर्षसंख्या' must be positive", arg.span)
+                elif arg.name == "is_causal":
+                    if not isinstance(arg.value, BoolLit):
+                        self.diag.error("PE3009", "अवधान 'कारणबद्ध' must be सत्य/असत्य", arg.span)
+                        continue
+                    is_causal = bool(arg.value.value)
                 else:
                     self.diag.error(
                         "PE3009",
                         f"unknown अवधान argument '{surface(arg.name)}'",
                         arg.span,
-                        hint="supported arguments: निवेशविस्तार, प्रारूपविस्तार, शीर्षसंख्या",
+                        hint="supported arguments: निवेशविस्तार, प्रारूपविस्तार, शीर्षसंख्या, कारणबद्ध",
                     )
             if d_model is None or num_heads is None:
                 self.diag.error("PE3009", "अवधान layer requires 'प्रारूपविस्तार' and 'शीर्षसंख्या'", layer.span)
                 return None
-            # input_dim defaults to previous layer's output; validated later in _analyse_model, but set here if not provided
-            return ResolvedLayer("Attention", input_dim=input_dim, d_model=d_model, num_heads=num_heads)
+            return ResolvedLayer("Attention", input_dim=input_dim, d_model=d_model, num_heads=num_heads, is_causal=is_causal)
         elif layer.name == "Transformer":
             seen: set[str] = set()
             d_model = None
@@ -794,12 +816,80 @@ class SemanticAnalyzer:
                 self.diag.error("PE3009", "परिवर्तक layer requires 'प्रारूपविस्तार' and 'शीर्षसंख्या'", layer.span)
                 return None
             return ResolvedLayer("Transformer", d_model=d_model, num_heads=num_heads, d_ff=d_ff)
+        elif layer.name == "CrossAttention":
+            seen: set[str] = set()
+            input_dim = None
+            context_dim = None
+            d_model = None
+            num_heads = None
+            for arg in layer.args:
+                if arg.name in seen:
+                    self.diag.error("PE3009", f"duplicate layer argument '{surface(arg.name)}'", arg.span)
+                    continue
+                seen.add(arg.name)
+                if arg.name == "input_dim":
+                    if not isinstance(arg.value, IntLit):
+                        self.diag.error("PE3009", "तिर्यगेकाग्रता 'निवेशविस्तार' must be an integer literal", arg.span)
+                        continue
+                    input_dim = arg.value.value
+                elif arg.name == "context_dim":
+                    if not isinstance(arg.value, IntLit):
+                        self.diag.error("PE3009", "तिर्यगेकाग्रता 'प्रसङ्गविस्तार' must be an integer literal", arg.span)
+                        continue
+                    context_dim = arg.value.value
+                elif arg.name == "d_model":
+                    if not isinstance(arg.value, IntLit):
+                        self.diag.error("PE3009", "तिर्यगेकाग्रता 'प्रारूपविस्तार' must be an integer literal", arg.span)
+                        continue
+                    d_model = arg.value.value
+                elif arg.name == "num_heads":
+                    if not isinstance(arg.value, IntLit):
+                        self.diag.error("PE3009", "तिर्यगेकाग्रता 'शीर्षसंख्या' must be an integer literal", arg.span)
+                        continue
+                    num_heads = arg.value.value
+                else:
+                    self.diag.error("PE3009", f"unknown तिर्यगेकाग्रता argument '{surface(arg.name)}'", arg.span, hint="supported: निवेशविस्तार, प्रसङ्गविस्तार, प्रारूपविस्तार, शीर्षसंख्या")
+            if d_model is None or num_heads is None:
+                self.diag.error("PE3009", "तिर्यगेकाग्रता layer requires 'प्रारूपविस्तार' and 'शीर्षसंख्या'", layer.span)
+                return None
+            return ResolvedLayer("CrossAttention", input_dim=input_dim, context_dim=context_dim, d_model=d_model, num_heads=num_heads)
+        elif layer.name == "Decoder":
+            seen: set[str] = set()
+            d_model = None
+            num_heads = None
+            d_ff = None
+            for arg in layer.args:
+                if arg.name in seen:
+                    self.diag.error("PE3009", f"duplicate layer argument '{surface(arg.name)}'", arg.span)
+                    continue
+                seen.add(arg.name)
+                if arg.name == "d_model":
+                    if not isinstance(arg.value, IntLit):
+                        self.diag.error("PE3009", "विसंकेतक 'प्रारूपविस्तार' must be an integer literal", arg.span)
+                        continue
+                    d_model = arg.value.value
+                elif arg.name == "num_heads":
+                    if not isinstance(arg.value, IntLit):
+                        self.diag.error("PE3009", "विसंकेतक 'शीर्षसंख्या' must be an integer literal", arg.span)
+                        continue
+                    num_heads = arg.value.value
+                elif arg.name == "d_ff":
+                    if not isinstance(arg.value, IntLit):
+                        self.diag.error("PE3009", "विसंकेतक 'अग्रविस्तार' must be an integer literal", arg.span)
+                        continue
+                    d_ff = arg.value.value
+                else:
+                    self.diag.error("PE3009", f"unknown विसंकेतक argument '{surface(arg.name)}'", arg.span, hint="supported: प्रारूपविस्तार, शीर्षसंख्या, अग्रविस्तार")
+            if d_model is None or num_heads is None:
+                self.diag.error("PE3009", "विसंकेतक layer requires 'प्रारूपविस्तार' and 'शीर्षसंख्या'", layer.span)
+                return None
+            return ResolvedLayer("Decoder", d_model=d_model, num_heads=num_heads, d_ff=d_ff)
         else:
             self.diag.error(
                 "PE3009",
                 f"unknown layer '{surface(layer.name)}'",
                 layer.span,
-                hint="supported: सघन(एककानि: N, ...), सामान्यीकरण(सामान्यमान: N, ...), अवधान(प्रारूपविस्तार: N, शीर्षसंख्या: H), परिवर्तक(प्रारूपविस्तार: N, शीर्षसंख्या: H)",
+                hint="supported: सघन(एककानि: N, ...), सामान्यीकरण(सामान्यमान: N, ...), एकाग्रता(प्रारूपविस्तार: N, शीर्षसंख्या: H, कारणबद्ध: सत्य/असत्य), रूपान्तरक(...), तिर्यगेकाग्रता(...), विसंकेतक(...)",
             )
             return None
 
